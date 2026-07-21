@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "module": "hippocampus-memory",
+  "version": "3.8.6",
+  "capabilities": [
+    "episodic_encoding",
+    "episodic_retrieval",
+    "consolidation",
+    "decay",
+    "reflection"
+  ],
+  "inputs": [
+    {
+      "name": "workspace_events",
+      "type": "event",
+      "source": "workspace/events"
+    },
+    {
+      "name": "core_memory",
+      "type": "state_file",
+      "source": "memory/hippocampus-core.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "core_sync",
+      "type": "state_write",
+      "target": "memory/hippocampus-core.json"
+    },
+    {
+      "name": "event_log",
+      "type": "log_entry",
+      "target": "memory/hippocampus-events.jsonl"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "spawns_inference",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/test_hippocampus_load_core.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

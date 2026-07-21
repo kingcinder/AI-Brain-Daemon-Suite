@@ -1,0 +1,42 @@
+{
+  "proposal_id": "prop_8a7b9c1d",
+  "deployed_at": "2026-07-20T23:09:01Z",
+  "pre_snapshot": "20260720T230900Z-pre-deploy-prop_8a7b9c1d-264370",
+  "post_snapshot": "20260720T230900Z-post-deploy-prop_8a7b9c1d-264458",
+  "backup_dir": "/home/cody/.openclaw/workspace/memory/self-mod/backups/prop_8a7b9c1d",
+  "suite_root": "/home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE",
+  "apply": {
+    "ok": true,
+    "mode": "file_write",
+    "applied": [
+      "skills/cerebellum-memory/scripts/get-calibration.sh"
+    ],
+    "dry_run": false
+  },
+  "divergence_at_deploy": {
+    "baseline": "20260720T230900Z-pre-deploy-prop_8a7b9c1d-264370",
+    "goals_changed": false,
+    "inhibitions_changed": false,
+    "executive_load_divergent": false,
+    "executive_load_delta": 0.0,
+    "baseline_executive_load": 0.0,
+    "current_executive_load": 0.0,
+    "retest_required": false,
+    "rule": {
+      "goals_inhibitions": "any change -> fresh snapshot + re-test",
+      "executive_load": "abs diff > 0.12 -> re-test"
+    }
+  },
+  "monitor": {
+    "status": "rolled_back",
+    "breaches": []
+  },
+  "rolled_back": true,
+  "rollback_at": "2026-07-20T23:09:01Z",
+  "rollback_reason": "item2-prove-rollback",
+  "rollback_detail": {
+    "files_restored": 1,
+    "git_repo": false,
+    "snapshot_restored": true
+  }
+}

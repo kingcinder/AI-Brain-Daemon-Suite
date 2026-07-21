@@ -1,0 +1,11 @@
+{
+  "ok": false,
+  "accepted": [],
+  "rejected": [
+    {
+      "target": "skills/prefrontal-cortex-memory/scripts/decide.sh",
+      "reason": "immutable_core"
+    }
+  ],
+  "module": null
+}

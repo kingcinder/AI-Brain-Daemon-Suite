@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "module": "heartbeat-memory",
+  "version": "1.0.0",
+  "capabilities": [
+    "autonomous_initiative",
+    "circadian_scheduling",
+    "option_cooldowns"
+  ],
+  "inputs": [
+    {
+      "name": "heartbeat_state",
+      "type": "state_file",
+      "source": "memory/heartbeat-state.json",
+      "required": false
+    },
+    {
+      "name": "pfc_decision",
+      "type": "scalar",
+      "source": "prefrontal-cortex-memory/decide.sh",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "heartbeat_state",
+      "type": "state_write",
+      "target": "memory/heartbeat-state.json"
+    },
+    {
+      "name": "action",
+      "type": "event",
+      "target": "heartbeat/action"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "dependencies": [
+    {
+      "module": "prefrontal-cortex-memory",
+      "version_constraint": ">=1.0.0"
+    }
+  ],
+  "tests": [
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/test_heartbeat_get_state.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

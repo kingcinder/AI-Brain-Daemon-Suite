@@ -1,0 +1,76 @@
+=== PHASE1 ===
+  PASS: try-read blocked during write
+
+========================================
+Phase 1 harness: 27 passed, 0 failed
+========================================
+elapsed=6.15
+=== PHASE2 ===
+  PASS: KV 2049 rejected
+
+========================================
+Phase 2 harness: 19 passed, 0 failed
+========================================
+=== PHASE3 ===
+=== graduation-tracker ===
+  PASS: clean streak increments to 3
+  PASS: failure resets streak to 0 (full_review)
+  PASS: graduation state file persisted
+
+========================================
+Phase 3 harness: 21 passed, 0 failed
+========================================
+=== SKILL UNITS ===
+PASS test_acc_conflict_state.sh
+PASS test_acc_error_lessons.sh
+PASS test_amygdala_get_state.sh
+PASS test_basal_ganglia_habits.sh
+PASS test_cerebellum_calibration.sh
+PASS test_heartbeat_get_state.sh
+PASS test_hippocampus_load_core.sh
+PASS test_insula_state.sh
+PASS test_pfc_get_state.sh
+PASS test_social_relationships.sh
+PASS test_vta_get_drive.sh
+Skill unit tests: 11 passed, 0 failed
+=== MANIFESTS ===
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/prefrontal-cortex-memory/capability-manifest.json (module=prefrontal-cortex-memory v1.0.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/self-mod-runner/capability-manifest.json (module=self-mod-runner v0.1.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/social-memory/capability-manifest.json (module=social-memory v1.0.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/vta-memory/capability-manifest.json (module=vta-memory v1.2.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/core/executive/capability-manifest.json (module=executive-function v0.1.0)
+=== DAEMON CHECK ===
+social_encoding              spawn    *          0,3,6,9,12,15,18,21      52         (sessions:spawn task, 142 chars)
+cerebellum_refine            direct   *          0,8,16                   26         ok
+executive_goal_cycle         direct   *          1,9,17                   28         ok
+self_mod_monitor             direct   *          2,10,18                  32         ok
+
+hermes: found (/home/cody/.local/bin/hermes)
+
+✅ All checks passed.
+STACK_PARTIAL_FAILS=0
+=== LLM GENERATE (local only) ===
+llm_gen_rc=0
+generate-proposals-llm: raw=/home/cody/.openclaw/workspace/memory/self-mod/llm-raw/raw_20260720T234728Z.txt api=/home/cody/.openclaw/workspace/memory/self-mod/llm-raw/api_20260720T234728Z.json
+==== RAW MODEL ====
+{"proposal_id":"prop_a1b2c3d4e5f6","module":"cerebellum-memory","target_paths":["skills/cerebellum-memory/scripts/get-calibration.sh"],"insert_after_line":3,"insert_lines":["# V4-llm-gen: model-proposed annotation (2026-07-20)"],"estimated_components":{"task_success":0.95,"resource_cost":0.01,"error_rate":0.02,"regression_penalty":0.0}}=== RANK ===
+{
+  "top_k": 3,
+  "count": 0,
+  "ranked": []
+}
+=== EVALUATE ===
+evaluate-proposal: measuring latency baseline...
+evaluate-proposal: baseline latency_sec=6.162
+{
+  "accepted": true,
+  "reason": "",
+  "U": 0.384617,
+  "latency_checked": true,
+  "latency_sec": 6.1533,
+  "latency_increase": -0.0014118792599805419,
+  "breaches": [],
+  "reg": 0
+}
+=== DEPLOY ===
+=== ROLLBACK ===

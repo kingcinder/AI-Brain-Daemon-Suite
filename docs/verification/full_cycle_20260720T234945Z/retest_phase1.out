@@ -1,0 +1,77 @@
+
+=== schema-registry ===
+PASS: schema-registry.json structure ok (v4.0.0)
+  PASS: registry structure
+
+=== pid-lock ===
+  PASS: acquire
+  PASS: heartbeat
+  PASS: release clears pid
+  PASS: stale reclaim acquire
+
+=== provenance ===
+  PASS: append entry
+  PASS: sha256 length
+  PASS: show log
+
+=== executive-load ===
+  PASS: E=0.44 for G=2,Q=1,I=5
+  PASS: band desired
+  PASS: E clips at 1.0
+  PASS: clipped flag true
+
+=== concurrency-semaphore ===
+  PASS: second acquire blocked while other process holds slot
+  PASS: acquire inference slot after release
+  PASS: KV cap allows 2048
+  PASS: KV cap rejects 2049
+
+=== snapshot-divergence ===
+  PASS: create snapshot
+  PASS: no divergence at same state
+  PASS: goals change triggers retest
+  PASS: eload delta > 0.12 triggers retest
+
+=== sandbox ===
+  PASS: sandbox success path
+  PASS: sandbox propagates exit code
+
+=== schema-validate-sample ===
+PASS: executive-load-sample validates against registry (/tmp/tmp.ZxIR9tei2B/memory/executive-load-sample.json)
+  PASS: executive-load-sample schema
+
+=== pfc-decide-harness ===
+--- baseline (no sibling state) ---
+{"project_work":1.0,"idle":0.3,"dreaming":0.3,"social_interaction":0.3}
+--- A: high cognitive load + context saturation -> should suppress project_work, boost idle ---
+{"project_work":0.6,"idle":0.39,"dreaming":0.39,"social_interaction":0.18}
+  PASS: high load suppresses project_work (0.6 < 1.0)
+  PASS: high load boosts idle (0.39 > 0.3)
+--- B: unresolved conflicts + error patterns -> should boost dreaming ---
+{"project_work":1.0,"idle":0.3,"dreaming":0.42,"social_interaction":0.3}
+  PASS: conflicts/errors boost dreaming (0.42 > 0.3)
+--- C: low energy + negative mood -> should suppress project_work, boost idle ---
+{"project_work":0.75,"idle":0.375,"dreaming":0.375,"social_interaction":0.225}
+  PASS: low mood/energy suppresses project_work (0.75 < 1.0)
+  PASS: low mood/energy boosts idle (0.375 > 0.3)
+--- D: open social loops -> should boost social_interaction ---
+{"project_work":1.0,"idle":0.3,"dreaming":0.3,"social_interaction":0.348}
+  PASS: open loops boost social_interaction (0.348 > 0.3)
+--- E: active goal boosts the option that matches its description ---
+{"project_work":1.0,"idle":0.3,"dreaming":0.3,"social_interaction":0.3}
+  PASS: active goal boosts project_work over baseline weight (1.0 > 0.5)
+--- F: inhibition suppresses the option it matches ---
+{"interrupt_now":0.1,"idle":0.3}
+  PASS: inhibition suppresses interrupt_now below its own weight (0.1 < 1.0)
+
+✅ All PFC arbitration assertions passed — decide.sh's score adjustments are real, not just documented.
+  PASS: decide.sh closed-loop harness
+
+=== rwlock ===
+  PASS: try-read acquire
+  PASS: write acquire
+  PASS: try-read blocked during write
+
+========================================
+Phase 1 harness: 27 passed, 0 failed
+========================================

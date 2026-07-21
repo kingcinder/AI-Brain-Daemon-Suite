@@ -1,0 +1,12 @@
+PASS test_acc_conflict_state.sh
+PASS test_acc_error_lessons.sh
+PASS test_amygdala_get_state.sh
+PASS test_basal_ganglia_habits.sh
+PASS test_cerebellum_calibration.sh
+PASS test_heartbeat_get_state.sh
+PASS test_hippocampus_load_core.sh
+PASS test_insula_state.sh
+PASS test_pfc_get_state.sh
+PASS test_social_relationships.sh
+PASS test_vta_get_drive.sh
+Skill unit tests: 11 passed, 0 failed

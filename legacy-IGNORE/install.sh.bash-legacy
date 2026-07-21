@@ -1,0 +1,63 @@
+#!/bin/bash
+# AI Brain Daemon Suite - Installer
+# Deploys brain-daemon.sh (unified scheduling daemon) + aibrain.service.
+set -e # Exit on error
+
+echo "--- Step 1: Initializing Workspace ---"
+mkdir -p ~/.openclaw/workspace
+mkdir -p ~/.config/systemd/user/
+
+echo "--- Step 2: Deploying Artifacts ---"
+if [ ! -f "brain-daemon.sh" ] || [ ! -f "aibrain.service" ]; then
+    echo "Error: brain-daemon.sh or aibrain.service not found in current directory."
+    echo "Extract brain-daemon-suite.zip and run this script from inside that directory."
+    exit 1
+fi
+
+cp brain-daemon.sh ~/.openclaw/workspace/brain-daemon.sh
+cp aibrain.service ~/.config/systemd/user/aibrain.service
+
+echo "--- Step 3: Configuring Permissions ---"
+chmod +x ~/.openclaw/workspace/brain-daemon.sh
+
+echo "--- Step 4: Pre-flight Check ---"
+# Validates the job table (no minute collisions), confirms every 'direct'
+# job's script exists and is executable, and checks openclaw is on PATH
+# for 'spawn' jobs. Does NOT start the loop.
+if ! WORKSPACE="$HOME/.openclaw/workspace" ~/.openclaw/workspace/brain-daemon.sh --check; then
+    echo ""
+    echo "Pre-flight check reported problems (see above)."
+    echo "Fix them before enabling the service, then re-run this script."
+    exit 1
+fi
+
+echo ""
+echo "!!! ACTION REQUIRED BEFORE ENABLING !!!"
+echo "Edit ~/.config/systemd/user/aibrain.service now if either applies to you:"
+echo "  (a) Your OpenClaw workspace is NOT at \$HOME/.openclaw/workspace"
+echo "      -> change the Environment=WORKSPACE= line"
+echo "  (b) 'openclaw', 'jq', 'curl', or 'python3' live in a non-standard"
+echo "      location (run: which openclaw jq curl python3)"
+echo "      -> uncomment and edit the Environment=PATH= line"
+read -p "Press Enter once you've reviewed/edited the service file (or to continue as-is): " _
+
+echo "--- Step 5: Systemd Integration ---"
+systemctl --user daemon-reload
+
+echo "--- Step 6: Activation ---"
+systemctl --user enable --now aibrain.service
+
+echo "--- Step 7: Verification & Status ---"
+sleep 1
+if systemctl --user is-active --quiet aibrain.service; then
+    echo "Installation Successful: Suite is active."
+    systemctl --user status aibrain.service --no-pager | head -n 5
+    echo ""
+    echo "Tail logs with: journalctl --user -u aibrain.service -f"
+    echo "Once you've confirmed it's running cleanly, remove the old per-skill"
+    echo "cron entries (see BRAIN_DAEMON_SCHEDULE.md for the old-cron mapping)."
+else
+    echo "Installation Error: Suite failed to activate."
+    echo "Check: journalctl --user -u aibrain.service -e"
+    exit 1
+fi

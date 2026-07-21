@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "module": "acc-error-memory",
+  "version": "1.0.0",
+  "capabilities": [
+    "error_logging",
+    "error_pattern_calibration",
+    "lesson_retrieval"
+  ],
+  "inputs": [
+    {
+      "name": "error_events",
+      "type": "event",
+      "source": "workspace/events"
+    },
+    {
+      "name": "acc_state",
+      "type": "state_file",
+      "source": "memory/acc-state.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "acc_state",
+      "type": "state_write",
+      "target": "memory/acc-state.json"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "spawns_inference",
+    "filesystem_write"
+  ],
+  "dependencies": [
+    {
+      "module": "anterior-cingulate-memory",
+      "version_constraint": ">=1.0.0"
+    }
+  ],
+  "tests": [
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/test_acc_error_lessons.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

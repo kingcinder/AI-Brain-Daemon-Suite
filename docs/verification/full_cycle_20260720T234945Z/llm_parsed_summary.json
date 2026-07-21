@@ -1,0 +1,13 @@
+{
+  "proposal_id": "prop_8a3f9c1d",
+  "module": "cerebellum-memory",
+  "target_paths": [
+    "skills/cerebellum-memory/scripts/get-calibration.sh"
+  ],
+  "insert_after_line": 3,
+  "insert_lines": [
+    "# V4-llm-gen: model-proposed annotation (2026-07-20)"
+  ],
+  "raw_age_sec": 0.12367129325866699,
+  "fresh": true
+}

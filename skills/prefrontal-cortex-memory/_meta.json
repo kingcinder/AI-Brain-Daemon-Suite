@@ -1,0 +1,29 @@
+{
+  "ownerId": "kn7ajk5wfb77rqxr83dvywa7bh809eb0",
+  "slug": "prefrontal-cortex-memory",
+  "version": "1.0.0",
+  "publishedAt": 1771000000001,
+  "description": "Executive function: goal tracking, impulse control, and arbitration across the brain suite. decide.sh reads sibling skills' state (insula, VTA, amygdala, basal ganglia, ACC) to weigh candidate actions in context, and is the decision-maker heartbeat-memory defers to when installed. Part of the AI Brain series.",
+  "tags": ["memory", "executive-function", "ai-brain", "decision-making"],
+  "openclaw": {
+    "emoji": "🧭",
+    "category": "memory",
+    "inject": ["PFC_STATE.md"],
+    "cron": [
+      {
+        "schedule": "0 */6 * * *",
+        "script": "scripts/decay-load.sh",
+        "description": "Executive load decay every 6 hours"
+      }
+    ]
+  },
+  "related": [
+    "heartbeat-memory",
+    "insula-memory",
+    "vta-memory",
+    "amygdala-memory",
+    "basal-ganglia-memory",
+    "anterior-cingulate-memory",
+    "acc-error-memory"
+  ]
+}

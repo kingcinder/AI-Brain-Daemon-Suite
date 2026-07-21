@@ -1,0 +1,1 @@
+generate-proposals-llm: raw=/home/cody/.openclaw/workspace/memory/self-mod/llm-raw/raw_20260720T235105Z.txt api=/home/cody/.openclaw/workspace/memory/self-mod/llm-raw/api_20260720T235105Z.json

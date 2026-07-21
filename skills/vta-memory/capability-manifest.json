@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "module": "vta-memory",
+  "version": "1.2.0",
+  "capabilities": [
+    "reward_tracking",
+    "drive_decay",
+    "anticipation",
+    "seeking"
+  ],
+  "inputs": [
+    {
+      "name": "reward_events",
+      "type": "event",
+      "source": "workspace/events"
+    },
+    {
+      "name": "reward_state",
+      "type": "state_file",
+      "source": "memory/reward-state.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "reward_state",
+      "type": "state_write",
+      "target": "memory/reward-state.json"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "spawns_inference",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/test_vta_get_drive.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

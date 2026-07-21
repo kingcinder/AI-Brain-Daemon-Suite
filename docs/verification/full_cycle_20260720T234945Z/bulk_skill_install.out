@@ -1,0 +1,81 @@
+=== install amygdala-memory ===
+
+┌────────────────────────────────────────────────────────┐
+│  🎭 View your agent's MOOD in the Brain Dashboard      │
+│                                                        │
+│  open ~/.openclaw/workspace/brain-dashboard.html       │
+└────────────────────────────────────────────────────────┘
+
+Done! 🎭
+=== install hippocampus-memory ===
+
+Next steps:
+  1. Run first encoding: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/hippocampus-memory/scripts/encode-pipeline.sh
+  2. The encoding will process the last 100 signals
+  3. Add memory/index.json to .gitignore (contains personal data)
+  4. Test loading: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/hippocampus-memory/scripts/load-core.sh
+
+See SKILL.md for full usage instructions.
+=== install vta-memory ===
+
+┌────────────────────────────────────────────────────────┐
+│  ⭐ View your agent's DRIVE in the Brain Dashboard     │
+│                                                        │
+│  open ~/.openclaw/workspace/brain-dashboard.html       │
+└────────────────────────────────────────────────────────┘
+
+Done! ⭐
+=== install basal-ganglia-memory ===
+
+Next steps:
+  1. Run first encoding: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/basal-ganglia-memory/scripts/encode-pipeline.sh
+  2. The encoding will process the last 100 signals
+  3. Add memory/habit-state.json to .gitignore (contains behavioral data)
+  4. Test loading: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/basal-ganglia-memory/load-habits.sh
+
+See SKILL.md for full usage instructions.
+=== install social-memory ===
+
+Usage:
+  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/social-memory/scripts/upsert-relationship.sh --id alice --name "Alice" --type human
+  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/social-memory/scripts/log-interaction.sh --id alice --summary "..." --trust-delta 0.05
+  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/social-memory/scripts/get-relationship.sh --id alice
+
+TIP: ./install.sh --with-cron to enable decay + auto-encoding
+Done! 🫂
+=== install cerebellum-memory ===
+│  🎚️ Precision & smoothness of HOW things get executed   │
+└──────────────────────────────────────────────────────────┘
+
+Usage:
+  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/cerebellum-memory/scripts/log-execution.sh --skill "writing-code" --quality 0.8
+  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/cerebellum-memory/scripts/get-calibration.sh
+
+Done! 🎚️
+=== install anterior-cingulate-memory ===
+   State:     /home/cody/.openclaw/workspace/memory/conflict-state.json
+   Inject:    /home/cody/.openclaw/workspace/ACC_CONFLICT_STATE.md
+
+   Quick commands:
+   ./scripts/load-state.sh               # human-readable state
+   ./scripts/log-conflict.sh --help      # log a conflict
+   ./scripts/resolve-conflict.sh --help  # resolve a conflict
+   ./scripts/flag-attention.sh --help    # flag a topic
+=== install acc-error-memory ===
+  - /home/cody/.openclaw/workspace/memory/acc-state.json
+  - /home/cody/.openclaw/workspace/memory/acc-watcher-watermark.json
+  - /home/cody/.openclaw/workspace/ACC_STATE.md
+
+┌─────────────────────────────────────────────┐
+│  Load at session start:                     │
+│  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/acc-error-memory/scripts/load-state.sh           │
+└─────────────────────────────────────────────┘
+=== install prefrontal-cortex-memory ===
+  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/prefrontal-cortex-memory/scripts/get-state.sh
+
+NOTE: decide.sh deliberately reads sibling skills' state files (insula,
+      VTA, amygdala, basal ganglia, ACC) to arbitrate — this is the one
+      skill in the suite designed to do that. Every read is optional and
+      degrades gracefully if a sibling isn't installed.
+
+Done! 🧭

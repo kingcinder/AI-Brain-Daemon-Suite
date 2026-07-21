@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "module": "prefrontal-cortex-memory",
+  "version": "1.0.0",
+  "capabilities": [
+    "goal_tracking",
+    "inhibition_control",
+    "executive_arbitration",
+    "executive_load_decay"
+  ],
+  "inputs": [
+    {
+      "name": "pfc_state",
+      "type": "state_file",
+      "source": "memory/pfc-state.json"
+    },
+    {
+      "name": "interoceptive_state",
+      "type": "state_file",
+      "source": "memory/interoceptive-state.json",
+      "required": false
+    },
+    {
+      "name": "reward_state",
+      "type": "state_file",
+      "source": "memory/reward-state.json",
+      "required": false
+    },
+    {
+      "name": "emotional_state",
+      "type": "state_file",
+      "source": "memory/emotional-state.json",
+      "required": false
+    },
+    {
+      "name": "conflict_state",
+      "type": "state_file",
+      "source": "memory/conflict-state.json",
+      "required": false
+    },
+    {
+      "name": "acc_state",
+      "type": "state_file",
+      "source": "memory/acc-state.json",
+      "required": false
+    },
+    {
+      "name": "habit_state",
+      "type": "state_file",
+      "source": "memory/habit-state.json",
+      "required": false
+    },
+    {
+      "name": "cerebellum_state",
+      "type": "state_file",
+      "source": "memory/cerebellum-state.json",
+      "required": false
+    },
+    {
+      "name": "social_state",
+      "type": "state_file",
+      "source": "memory/social-state.json",
+      "required": false
+    },
+    {
+      "name": "arbitration_options",
+      "type": "scalar",
+      "source": "decide.sh:--options"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "pfc_state",
+      "type": "state_write",
+      "target": "memory/pfc-state.json"
+    },
+    {
+      "name": "decision",
+      "type": "scalar",
+      "target": "decide.sh:stdout"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/pfc_decide_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/test_pfc_get_state.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

@@ -1,0 +1,11 @@
+{
+  "ok": false,
+  "accepted": [],
+  "rejected": [
+    {
+      "target": "core/locks/rwlock.sh",
+      "reason": "immutable_core"
+    }
+  ],
+  "module": null
+}

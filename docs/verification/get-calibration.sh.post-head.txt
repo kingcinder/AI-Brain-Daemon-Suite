@@ -1,0 +1,20 @@
+#!/bin/bash
+# get-calibration.sh — Usage: get-calibration.sh [--skill <name>] [--json]
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
+exec 200>"$STATE_FILE.lock"
+flock 200
+[ ! -f "$STATE_FILE" ] && { echo "❌ No cerebellum state found"; exit 1; }
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
+
+SKILL=""; JSON_OUT=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skill) SKILL="$2"; shift 2 ;;
+        --json) JSON_OUT=true; shift ;;
+        *) shift ;;
+    esac
+done
+
+if [ "$JSON_OUT" = true ]; then

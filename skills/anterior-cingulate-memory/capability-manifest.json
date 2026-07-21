@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "module": "anterior-cingulate-memory",
+  "version": "1.0.0",
+  "capabilities": [
+    "conflict_detection",
+    "uncertainty_monitoring",
+    "attention_flagging"
+  ],
+  "inputs": [
+    {
+      "name": "conflict_events",
+      "type": "event",
+      "source": "workspace/events"
+    },
+    {
+      "name": "conflict_state",
+      "type": "state_file",
+      "source": "memory/conflict-state.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "conflict_state",
+      "type": "state_write",
+      "target": "memory/conflict-state.json"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/test_acc_conflict_state.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

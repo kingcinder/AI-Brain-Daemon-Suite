@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Brain Suite Capability Registry Manifest",
+  "type": "object",
+  "required": ["schema", "module", "version", "capabilities", "inputs", "outputs", "side_effects", "dependencies", "tests", "immutable"],
+  "properties": {
+    "schema": { "type": "integer", "const": 1 },
+    "module": { "type": "string", "description": "Module identifier, e.g. 'hippocampus-memory'" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Declared functional capabilities this module provides, e.g. ['episodic_retrieval', 'goal_scoring']"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "source"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["state_file", "inference_call", "scalar", "event"] },
+          "source": { "type": "string", "description": "Path or identifier of the input origin, e.g. 'pfc-state.json'" },
+          "required": { "type": "boolean", "default": true }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "target"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["state_write", "log_entry", "scalar", "event"] },
+          "target": { "type": "string" }
+        }
+      }
+    },
+    "side_effects": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["writes_shared_state", "spawns_inference", "modifies_locks", "network_io", "filesystem_write", "none"]
+      },
+      "description": "Explicit declaration of anything beyond pure computation. 'none' must be present if the list is otherwise empty."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["module", "version_constraint"],
+        "properties": {
+          "module": { "type": "string" },
+          "version_constraint": { "type": "string", "description": "e.g. '>=1.2.0'" }
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "kind"],
+        "properties": {
+          "path": { "type": "string", "description": "Path to the test file/function" },
+          "kind": { "type": "string", "enum": ["unit", "regression", "sandbox_replay"] }
+        }
+      },
+      "minItems": 1,
+      "description": "Every mutable module must declare at least one test; Phase 3 sandbox execution runs these before ranking."
+    },
+    "immutable": {
+      "type": "boolean",
+      "const": false,
+      "description": "Hardcoded false for any module carrying this manifest — modules in the Immutable Core list do not receive manifests at all."
+    }
+  }
+}

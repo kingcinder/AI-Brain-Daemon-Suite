@@ -1,0 +1,17 @@
+PSI investigation (Ubuntu 6.8.0-136-generic, CONFIG_PSI=y)
+
+1) Syscall: open("/proc/pressure/{memory,cpu}", O_RDWR|O_NONBLOCK) succeeds.
+2) write(fd, "some <stall_us> <window_us>") as UID 1000 → errno 22 EINVAL for all tested windows.
+3) Same write as root (sudo): succeeds (rc=0).
+4) Read of /proc/pressure/* works unprivileged (avg10/total visible).
+5) cgroup *.pressure files exist but open O_RDWR as user → EACCES (Permission denied).
+6) CapEff for user process is empty — no special caps.
+7) Conclusion: unprivileged PSI *trigger registration* is rejected on this host;
+   not a missing CONFIG_PSI; not bad stall/window format (root accepts same string).
+8) Fix in deep-brain-kernel.py: when trigger write fails, arm "poll" mode that
+   samples psi_avg10() on a timer and still sets pressure_state for spawn deferral.
+9) Instantaneous pre-spawn psi_avg10() check was already present (FIX #5).
+
+Permanent substitute if triggers remain privileged-only:
+  - Documented poll-mode PSI + VRAM + executive-load gates.
+  - Not silent: journal logs the EINVAL and poll fallback explicitly.

@@ -1,0 +1,27 @@
+{
+  "top_k": 1,
+  "count": 1,
+  "ranked": [
+    {
+      "proposal_id": "prop_cerebellum_memory_install_comment_v1",
+      "path": "/home/cody/.openclaw/workspace/memory/self-mod/proposals/prop_cerebellum_memory_install_comment_v1.json",
+      "pre_utility": 0.366,
+      "score": {
+        "U": 0.366,
+        "components": {
+          "task_success": 0.95,
+          "resource_cost": 0.01,
+          "error_rate": 0.01,
+          "regression_penalty": 0.05
+        },
+        "weights": {
+          "alpha": 0.4,
+          "beta": 0.15,
+          "gamma": 0.25,
+          "delta": 0.2
+        },
+        "formula": "U = \u03b1(TS) - \u03b2(RC) - \u03b3(ER) - \u03b4(RP)"
+      }
+    }
+  ]
+}

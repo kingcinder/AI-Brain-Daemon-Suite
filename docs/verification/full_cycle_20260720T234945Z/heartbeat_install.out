@@ -1,0 +1,19 @@
+💓 Installing heartbeat-memory...
+
+Creating initial heartbeat state...
+✅ Created /home/cody/.openclaw/workspace/memory/heartbeat-state.json
+✅ Scripts are executable
+✅ Synced to /home/cody/.openclaw/workspace/HEARTBEAT_STATE.md
+🧠 Dashboard generated: /home/cody/.openclaw/workspace/brain-dashboard.html
+
+┌──────────────────────────────────────────────────────┐
+│  💓 Pulse — autonomous initiative, on a 30-min timer  │
+└──────────────────────────────────────────────────────┘
+
+Usage:
+  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/heartbeat-memory/scripts/beat.sh                 # decide what to do right now
+  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/heartbeat-memory/scripts/projects.sh add --title "..." --type unfinished
+  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/heartbeat-memory/scripts/get-state.sh
+
+TIP: ./install.sh --with-cron to wire up the 30-minute timer
+Done! 💓

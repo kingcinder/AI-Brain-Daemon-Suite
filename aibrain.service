@@ -1,0 +1,105 @@
+# aibrain.service — systemd --user unit for deep-brain-kernel.py
+#
+# INSTALLATION:
+#   1. Copy deep-brain-kernel.py to your workspace root:
+#        cp deep-brain-kernel.py ~/.openclaw/workspace/deep-brain-kernel.py
+#        chmod +x ~/.openclaw/workspace/deep-brain-kernel.py
+#
+#   2. Copy this file into place:
+#        mkdir -p ~/.config/systemd/user
+#        cp aibrain.service ~/.config/systemd/user/aibrain.service
+#
+#   3. Edit the Environment= lines below (see GOTCHAS), then:
+#        systemctl --user daemon-reload
+#        systemctl --user enable --now aibrain.service
+#
+#   4. Verify:
+#        systemctl --user status aibrain.service
+#        journalctl --user -u aibrain.service -f
+#        python3 ~/.openclaw/workspace/deep-brain-kernel.py --check
+#
+# GOTCHAS (real, not hypothetical — same two as the prior bash iteration):
+#
+#   (a) WORKSPACE / PATH: `systemctl --user` services do NOT inherit your
+#       interactive shell's environment. Environment= below sets WORKSPACE
+#       explicitly via systemd's %h specifier (your home directory). If
+#       `journalctl --user -u aibrain.service` shows "openclaw not found in
+#       PATH" even though it works fine in your terminal, add the real
+#       paths to the PATH= line — run `which openclaw jq curl python3` in
+#       your normal terminal to find them.
+#
+#   (b) CGROUP DELEGATION (this replaced the earlier hand-rolled
+#       `/sys/fs/cgroup/aibrain/background` design): an unprivileged user
+#       cannot create arbitrary top-level cgroup directories — that needs
+#       root, and explicit delegation afterward. This unit does NOT do
+#       that. Instead it uses systemd's OWN resource-control directives
+#       (CPUWeight=, MemoryHigh= below), which write into the cgroup
+#       subtree systemd has ALREADY delegated to this specific service
+#       under your user session — no manual cgroup surgery needed. The
+#       Python script reads its own delegated path from /proc/self/cgroup
+#       at runtime (see CgroupThrottle in deep-brain-kernel.py) and only
+#       ever writes inside that already-delegated subtree, never anywhere
+#       else. Confirm delegation is active for your user session with:
+#         systemctl --user show -p DelegateControllers aibrain.service
+#       (See the setup commands below for what to do if that comes back
+#       empty — usually nothing, `Delegate=yes` below handles it, but
+#       rootless cgroup v2 support does vary by distro/systemd version.)
+#
+#   (c) Nice=-5 is a real trade-off, not a free win: it gives this daemon's
+#       jobs higher CPU scheduling priority than normal (default 0)
+#       processes — including, potentially, whatever you're doing
+#       interactively at the same time. Requested as specified; if the
+#       machine ever feels laggy while a spawn-type job is running, this is
+#       the first thing to reconsider.
+
+[Unit]
+Description=AI Brain Suite unified async scheduler (deep-brain-kernel)
+Documentation=file:BRAIN_DAEMON_SCHEDULE.md
+After=network-online.target
+
+[Service]
+Type=simple
+
+# See gotcha (a). Adjust if your workspace isn't the default, or if
+# openclaw/jq/curl/python3/vulkaninfo (primary VRAM check — see
+# gpu_vram_percent() in deep-brain-kernel.py) live somewhere PATH here
+# wouldn't otherwise find. nvidia-smi/rocm-smi are also checked as
+# portability fallbacks but are not expected to exist on this hardware
+# (RX 5700 XT / RDNA1 has no ROCm support and there's no NVIDIA GPU).
+Environment=WORKSPACE=%h/.openclaw/workspace
+Environment=PATH=/usr/bin:/bin:/usr/local/bin:%h/.local/bin
+
+ExecStart=/usr/bin/python3 %h/.openclaw/workspace/deep-brain-kernel.py
+
+# Crash recovery.
+Restart=always
+RestartSec=10
+
+# KillMode=control-group explicitly kills every process in this unit's
+# cgroup on stop/restart, including any in-flight spawned children, as a
+# backstop alongside the daemon's own pidfd-based termination cascade.
+KillMode=control-group
+TimeoutStopSec=15
+
+# Resource control (Pillar 2, via systemd's own delegation rather than a
+# hand-rolled cgroup path — see gotcha (b)). Delegate=yes is what actually
+# grants this service write access to its own cgroup subtree's controllers;
+# without it, the Python-side CgroupThrottle will correctly detect it has
+# no writable path and log that resource throttling is disabled, rather
+# than failing loudly.
+Delegate=yes
+CPUWeight=100
+MemoryHigh=infinity
+
+# See gotcha (c).
+Nice=-5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=4
+
+# journald captures stdout/stderr automatically for Type=simple — no
+# separate log file needed. `journalctl --user -u aibrain.service` is the log.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

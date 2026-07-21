@@ -1,0 +1,45 @@
+
+=== fixture-suite ===
+  PASS: temp suite assembled
+
+=== check-target-immutable ===
+  PASS: rejects decide.sh
+  PASS: rejects core/self-mod pipeline path
+  PASS: rejects missing manifest
+  PASS: accepts demo-mod target with manifest
+
+=== store-and-rank ===
+  PASS: rank prefers higher pre-utility (prop_demo_ok first)
+  PASS: immutable excluded from ranked
+
+=== evaluate ===
+evaluate-proposal: measuring latency baseline...
+evaluate-proposal: baseline latency_sec=0.05
+  PASS: evaluate accepts good proposal
+  PASS: evaluate rejects immutable proposal
+
+=== deploy-rollback ===
+  PASS: deploy applied hello-v2 content
+  PASS: deploy record written
+  PASS: rollback restored hello-v1
+  PASS: deploy record marked rolled_back
+
+=== monitor ===
+  PASS: monitor auto-rollback on task_success breach
+  PASS: monitor rollback restored files
+
+=== run-pipeline ===
+  PASS: pipeline summary structure
+  PASS: pipeline deployed content to suite
+
+=== utility-weights ===
+  PASS: utility weights L1 sum to 1
+
+=== graduation-tracker ===
+  PASS: clean streak increments to 3
+  PASS: failure resets streak to 0 (full_review)
+  PASS: graduation state file persisted
+
+========================================
+Phase 3 harness: 21 passed, 0 failed
+========================================

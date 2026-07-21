@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "module": "executive-function",
+  "version": "0.1.0",
+  "capabilities": [
+    "isolated_reflection",
+    "goal_proposal",
+    "goal_promotion"
+  ],
+  "inputs": [
+    {
+      "name": "pfc_state",
+      "type": "state_file",
+      "source": "memory/pfc-state.json",
+      "required": false
+    },
+    {
+      "name": "executive_load",
+      "type": "state_file",
+      "source": "memory/executive-load.json",
+      "required": false
+    },
+    {
+      "name": "decision_queue",
+      "type": "state_file",
+      "source": "memory/decision-queue.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "reflection_json",
+      "type": "state_write",
+      "target": "memory/executive/reflections/"
+    },
+    {
+      "name": "goal_proposals",
+      "type": "log_entry",
+      "target": "memory/executive/goal-proposals.jsonl"
+    },
+    {
+      "name": "promoted_goals",
+      "type": "state_write",
+      "target": "memory/pfc-state.json"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "dependencies": [
+    {
+      "module": "prefrontal-cortex-memory",
+      "version_constraint": ">=1.0.0"
+    }
+  ],
+  "tests": [
+    {
+      "path": "tests/run_phase2_harness.sh",
+      "kind": "regression"
+    }
+  ],
+  "immutable": false
+}

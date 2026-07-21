@@ -1,0 +1,44 @@
+
+=== fixtures ===
+  PASS: workspace fixtures written
+
+=== isolated-reflect ===
+  PASS: reflection file created
+  PASS: pfc-state unchanged after isolated reflect
+  PASS: reflection schema: read-only + proposals array
+  PASS: at least one goal proposal from empty goals + queue
+
+=== propose-goals-queue ===
+  PASS: goal-proposals.jsonl written
+  PASS: queued without promote
+  PASS: pfc still unchanged without --promote
+
+=== propose-goals-promote ===
+  PASS: promoted goals within max-promote=2 (active=2)
+  PASS: promote report non-empty
+
+=== executive-load-gate ===
+  PASS: high E blocks promote
+
+=== run-executive-cycle ===
+  PASS: run-executive-cycle exit 0
+  PASS: last-cycle.json marker
+  PASS: cycle promoted at least one goal
+
+=== skill-wrapper ===
+  PASS: skill run-cycle.sh --no-promote
+
+=== manifests ===
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/executive-function/capability-manifest.json (module=executive-function v0.1.0)
+  PASS: executive-function skill manifest
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/core/executive/capability-manifest.json (module=executive-function v0.1.0)
+  PASS: core executive manifest
+
+=== concurrency-contract ===
+  PASS: KV 2048 allowed
+semaphore: requested 2049 tokens exceeds KV cap 2048
+  PASS: KV 2049 rejected
+
+========================================
+Phase 2 harness: 19 passed, 0 failed
+========================================

@@ -1,0 +1,5 @@
+generate-proposals-llm: raw=/home/cody/.openclaw/workspace/memory/self-mod/llm-raw/raw_20260720T230606Z.txt api=/home/cody/.openclaw/workspace/memory/self-mod/llm-raw/api_20260720T230606Z.json
+NO_CONTENT
+generate-proposals-llm: FAILED to parse model output (rc=4)
+  raw: /home/cody/.openclaw/workspace/memory/self-mod/llm-raw/raw_20260720T230606Z.txt
+  api: /home/cody/.openclaw/workspace/memory/self-mod/llm-raw/api_20260720T230606Z.json

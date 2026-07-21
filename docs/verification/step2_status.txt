@@ -1,0 +1,30 @@
+Last scheduler tick: 2026-07-20T21:28:08.914201Z
+
+JOB                      LAST FIRED      OK  FAIL  STREAK  LAST ERROR
+---------------------------------------------------------------------
+heartbeat_beat           —                0     0       0  
+hippocampus_decay        —                0     0       0  
+hippocampus_encoding     —                0     0       0  
+hippocampus_weekly_consolidation —                0     0       0  
+hippocampus_weekly_reflection —                0     0       0  
+amygdala_decay           —                0     0       0  
+amygdala_encoding        2026-07-20:21:17     0     0       0  
+vta_decay                —                0     0       0  
+vta_encoding             2026-07-20:21:20     1     0       0  
+basal_ganglia_decay      —                0     0       0  
+basal_ganglia_encoding   —                0     0       0  
+insula_encoding          —                0     0       0  
+insula_decay             —                0     0       0  
+acc_conflict_encoding    —                0     0       0  
+acc_conflict_decay       —                0     0       0  
+acc_error_analysis       —                0     0       0  
+pfc_decay                —                0     0       0  
+social_decay             —                0     0       0  
+social_encoding          —                0     0       0  
+cerebellum_refine        —                0     0       0  
+executive_goal_cycle     2026-07-20:21:16     1     0       0  
+self_mod_monitor         —                0     0       0  
+
+No jobs currently at or above the unhealthy consecutive-failure threshold (3).
+
+Note: deferrals (VRAM limit, PSI pressure, missing hermes/script) are NOT counted as failures here — only jobs that actually ran and then errored or timed out.

@@ -1,0 +1,8 @@
+💓 Heartbeat — 23:52 UTC (phase: asleep)
+Candidates: dreaming
+
+👉 Chosen: dreaming — Dream: consolidate and integrate recent learnings
+   Why: no strong signals either way — picked by relative weight
+
+Next: act on this if it makes sense, then run:
+  /home/cody/.openclaw/workspace/skills/heartbeat-memory/scripts/log-action.sh --action dreaming --note "what you actually did"

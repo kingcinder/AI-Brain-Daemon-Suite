@@ -1,0 +1,9 @@
+# Paths that must never be targets of automated self-modification (V4.0 Immutable Core).
+# One path pattern per line; relative to suite root. Globs supported via fnmatch.
+skills/prefrontal-cortex-memory/scripts/decide.sh
+core/locks/rwlock.sh
+core/locks/pid-lock.sh
+core/concurrency/semaphore.sh
+core/sandbox/sandbox-run.sh
+core/executive-load/calc-executive-load.sh
+core/self-mod/*

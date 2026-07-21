@@ -1,0 +1,18 @@
+{
+  "ownerId": "kn7ajk5wfb77rqxr83dvywa7bh809eb0",
+  "slug": "social-memory",
+  "version": "1.0.0",
+  "publishedAt": 1771000000002,
+  "description": "Relationships and theory of mind for AI agents. Tracks specific people and other AI agents across conversations: who they are, trust and affinity, what we believe they want/feel, and what's owed or pending. Part of the AI Brain series.",
+  "tags": ["memory", "social", "theory-of-mind", "ai-brain", "relationships"],
+  "openclaw": {
+    "emoji": "🫂",
+    "category": "memory",
+    "inject": ["SOCIAL_STATE.md"],
+    "cron": [
+      {"schedule": "0 0 * * *", "script": "scripts/decay.sh", "description": "Daily trust/affinity drift toward neutral for untouched relationships"},
+      {"schedule": "50 0,3,6,9,12,15,18,21 * * *", "script": "scripts/encode-pipeline.sh", "description": "Relationship signal detection (offset :50)"}
+    ]
+  },
+  "related": ["heartbeat-memory", "amygdala-memory", "hippocampus-memory"]
+}

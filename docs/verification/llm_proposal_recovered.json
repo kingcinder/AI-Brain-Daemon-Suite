@@ -1,0 +1,17 @@
+{
+  "module": "cerebellum-memory",
+  "target_paths": [
+    "skills/cerebellum-memory/install.sh"
+  ],
+  "content": "#!/bin/bash\n# install.sh \u2014 Set up cerebellum-memory forOpenClaw\n# This script initializes the cerebellum-memory state and makesits helper scripts executable.\n# Usage: ./install.sh [--with-cron]\nset-e\nWORKSPACE=\"${WORKSPACE:-$HOME/.openclaw/workspace}\"\nSKILL_DIR=\"$(cd \"$(dirname \\\"$0\\\")\" && pwd)\"\nWITH_CRON=false\n[ \"$1\" =\"--with-cron\" ] && WITH_CRON=true\n\necho \"\ud83c\udf9a\ufe0f Installingcerebellum-memory...\"\necho \"\"\nmkdir -p\"$WORKSPACE/memory\"\n\nSTATE_FILE=\"$WORKSPACE/memory/cerebellum-state.json\"\nif [ ! -f \"$STATE_FILE\" ]; then\n  cat > \"$STATE_FILE\" <<'EOF'\n{\n  \"version\": \"1.0\",\n  \"lastUpdated\": \"\",\n \"globalCalibration\": 0.5,\n  \"skills\": {}\n}\nEOF\n  echo \"\u2705 Created$STATE_FILE\"\nelse\n  echo \"\u2705 State file already exists\"\nfi\n\nchmod+x \"$SKILL_DIR/scripts/\"*.sh\necho \"\u2705 Scripts areexecutable\"\n\"$SKILL_DIR/scripts/sync-state.sh\"\n\nif [ \"$WITH_CRON\"= true ]; then\n  echo \"\"\n  echo \"Setting up OpenClaw cron job...\"\nif ! command -v openclaw &> /dev/null; then\n    echo \"\u26a0\ufe0f  'openclaw'not in PATH. Add this cron job manually:\"\n    echo \"openclaw cron add--name cerebellum-refine --cron '0 */8 * * *' --session isolated--agent-turn '\ud83c\udf9a\ufe0f Run $SKILL_DIR/scripts/refine.sh'\"\n  else\n   openclaw cron add --name cerebellum-refine --cron '0 */8 * * *' --sessionisolated \\\n      --agent-turn \"\ud83c\udf9a\ufe0f Run $SKILL_DIR/scripts/refine.sh andreport results\" \\\n      2>/dev/null && echo \"   \u2705 Created\" || echo\"   \u23ed\ufe0f  Already exists\"\n  fi\nfi\n\necho \"\"\necho\"\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\"\necho\"\u2502  \ud83c\udf9a\ufe0f Precision & smoothness of HOW things get executed   \u2502\"\necho\"\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\"\necho\"\"\necho \"Usage:\"\necho \"  $SKILL_DIR/scripts/log-execution.sh --skill \\\"writing-code\\\" --quality 0.8\"\necho \"  $SKILL_DIR/scripts/get-calibration.sh\"\n\necho \"Done! \ud83c\udf9a\ufe0f\"\n",
+  "estimated_components": {
+    "task_success": 0.95,
+    "resource_cost": 0.01,
+    "error_rate": 0.01,
+    "regression_penalty": 0.05
+  },
+  "proposal_id": "prop_cerebellum_memory_install_comment_v1",
+  "proposer": "generate-proposals-llm",
+  "source": "llm",
+  "parse_note": "recovered from hermes openrouter output with line-wrap repair"
+}

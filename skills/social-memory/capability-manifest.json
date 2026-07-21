@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "module": "social-memory",
+  "version": "1.0.0",
+  "capabilities": [
+    "relationship_tracking",
+    "theory_of_mind",
+    "open_loop_tracking",
+    "social_decay"
+  ],
+  "inputs": [
+    {
+      "name": "social_events",
+      "type": "event",
+      "source": "workspace/events"
+    },
+    {
+      "name": "social_state",
+      "type": "state_file",
+      "source": "memory/social-state.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "social_state",
+      "type": "state_write",
+      "target": "memory/social-state.json"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "spawns_inference",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/test_social_relationships.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

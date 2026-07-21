@@ -1,0 +1,174 @@
+> **Live implementation:** schedule table is executed by `deep-brain-kernel.py` via `aibrain.service`.
+> References to `brain-daemon.sh` below describe the **legacy** bash engine under `legacy-IGNORE/`.
+
+# Brain Daemon Schedule — Migration Reference
+
+This documents exactly what `brain-daemon.sh` replaces, why the minute
+offsets changed, and what to verify before decommissioning the old cron
+entries. Every schedule below was read directly from the actual
+`--with-cron` blocks in each skill's `install.sh` at the time this was
+built — not reconstructed from memory.
+
+## What this consolidation found
+
+Building one unified table across all 11 skills surfaced real collisions
+that were invisible while scattered across 11 separate `install.sh` files.
+If you've run `--with-cron` for more than a few of these skills, some of
+these are very likely firing at the same instant on your actual crontab
+right now:
+
+- **`amygdala-decay` and `pfc-decay` are identical schedules** (`0 */6 * * *`)
+  — always fire together, every 6 hours.
+- **`insula-decay` and `acc-conflict-decay` are identical schedules**
+  (`0 */4 * * *`) — always fire together, every 4 hours.
+- **`acc-conflict-encoding` and `social-encoding` are identical schedules**
+  (`50 0,3,6,9,12,15,18,21 * * *`) — always fire together, every 3 hours.
+- **Minute `:00` is used by 11 different jobs** across the suite
+  (`hippocampus-decay`, `hippocampus-encoding`, `amygdala-decay`,
+  `vta-decay`, `basal-ganglia-decay`, `insula-decay`, `acc-conflict-decay`,
+  `acc-analysis`, `pfc-decay`, `social-decay`, `cerebellum-refine`), with
+  heavily overlapping hour-sets — dozens of same-instant collisions
+  throughout the day.
+
+None of this was a daemon bug to fix — it's a real, pre-existing property
+of the current cron configuration, only visible once everything is in one
+table. The daemon fixes it by giving every single job **a minute value no
+other job uses**, full stop — that one invariant makes hour-set overlaps
+irrelevant, since two jobs can only actually collide if they share both
+the same hour and the same minute.
+
+## Job kind: direct vs. spawn
+
+Two genuinely different execution models exist across these jobs, and
+collapsing them into one would be a real regression, not a simplification:
+
+- **direct** — the script is fully self-contained: pure decay/refine math,
+  or a script that already does its own LLM call and degrades gracefully
+  on its own (insula's rule-based keyword encoder needs no LLM at all;
+  ACC-conflict's encoder calls the Anthropic API directly and no-ops
+  cleanly with no key set; heartbeat's `beat.sh` already delegates to
+  PFC's local-LLM-backed `decide.sh` with its own fallback). The daemon
+  just runs these scripts.
+- **spawn** — the script only does mechanical phase-1 staging (preprocess
+  transcripts, rule-score candidates) and then says, literally, "sub-agent
+  will handle X." There is no phase 2 without a real reasoning agent turn
+  over free text — deciding what's memory-worthy, what's an emotion,
+  what's a conflict pattern. A bash daemon cannot invent that judgment.
+  These jobs shell out to `openclaw sessions:spawn --task "..."`, reusing
+  the exact task text each skill's own `install.sh` already used for
+  `openclaw cron add --agent-turn "..."`.
+
+**Known caveat:** `acc-conflict-encoding` is classified `direct` because
+it's self-contained — but "self-contained" here means it calls the real
+Anthropic **cloud** API directly (needs `ANTHROPIC_API_KEY`, incurs real
+per-call cost on a Haiku-class model). That's inconsistent with the
+local-only, zero-cost design used for PFC's semantic matching. It's
+preserved as-is rather than silently changed, so this is a decision for
+you to make knowingly — either leave it, or point it at your local
+OpenAI-compatible endpoint the same way `prefrontal-cortex-memory`'s
+`decide.sh`/`semantic-match.sh` already do (that would be a real code
+change to that script, not something the daemon can paper over).
+
+## Full schedule: old cron → new daemon
+
+| Job | Kind | Hours (unchanged) | Old minute | New minute |
+|---|---|---|---|---|
+| `heartbeat_beat` | direct | every hour | 7, 37 | 7, 37 *(unchanged)* |
+| `hippocampus_decay` | direct | 3 | 0 | **2** |
+| `hippocampus_encoding` | spawn | 0,3,6,9,12,15,18,21 | 0 | 0 *(unchanged — this job keeps the anchor)* |
+| `amygdala_decay` | direct | 0,6,12,18 | 0 | **5** |
+| `amygdala_encoding` | spawn | 0,3,6,9,12,15,18,21 | 10 | 10 *(unchanged)* |
+| `vta_decay` | direct | 4,12,20 | 0 | **8** |
+| `vta_encoding` | spawn | 0,3,6,9,12,15,18,21 | 20 | 20 *(unchanged)* |
+| `basal_ganglia_decay` | direct | 4 | 0 | **12** |
+| `basal_ganglia_encoding` | spawn | 0,3,6,9,12,15,18,21 | 30 | 30 *(unchanged)* |
+| `insula_encoding` | direct | 0,3,6,9,12,15,18,21 | 40 | 40 *(unchanged)* |
+| `insula_decay` | direct | 0,4,8,12,16,20 | 0 | **14** |
+| `acc_conflict_encoding` | direct | 0,3,6,9,12,15,18,21 | 50 | 50 *(unchanged)* |
+| `acc_conflict_decay` | direct | 0,4,8,12,16,20 | 0 | **16** |
+| `acc_error_analysis` | spawn | 4,12,20 | 0 | **18** |
+| `pfc_decay` | direct | 0,6,12,18 | 0 | **22** |
+| `social_decay` | direct | 0 | 0 | **24** |
+| `social_encoding` | spawn | 0,3,6,9,12,15,18,21 | 50 | **52** *(was colliding with acc_conflict_encoding)* |
+| `cerebellum_refine` | direct | 0,8,16 | 0 | **26** |
+
+Every hour-set above is exactly what was already configured — only minutes
+changed, and only for jobs that were actually colliding with something
+else.
+
+## New: weekly consolidation and reflection (never previously scheduled)
+
+`hippocampus-memory` has shipped `consolidate.sh`, `reflect.sh`, and three
+supporting prompt files (`prompts/consolidation-guide.md`,
+`prompts/self-reflect.md`, `prompts/weekly-reflection-event.md`) since
+before this daemon existed — its own `SKILL.md` describes `consolidate.sh`
+as "Weekly review helper" and `weekly-reflection-event.md` opens with "It's
+time for your weekly reflection." None of that was ever wired into a
+scheduler: not the original per-skill `install.sh --with-cron`, not
+`legacy/brain-daemon.sh`, not this table until now. They were
+manual-invocation-only in every version of this suite that shipped before.
+
+Added as two `spawn` jobs, both Sunday-only (`days=6`, i.e.
+`datetime.weekday()`'s Sunday), at 02:00 UTC — deliberately outside every
+other job's `0,3,6,9,12,15,18,21`-hour cadence, so a slow weekly run never
+competes with the regular 3-hourly encoding jobs for the shared spawn lock:
+
+| Job | Kind | Days | Hour | Minute |
+|---|---|---|---|---|
+| `hippocampus_weekly_consolidation` | spawn | Sun | 2 | 34 |
+| `hippocampus_weekly_reflection` | spawn | Sun | 2 | 44 |
+
+`deep-brain-kernel.py`'s `Job` dataclass gained a `days` field
+(`"*"` = every day, matching every pre-existing job's behavior unchanged;
+comma-separated weekday ints otherwise, Python's `datetime.weekday()`
+convention: `0`=Monday .. `6`=Sunday) to support this. `--check`'s output
+now includes a `DAYS` column.
+
+## Bug fix that made weekly scheduling actually work: dedupe key needed a date
+
+While wiring the two jobs above in, a real, previously-undetected bug
+surfaced: `due_now()`'s "already fired this window" key was `"H:M"` only —
+no date. A job's `last_fired_key` is never reset, so the day *after* a job
+first fired, that day's identical `"H:M"` matched the value already stored
+from the day before, and `due_now()` returned `False` — permanently, for
+every future occurrence. **Every job in this table was silently exposed to
+this, not just the two new weekly ones** — each would fire exactly once
+after the daemon started, then never again, indistinguishable from
+"working" unless you happened to run `--status` weeks later and noticed a
+success count frozen at 1. This was inherited unchanged from
+`legacy/brain-daemon.sh`'s `LAST_FIRED_KEY`, which has the same date-less
+key (see `legacy/README.md` — the bash daemon has not been patched for
+this, since it's retained for rollback only, not active use).
+
+Fixed in `deep-brain-kernel.py` by including the date in the key
+(`_job_key()`: `"YYYY-MM-DD:H:M"`). This was a hard requirement for the
+weekly jobs to be viable at all — a weekly job is the worst-case exposure
+of the bug, since "did this fire since last Sunday" was never actually
+being asked — and it also fixes the same silent one-shot failure mode for
+every daily/hourly job in the table. Verified against concrete date
+scenarios (same-minute re-poll still correctly suppressed; next-day and
+next-Sunday recurrence both now fire correctly, where next-day previously
+did not).
+
+## Before decommissioning the old cron entries
+
+1. Run `python3 deep-brain-kernel.py --check` (or workspace copy under `~/.openclaw/workspace/`) — confirms every script path resolves and
+   flags whether `openclaw` is on PATH (needed for the 6 `spawn` jobs).
+2. Let the daemon run for at least one full day so every job (including the
+   once-daily ones) gets a chance to fire, and check
+   `journalctl --user -u aibrain.service` for clean `completed` lines
+   rather than repeated `ERROR`/`WARN`.
+3. Only then remove the old entries: `openclaw cron list` to see what's
+   registered, `openclaw cron remove --name <job>` for each one this
+   daemon now covers (or `crontab -e` and delete the corresponding lines
+   for anything installed via raw crontab).
+
+## Missed-tick behavior
+
+If the daemon is stopped and restarted later, it does **not** fire jobs
+retroactively for windows that passed while it was down — every job's
+"last fired" marker is initialized to the current minute on startup, so
+scheduling resumes cleanly from the next real match forward. This is a
+deliberate choice: several of these jobs are local-LLM- or cloud-API-bound,
+and firing a backlog of them all at once on restart would be worse than
+occasionally skipping one cycle.

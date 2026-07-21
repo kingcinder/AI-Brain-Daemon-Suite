@@ -1,0 +1,11 @@
+{
+  "ok": false,
+  "accepted": [],
+  "rejected": [
+    {
+      "target": null,
+      "reason": "no_targets"
+    }
+  ],
+  "module": null
+}

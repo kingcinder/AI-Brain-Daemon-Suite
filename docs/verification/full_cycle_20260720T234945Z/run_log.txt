@@ -1,0 +1,165 @@
+=== PHASE1 ===
+phase1 exit=0
+  PASS: high load suppresses project_work (0.6 < 1.0)
+  PASS: high load boosts idle (0.39 > 0.3)
+--- B: unresolved conflicts + error patterns -> should boost dreaming ---
+{"project_work":1.0,"idle":0.3,"dreaming":0.42,"social_interaction":0.3}
+  PASS: conflicts/errors boost dreaming (0.42 > 0.3)
+--- C: low energy + negative mood -> should suppress project_work, boost idle ---
+{"project_work":0.75,"idle":0.375,"dreaming":0.375,"social_interaction":0.225}
+  PASS: low mood/energy suppresses project_work (0.75 < 1.0)
+  PASS: low mood/energy boosts idle (0.375 > 0.3)
+--- D: open social loops -> should boost social_interaction ---
+{"project_work":1.0,"idle":0.3,"dreaming":0.3,"social_interaction":0.348}
+  PASS: open loops boost social_interaction (0.348 > 0.3)
+--- E: active goal boosts the option that matches its description ---
+{"project_work":1.0,"idle":0.3,"dreaming":0.3,"social_interaction":0.3}
+  PASS: active goal boosts project_work over baseline weight (1.0 > 0.5)
+--- F: inhibition suppresses the option it matches ---
+{"interrupt_now":0.1,"idle":0.3}
+  PASS: inhibition suppresses interrupt_now below its own weight (0.1 < 1.0)
+
+✅ All PFC arbitration assertions passed — decide.sh's score adjustments are real, not just documented.
+  PASS: decide.sh closed-loop harness
+
+=== rwlock ===
+  PASS: try-read acquire
+  PASS: write acquire
+  PASS: try-read blocked during write
+
+========================================
+Phase 1 harness: 27 passed, 0 failed
+========================================
+=== PHASE2 ===
+phase2 exit=0
+  PASS: last-cycle.json marker
+  PASS: cycle promoted at least one goal
+
+=== skill-wrapper ===
+  PASS: skill run-cycle.sh --no-promote
+
+=== manifests ===
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/executive-function/capability-manifest.json (module=executive-function v0.1.0)
+  PASS: executive-function skill manifest
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/core/executive/capability-manifest.json (module=executive-function v0.1.0)
+  PASS: core executive manifest
+
+=== concurrency-contract ===
+  PASS: KV 2048 allowed
+semaphore: requested 2049 tokens exceeds KV cap 2048
+  PASS: KV 2049 rejected
+
+========================================
+Phase 2 harness: 19 passed, 0 failed
+========================================
+=== PHASE3 ===
+phase3 exit=0
+evaluate-proposal: measuring latency baseline...
+evaluate-proposal: baseline latency_sec=0.05
+  PASS: evaluate accepts good proposal
+  PASS: evaluate rejects immutable proposal
+
+=== deploy-rollback ===
+  PASS: deploy applied hello-v2 content
+  PASS: deploy record written
+  PASS: rollback restored hello-v1
+  PASS: deploy record marked rolled_back
+
+=== monitor ===
+  PASS: monitor auto-rollback on task_success breach
+  PASS: monitor rollback restored files
+
+=== run-pipeline ===
+  PASS: pipeline summary structure
+  PASS: pipeline deployed content to suite
+
+=== utility-weights ===
+  PASS: utility weights L1 sum to 1
+
+=== graduation-tracker ===
+  PASS: clean streak increments to 3
+  PASS: failure resets streak to 0 (full_review)
+  PASS: graduation state file persisted
+
+========================================
+Phase 3 harness: 21 passed, 0 failed
+========================================
+=== SKILL UNITS ===
+skill_units exit=0
+PASS test_acc_conflict_state.sh
+PASS test_acc_error_lessons.sh
+PASS test_amygdala_get_state.sh
+PASS test_basal_ganglia_habits.sh
+PASS test_cerebellum_calibration.sh
+PASS test_heartbeat_get_state.sh
+PASS test_hippocampus_load_core.sh
+PASS test_insula_state.sh
+PASS test_pfc_get_state.sh
+PASS test_social_relationships.sh
+PASS test_vta_get_drive.sh
+Skill unit tests: 11 passed, 0 failed
+=== MANIFESTS ===
+manifests exit=0
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/acc-error-memory/capability-manifest.json (module=acc-error-memory v1.0.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/amygdala-memory/capability-manifest.json (module=amygdala-memory v1.7.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/anterior-cingulate-memory/capability-manifest.json (module=anterior-cingulate-memory v1.0.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/basal-ganglia-memory/capability-manifest.json (module=basal-ganglia-memory v0.2.2)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/cerebellum-memory/capability-manifest.json (module=cerebellum-memory v1.0.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/executive-function/capability-manifest.json (module=executive-function v0.1.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/heartbeat-memory/capability-manifest.json (module=heartbeat-memory v1.0.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/hippocampus-memory/capability-manifest.json (module=hippocampus-memory v3.8.6)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/insula-memory/capability-manifest.json (module=insula-memory v0.2.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/prefrontal-cortex-memory/capability-manifest.json (module=prefrontal-cortex-memory v1.0.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/self-mod-runner/capability-manifest.json (module=self-mod-runner v0.1.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/social-memory/capability-manifest.json (module=social-memory v1.0.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/vta-memory/capability-manifest.json (module=vta-memory v1.2.0)
+PASS: /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/core/executive/capability-manifest.json (module=executive-function v0.1.0)
+=== DAEMON ===
+daemon_check exit=0
+JOB                          KIND     DAYS       HOURS                    MINUTES    TARGET
+heartbeat_beat               direct   *          *                        7,37       ok
+hippocampus_decay            direct   *          3                        2          ok
+hippocampus_encoding         spawn    *          0,3,6,9,12,15,18,21      0          (sessions:spawn task, 268 chars)
+hippocampus_weekly_consolidation spawn    6          2                        34         (sessions:spawn task, 420 chars)
+hippocampus_weekly_reflection spawn    6          2                        44         (sessions:spawn task, 609 chars)
+amygdala_decay               direct   *          0,6,12,18                5          ok
+amygdala_encoding            spawn    *          0,3,6,9,12,15,18,21      10         (sessions:spawn task, 164 chars)
+vta_decay                    direct   *          4,12,20                  8          ok
+vta_encoding                 spawn    *          0,3,6,9,12,15,18,21      20         (sessions:spawn task, 169 chars)
+basal_ganglia_decay          direct   *          4                        12         ok
+basal_ganglia_encoding       spawn    *          0,3,6,9,12,15,18,21      30         (sessions:spawn task, 278 chars)
+insula_encoding              direct   *          0,3,6,9,12,15,18,21      40         ok
+insula_decay                 direct   *          0,4,8,12,16,20           14         ok
+acc_conflict_encoding        direct   *          0,3,6,9,12,15,18,21      50         ok
+acc_conflict_decay           direct   *          0,4,8,12,16,20           16         ok
+acc_error_analysis           spawn    *          4,12,20                  18         (sessions:spawn task, 91 chars)
+pfc_decay                    direct   *          0,6,12,18                22         ok
+social_decay                 direct   *          0                        24         ok
+social_encoding              spawn    *          0,3,6,9,12,15,18,21      52         (sessions:spawn task, 142 chars)
+cerebellum_refine            direct   *          0,8,16                   26         ok
+executive_goal_cycle         direct   *          1,9,17                   28         ok
+self_mod_monitor             direct   *          2,10,18                  32         ok
+
+hermes: found (/home/cody/.local/bin/hermes)
+
+✅ All checks passed.
+=== STACK DONE ===
+=== LLM GENERATE (local only) ===
+generate rc=1
+no target file under cerebellum-memory
+--- stdout ---
+copied latest raw/api
+PRE_TS=20260720T235104Z
+=== LLM GENERATE FRESH ===
+generate rc=0
+generate-proposals-llm: raw=/home/cody/.openclaw/workspace/memory/self-mod/llm-raw/raw_20260720T235105Z.txt api=/home/cody/.openclaw/workspace/memory/self-mod/llm-raw/api_20260720T235105Z.json
+=== RANK ===
+=== EVALUATE ===
+evaluate rc=0
+=== FILE STATE PRE-DEPLOY ===
+=== DEPLOY ===
+deploy rc=0
+=== ROLLBACK ===
+rollback rc=0
+retest cerebellum rc=0
+=== RETEST PHASE1-3 after ops fixes ===

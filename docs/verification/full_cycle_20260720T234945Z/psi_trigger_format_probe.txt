@@ -1,0 +1,16 @@
+uid=1000 euid=1000
+=== as current user ===
+memory: WRITE_FAIL errno=22 (EINVAL) payload=b'some 500000 1000000'
+memory: WRITE_FAIL errno=22 (EINVAL) payload=b'some 500000 1000000\n'
+memory: WRITE_FAIL errno=22 (EINVAL) payload=b'some 500000 1000000\x00'
+memory: WRITE_FAIL errno=22 (EINVAL) payload=b'some 150000 1000000'
+memory: WRITE_FAIL errno=22 (EINVAL) payload=b'some 150000 1000000\x00'
+memory: WRITE_FAIL errno=22 (EINVAL) payload=b'full 500000 1000000\x00'
+=== as root (sudo) ===
+uid=0 euid=0
+WRITE_FAIL errno=22 payload=b'some 500000 1000000'
+WRITE_OK bytes=20 payload=b'some 500000 1000000\n'
+WRITE_OK bytes=20 payload=b'some 500000 1000000\x00'
+WRITE_OK bytes=20 payload=b'some 150000 1000000\x00'
+WRITE_OK bytes=20 payload=b'full 500000 1000000\x00'
+

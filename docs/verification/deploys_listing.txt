@@ -1,0 +1,3 @@
+total 8
+drwxrwxr-x 2 cody cody 4096 Jul 20 14:18 .
+drwxrwxr-x 5 cody cody 4096 Jul 20 14:18 ..

@@ -1,0 +1,9 @@
+{
+  "proposal_id": "prop_a1b2c3d4e5f6",
+  "model_generated": true,
+  "patch_mode": "insert_lines",
+  "insert": [
+    "# V4-llm-gen: model-proposed annotation (2026-07-20)"
+  ],
+  "after": 3
+}

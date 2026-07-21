@@ -1,0 +1,26 @@
+{
+  "ownerId": "kn7ajk5wfb77rqxr83dvywa7bh809eb0",
+  "slug": "heartbeat-memory",
+  "version": "1.0.0",
+  "publishedAt": 1771000000000,
+  "description": "Autonomous initiative on a timer. Every 30 minutes, decides whether to work on a project, check AI social media, reach out to a known agent, dream/consolidate, or stay quiet — weighted by circadian phase and option cooldowns. Defers to prefrontal-cortex-memory for arbitration if installed. Part of the AI Brain series.",
+  "tags": ["memory", "autonomy", "ai-brain", "scheduling", "circadian"],
+  "openclaw": {
+    "emoji": "💓",
+    "category": "memory",
+    "inject": ["HEARTBEAT_STATE.md"],
+    "cron": [
+      {
+        "schedule": "7,37 * * * *",
+        "script": "scripts/beat.sh",
+        "description": "Heartbeat tick every 30 minutes (offset :07/:37 to avoid colliding with sibling skills' cron slots)"
+      }
+    ]
+  },
+  "related": [
+    "prefrontal-cortex-memory",
+    "hippocampus-memory",
+    "vta-memory",
+    "social-memory"
+  ]
+}

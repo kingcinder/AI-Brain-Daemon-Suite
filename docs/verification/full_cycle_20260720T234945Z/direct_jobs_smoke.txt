@@ -1,0 +1,75 @@
+=== SMOKE DIRECT JOBS ===
+💓 Heartbeat — 23:52 UTC (phase: asleep)
+Candidates: dreaming
+
+👉 Chosen: dreaming — Dream: consolidate and integrate recent learnings
+   Why: no strong signals either way — picked by relative weight
+
+Next: act on this if it makes sense, then run:
+  /home/cody/.openclaw/workspace/skills/heartbeat-memory/scripts/log-action.sh --action dreaming --note "what you actually did"
+🌡️ Insula Encode Pipeline — 2026-07-20T23:52:44Z
+Step 1: Preprocessing transcripts...
+✅ Found 0 interoceptive signals
+Step 2: Applying 0 signals...
+Step 3: Applying gentle decay...
+Step 4: Syncing INSULA_STATE.md...
+✅ INSULA_STATE.md updated
+Step 5: Updating dashboard...
+✅ Insula pipeline complete
+🌡️ Insula Decay:
+✅ Decay complete
+⚡ encode-pipeline: insufficient exchanges (0) — skipping.
+🧠 Dashboard generated: /home/cody/.openclaw/workspace/brain-dashboard.html
+⚡ Conflict load decayed: 0.232 → 0.2256 (baseline: 0.2)
+🧭 Executive load: 0.3 → 0.300
+✅ Synced to /home/cody/.openclaw/workspace/PFC_STATE.md
+🧠 Dashboard generated: /home/cody/.openclaw/workspace/brain-dashboard.html
+🫂 Decayed 0 relationship(s) untouched for 7+ days toward neutral
+✅ Synced to /home/cody/.openclaw/workspace/SOCIAL_STATE.md
+🧠 Dashboard generated: /home/cody/.openclaw/workspace/brain-dashboard.html
+🎚️ No skills tracked yet — nothing to refine.
+🎭 Emotional Decay
+─────────────────────
+
+arousal: 0.3 → 0.30 (rate: 0.1)
+connection: 0.4 → 0.40 (rate: 0.1)
+curiosity: 0.5 → 0.50 (rate: 0.1)
+energy: 0.5 → 0.50 (rate: 0.1)
+valence: 0.1 → 0.10 (rate: 0.1)
+
+✅ State decayed toward baseline
+✅ Synced emotional state to /home/cody/.openclaw/workspace/AMYGDALA_STATE.md
+🧠 Dashboard generated: /home/cody/.openclaw/workspace/brain-dashboard.html
+⭐ Drive Decay
+─────────────────────
+
+Drive: 0.5 → 0.50 (baseline: 0.5)
+
+✅ Drive decayed
+✅ Synced motivation state to /home/cody/.openclaw/workspace/VTA_STATE.md
+🧠 Dashboard generated: /home/cody/.openclaw/workspace/brain-dashboard.html
+🎯 Basal Ganglia Decay
+======================
+Date: 2026-07-20
+Habit/procedure decay: 3% per day inactive
+Suppression decay:     0.5% per day since last reinforced
+
+
+✅ Decayed 0 item(s)
+
+Done. Backup saved to: /home/cody/.openclaw/workspace/memory/habit-state.backup.json
+🎯 Synced 0 chunked habits, 0 active habits, 0 procedures, 0 suppressions to /home/cody/.openclaw/workspace/BASAL_GANGLIA_STATE.md
+🧠 Dashboard generated: /home/cody/.openclaw/workspace/brain-dashboard.html
+🧠 Memory Decay Process
+=======================
+Date: 2026-07-20
+Decay rate: 0.99 per day
+
+Processing memories...
+
+✅ Decayed 0 memories
+
+Done. Backup saved to: /home/cody/.openclaw/workspace/memory/index.backup.json
+
+✅ Synced 0 core memories to /home/cody/.openclaw/workspace/HIPPOCAMPUS_CORE.md
+🧠 Dashboard generated: /home/cody/.openclaw/workspace/brain-dashboard.html

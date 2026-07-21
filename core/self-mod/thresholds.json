@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "phase": 3,
+  "rollback": {
+    "task_success_decrease_max": 0.03,
+    "latency_increase_max": 0.20,
+    "memory_kv_increase_max": 0.15,
+    "any_regression_failure": true
+  },
+  "ranking": {
+    "top_k": 3,
+    "min_pre_utility": -1.0
+  },
+  "graduation": {
+    "asymmetric": true,
+    "notes": "Per-proposal accept: sandbox success AND no rollback threshold breach AND utility U strictly greater than baseline U. Review-frequency: separate clean-streak of 20 consecutive clean proposals (graduation-tracker.sh); any failure resets to 0.",
+    "require_sandbox_success": true,
+    "require_utility_improvement": true,
+    "require_manifest": true,
+    "forbid_immutable_targets": true,
+    "review_frequency": {
+      "clean_streak_target": 20,
+      "state_file": "memory/self-mod/graduation-streak.json",
+      "module": "core/self-mod/graduation-tracker.sh"
+    }
+  },
+  "monitoring": {
+    "post_deploy_window_ticks": 50,
+    "auto_rollback_on_breach": true
+  }
+}

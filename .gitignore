@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+
+# Local secrets & env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# Runtime / workspace (live agent memory lives under ~/.openclaw, not here)
+*.lock
+*.tmp
+*.bak
+
+# Logs & local noise
+logs/
+*.log
+
+# Large model weights (never commit GGUF/binaries)
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.onnx
+
+# Local verification noise that may contain host paths only if needed —
+# verification evidence IS committed (small text/json). Keep packs.
+
+# Test temp
+/tmp/

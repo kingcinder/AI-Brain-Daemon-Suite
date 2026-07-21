@@ -1,0 +1,19 @@
+{
+  "clean_streak": 0,
+  "clean_streak_target": 20,
+  "history": [
+    {
+      "event": "failure_reset",
+      "proposal_id": "prop_cerebellum_v4verify_model_assist",
+      "reason": "threshold_or_checklist_failure",
+      "streak_after": 0,
+      "streak_before": 0,
+      "ts": "2026-07-20T21:18:40Z"
+    }
+  ],
+  "last_event": "failure_reset",
+  "last_proposal_id": "prop_cerebellum_v4verify_model_assist",
+  "last_reason": "threshold_or_checklist_failure",
+  "last_updated": "2026-07-20T21:18:40Z",
+  "review_mode": "full_review"
+}

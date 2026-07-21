@@ -1,0 +1,27 @@
+JOB                          KIND     DAYS       HOURS                    MINUTES    TARGET
+heartbeat_beat               direct   *          *                        7,37       ok
+hippocampus_decay            direct   *          3                        2          ok
+hippocampus_encoding         spawn    *          0,3,6,9,12,15,18,21      0          (sessions:spawn task, 268 chars)
+hippocampus_weekly_consolidation spawn    6          2                        34         (sessions:spawn task, 420 chars)
+hippocampus_weekly_reflection spawn    6          2                        44         (sessions:spawn task, 609 chars)
+amygdala_decay               direct   *          0,6,12,18                5          ok
+amygdala_encoding            spawn    *          0,3,6,9,12,15,18,21      10         (sessions:spawn task, 164 chars)
+vta_decay                    direct   *          4,12,20                  8          ok
+vta_encoding                 spawn    *          0,3,6,9,12,15,18,21      20         (sessions:spawn task, 169 chars)
+basal_ganglia_decay          direct   *          4                        12         ok
+basal_ganglia_encoding       spawn    *          0,3,6,9,12,15,18,21      30         (sessions:spawn task, 278 chars)
+insula_encoding              direct   *          0,3,6,9,12,15,18,21      40         ok
+insula_decay                 direct   *          0,4,8,12,16,20           14         ok
+acc_conflict_encoding        direct   *          0,3,6,9,12,15,18,21      50         ok
+acc_conflict_decay           direct   *          0,4,8,12,16,20           16         ok
+acc_error_analysis           spawn    *          4,12,20                  18         (sessions:spawn task, 91 chars)
+pfc_decay                    direct   *          0,6,12,18                22         ok
+social_decay                 direct   *          0                        24         ok
+social_encoding              spawn    *          0,3,6,9,12,15,18,21      52         (sessions:spawn task, 142 chars)
+cerebellum_refine            direct   *          0,8,16                   26         ok
+executive_goal_cycle         direct   *          1,9,17                   28         ok
+self_mod_monitor             direct   *          2,10,18                  32         ok
+
+hermes: found (/home/cody/.local/bin/hermes)
+
+✅ All checks passed.

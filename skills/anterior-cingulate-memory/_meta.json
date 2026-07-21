@@ -1,0 +1,67 @@
+{
+  "name": "anterior-cingulate-memory",
+  "version": "1.0.0",
+  "description": "Conflict detection and uncertainty monitoring for AI agents. Tracks information conflicts, ambiguous intent, and cognitive load. Part of the AI Brain series.",
+  "author": "ImpKind",
+  "license": "MIT",
+  "homepage": "https://github.com/ImpKind/anterior-cingulate-memory",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ImpKind/anterior-cingulate-memory"
+  },
+  "tags": [
+    "memory",
+    "monitoring",
+    "conflict",
+    "uncertainty",
+    "ai-brain",
+    "metacognition"
+  ],
+  "requires": {
+    "os": [
+      "darwin",
+      "linux"
+    ],
+    "bins": [
+      "jq",
+      "awk",
+      "bc",
+      "python3"
+    ]
+  },
+  "openclaw": {
+    "emoji": "\u26a1",
+    "category": "memory",
+    "inject": [
+      "ACC_CONFLICT_STATE.md"
+    ],
+    "cron": [
+      {
+        "schedule": "0 */4 * * *",
+        "script": "scripts/decay-load.sh",
+        "description": "Conflict load decay every 4 hours"
+      },
+      {
+        "schedule": "50 0,3,6,9,12,15,18,21 * * *",
+        "script": "scripts/encode-pipeline.sh",
+        "description": "LLM conflict detection from transcripts (staggered +50m)"
+      }
+    ],
+    "related": [
+      "hippocampus",
+      "amygdala-memory",
+      "vta-memory",
+      "basal-ganglia-memory",
+      "insula-memory",
+      "acc-error-memory"
+    ]
+  },
+  "related": [
+    "hippocampus",
+    "amygdala-memory",
+    "vta-memory",
+    "acc-error-memory",
+    "basal-ganglia-memory",
+    "insula-memory"
+  ]
+}

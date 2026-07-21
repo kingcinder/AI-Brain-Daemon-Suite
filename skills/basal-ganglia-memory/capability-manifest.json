@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "module": "basal-ganglia-memory",
+  "version": "0.2.2",
+  "capabilities": [
+    "habit_encoding",
+    "habit_reinforcement",
+    "habit_decay"
+  ],
+  "inputs": [
+    {
+      "name": "habit_events",
+      "type": "event",
+      "source": "workspace/events"
+    },
+    {
+      "name": "habit_state",
+      "type": "state_file",
+      "source": "memory/habit-state.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "habit_state",
+      "type": "state_write",
+      "target": "memory/habit-state.json"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "spawns_inference",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/test_basal_ganglia_habits.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

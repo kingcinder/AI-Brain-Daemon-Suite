@@ -1,0 +1,72 @@
+{
+  "first_run_note": "see pipeline_e2e_result.json",
+  "after_fix": {
+    "evaluations": [
+      {
+        "accepted": true,
+        "reason": "",
+        "utility": {
+          "U": 0.38465,
+          "components": {
+            "task_success": 1.0,
+            "resource_cost": 0.10233333333333333,
+            "error_rate": 0.0,
+            "regression_penalty": 0.0
+          },
+          "weights": {
+            "alpha": 0.4,
+            "beta": 0.15,
+            "gamma": 0.25,
+            "delta": 0.2
+          },
+          "formula": "U = α(TS) - β(RC) - γ(ER) - δ(RP)"
+        },
+        "threshold": [],
+        "graduation": {
+          "review_mode": "full_review",
+          "graduated": false,
+          "clean_streak": 1,
+          "clean_streak_target": 20,
+          "remaining_to_graduate": 19,
+          "source_file": "/home/cody/.openclaw/workspace/memory/self-mod/graduation-streak.json",
+          "note": "Relaxed review only after 20 consecutive clean proposals; any failure resets to 0."
+        }
+      }
+    ],
+    "deploy": {
+      "proposal_id": "prop_cerebellum_v4verify_model_assist",
+      "deployed_at": "2026-07-20T21:19:40Z",
+      "pre_snapshot": "20260720T211940Z-pre-deploy-prop_cerebellum_v4verify_model_assist-152022",
+      "post_snapshot": "20260720T211940Z-post-deploy-prop_cerebellum_v4verify_model_assist-152118",
+      "backup_dir": "/home/cody/.openclaw/workspace/memory/self-mod/backups/prop_cerebellum_v4verify_model_assist",
+      "suite_root": "/home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE",
+      "apply": {
+        "ok": true,
+        "mode": "file_write",
+        "applied": [
+          "skills/cerebellum-memory/scripts/get-calibration.sh"
+        ],
+        "dry_run": false
+      },
+      "divergence_at_deploy": {
+        "baseline": "20260720T211940Z-pre-deploy-prop_cerebellum_v4verify_model_assist-152022",
+        "goals_changed": false,
+        "inhibitions_changed": false,
+        "executive_load_divergent": false,
+        "executive_load_delta": 0.0,
+        "baseline_executive_load": 0.0,
+        "current_executive_load": 0.0,
+        "retest_required": false,
+        "rule": {
+          "goals_inhibitions": "any change -> fresh snapshot + re-test",
+          "executive_load": "abs diff > 0.12 -> re-test"
+        }
+      },
+      "monitor": {
+        "status": "active",
+        "breaches": []
+      },
+      "rolled_back": false
+    }
+  }
+}

@@ -1,0 +1,3 @@
+/sys/class/drm/card1: 7691MB / 8573MB = 89.7%
+VRAM_PCT=89.7
+VRAM_GATE=PASS

@@ -1,0 +1,83 @@
+Query: Generate ONE self-modification proposal as a single JSON object (no 
+markdown).
+module: cerebellum-memory
+target_paths: ["skills/cerebellum-memory/scripts/get-calibration.sh"]
+Task: return the FULL new file body in "content" with exactly one added comment 
+line after the header comments:
+# V4-verify: calibration lookup is read-primary (2026-07-20)
+Do not change logic. Do not touch decide.sh or core/.
+JSON keys required: proposal_id, module, target_paths, content, 
+estimated_components (task_success, resource_cost, error_rate, 
+regression_penalty floats 0-1).
+CURRENT FILE:
+#!/bin/bash
+# get-calibration.sh — Usage: get-calibration.sh [--skill <name>] [--json]
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
+exec 200>"$STATE_FILE.lock"
+flock 200
+[ ! -f "$STATE_FILE" ] && { echo "❌ No cerebellum state found"; exit 1; }
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' 
+"$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; }
+2>/dev/null || true
+
+SKILL=""; JSON_OUT=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skill) SKILL="$2"; shift 2 ;;
+        --json) JSON_OUT=true; shift ;;
+        *) shift ;;
+    esac
+done
+
+if [ "$JSON_OUT" = true ]; then
+    if [ -n "$SKILL" ]; then
+        jq --arg s "$SKILL" '.skills[$s] // {}' "$STATE_FILE"
+    else
+        cat "$STATE_FILE"
+    fi
+    exit 0
+fi
+
+if [ -n "$SKILL" ]; then
+    EXISTS=$(jq --arg s "$SKILL" '.skills | has($s)' "$STATE_FILE")
+    [ "$EXISTS" != "true" ] && { echo "No data yet for '$SKILL'"; exit 0; }
+    jq -r --arg s "$SKILL" '.skills[$s] | "\($s // "skill"): 
+precision=\(.precision) smoothness=\(.smoothness) reps=\(.reps)"' "$STATE_FILE" 
+2>/dev/null
+    jq -r --arg s "$SKILL" '.skills[$s].recentCorrections[:3][] | "  note: 
+\(.note)"' "$STATE_FILE" 2>/dev/null
+else
+    echo "🎚️ Cerebellum Calibration"
+    echo "─────────────────────────"
+    echo "Global: $(jq -r '.globalCalibration' "$STATE_FILE")"
+    echo ""
+    COUNT=$(jq '.skills | length' "$STATE_FILE")
+    if [ "$COUNT" -eq 0 ]; then
+        echo "No skills tracked yet."
+    else
+        jq -r '.skills | to_entries[] | "\(.key): precision=\(.value.precision) 
+smoothness=\(.value.smoothness) reps=\(.value.reps)"' "$STATE_FILE"
+    fi
+fi
+Initializing agent...
+────────────────────────────────────────
+
+  ┊ 📝 preparing skill_manage…
+  ┊ ⚡ skill_man cerebellum-memory  0.1s [Skill 'cerebellum-memory' not found in active...]
+
+╭─ ⚕ Hermes ───────────────────────────────────────────────────────────────────╮
+    I encountered an error while trying to apply the patch. It seems the
+    skill 'cerebellum-memory' is not found in the active profile. Please
+    ensure the skill is correctly loaded or available in the current environment.
+    
+    If you'd like, I can list the available skills for you to choose from.
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+Resume this session with:
+  hermes --resume 20260720_141812_d82361
+
+Session:        20260720_141812_d82361
+Duration:       7s
+Messages:       4 (1 user, 2 tool calls)

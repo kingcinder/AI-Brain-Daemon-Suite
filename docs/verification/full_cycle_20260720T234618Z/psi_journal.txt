@@ -1,0 +1,2 @@
+Jul 20 15:16:22 codypc python3[186871]: [2026-07-20T22:16:22Z] [WARNING] PSI trigger write failed for memory ([Errno 22] Invalid argument). Root can arm triggers; unprivileged write returns EINVAL on this kernel. Falling back to avg10 poll mode for memory.
+Jul 20 15:16:22 codypc python3[186871]: [2026-07-20T22:16:22Z] [WARNING] PSI trigger write failed for cpu ([Errno 22] Invalid argument). Root can arm triggers; unprivileged write returns EINVAL on this kernel. Falling back to avg10 poll mode for cpu.

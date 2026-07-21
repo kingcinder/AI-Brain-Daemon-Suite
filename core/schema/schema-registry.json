@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "title": "AI Brain Suite Schema Registry",
+  "version": "4.0.0",
+  "description": "Phase 1a schema versioning skeleton. Each named document type declares current schema_version and compatible range.",
+  "document_types": {
+    "pfc-state": {
+      "schema_version": "1.0",
+      "min_compatible": "1.0",
+      "path_glob": "memory/pfc-state.json",
+      "required_fields": ["version", "goals", "inhibitions", "executiveLoad"]
+    },
+    "daemon-state": {
+      "schema_version": "1.0",
+      "min_compatible": "1.0",
+      "path_glob": "memory/deep-brain-kernel-state.json",
+      "required_fields": ["jobs"]
+    },
+    "capability-manifest": {
+      "schema_version": "1.0",
+      "min_compatible": "1.0",
+      "path_glob": "skills/*/capability-manifest.json",
+      "required_fields": ["schema", "module", "version", "capabilities", "inputs", "outputs", "side_effects", "dependencies", "tests", "immutable"]
+    },
+    "provenance-entry": {
+      "schema_version": "1.0",
+      "min_compatible": "1.0",
+      "path_glob": "memory/provenance/*.jsonl",
+      "required_fields": ["proposal_id", "content_hash", "parent_hash", "timestamp", "proposer", "sandbox_score", "utility_score", "rollback_status"]
+    },
+    "executive-load-sample": {
+      "schema_version": "1.0",
+      "min_compatible": "1.0",
+      "path_glob": "memory/executive-load.json",
+      "required_fields": ["E", "G", "Q", "I_sec", "tick", "timestamp"]
+    },
+    "snapshot-meta": {
+      "schema_version": "1.0",
+      "min_compatible": "1.0",
+      "path_glob": "memory/snapshots/*/meta.json",
+      "required_fields": ["snapshot_id", "created_at", "files", "executive_load", "goals_hash", "inhibitions_hash"]
+    }
+  },
+  "immutable_core_modules": [
+    "decide.sh",
+    "locks/rwlock.sh",
+    "locks/pid-lock.sh",
+    "concurrency/semaphore.sh",
+    "sandbox/sandbox-run.sh",
+    "executive-load/calc-executive-load.sh",
+    "self-modification-pipeline"
+  ]
+}

@@ -1,0 +1,88 @@
+# aibrain.service — systemd --user unit for brain-daemon.sh
+#
+# INSTALLATION:
+#   1. Copy brain-daemon.sh to your workspace root:
+#        cp brain-daemon.sh ~/.openclaw/workspace/brain-daemon.sh
+#        chmod +x ~/.openclaw/workspace/brain-daemon.sh
+#
+#   2. Copy this file into place:
+#        mkdir -p ~/.config/systemd/user
+#        cp aibrain.service ~/.config/systemd/user/aibrain.service
+#
+#   3. Edit the Environment= and PATH lines below (see the two gotchas
+#      explained under EDIT BEFORE ENABLING), then:
+#        systemctl --user daemon-reload
+#        systemctl --user enable --now aibrain.service
+#
+#   4. Verify:
+#        systemctl --user status aibrain.service
+#        journalctl --user -u aibrain.service -f
+#
+#   5. Once you've confirmed it's been running cleanly for a while, remove
+#      the old per-skill cron entries (`crontab -e`, or `openclaw cron
+#      remove --name <job>` for each one currently listed by
+#      `openclaw cron list`) — the daemon replaces all of them (see
+#      BRAIN_DAEMON_SCHEDULE.md for the full old-cron → new-daemon mapping).
+#      Don't remove the old cron entries until you've confirmed the daemon
+#      is actually running the jobs — belt and suspenders during the
+#      transition costs nothing but a few duplicate log lines.
+#
+# EDIT BEFORE ENABLING — two real gotchas, not hypothetical:
+#
+#   (a) WORKSPACE: a `systemctl --user` service does NOT inherit your
+#       interactive shell's environment (whatever you've exported in
+#       .bashrc/.profile is invisible here) — it starts from a minimal,
+#       separate environment. The Environment= line below sets WORKSPACE
+#       explicitly using systemd's %h specifier (expands to your home
+#       directory), which matches the suite's own default
+#       ($HOME/.openclaw/workspace). If your actual workspace lives
+#       somewhere else, change that line to the real absolute path —
+#       don't assume it'll pick up whatever WORKSPACE is set to in your
+#       terminal, because it won't.
+#
+#   (b) PATH: same issue — systemd user services get a minimal PATH by
+#       default, which may not include wherever `openclaw`, `jq`, `curl`,
+#       or `python3` actually live if any of those are installed somewhere
+#       non-standard (a user-local npm/pip bin directory, a version
+#       manager shim, etc). If `journalctl --user -u aibrain.service` shows
+#       "openclaw not found in PATH" or similar even though it works fine
+#       in your terminal, that's this — add an explicit
+#       Environment=PATH=/usr/bin:/bin:/your/actual/path/here line below.
+#       Run `which openclaw jq curl python3` in your normal terminal to
+#       find the real paths if you're not sure.
+
+[Unit]
+Description=AI Brain Suite unified scheduling daemon
+Documentation=file:BRAIN_DAEMON_SCHEDULE.md
+After=network-online.target
+
+[Service]
+Type=simple
+
+# See gotcha (a) above. Adjust the path if your workspace isn't the default.
+Environment=WORKSPACE=%h/.openclaw/workspace
+
+# See gotcha (b) above. Uncomment and edit if openclaw/jq/curl/python3 aren't
+# found — journalctl will tell you clearly if this is needed.
+# Environment=PATH=/usr/bin:/bin:/usr/local/bin:%h/.local/bin
+
+ExecStart=%h/.openclaw/workspace/brain-daemon.sh
+
+# Crash recovery: if the daemon dies for any reason, systemd brings it back
+# after a short pause rather than leaving the whole suite un-scheduled.
+Restart=always
+RestartSec=10
+
+# Give the daemon a moment to notice SIGTERM and log a clean shutdown line
+# (see brain-daemon.sh's own trap handlers) before systemd escalates to
+# SIGKILL on `systemctl --user stop`.
+TimeoutStopSec=15
+
+# journald captures stdout/stderr automatically for a Type=simple service —
+# no separate log file or logger wrapper needed. `journalctl --user -u
+# aibrain.service` is the log.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

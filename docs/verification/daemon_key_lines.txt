@@ -1,0 +1,11 @@
+Jul 20 14:14:23 codypc python3[146757]: [2026-07-20T21:14:23Z] [WARNING] executive load E=0.960 band=hard_ceiling_zone — load-reduction active (deferring non-essential spawn jobs; G=0 Q=8 I_sec=0.00)
+Jul 20 14:14:23 codypc python3[146757]: [2026-07-20T21:14:23Z] [WARNING] executive load E=0.960 band=hard_ceiling_zone — load-reduction active (deferring non-essential spawn jobs; G=0 Q=8 I_sec=0.00)
+Jul 20 14:14:53 codypc python3[146757]: [2026-07-20T21:14:53Z] [WARNING] executive load E=0.960 band=hard_ceiling_zone — load-reduction active (deferring non-essential spawn jobs; G=0 Q=8 I_sec=0.00)
+Jul 20 14:15:23 codypc python3[146757]: [2026-07-20T21:15:23Z] [WARNING] executive load E=0.960 band=hard_ceiling_zone — load-reduction active (deferring non-essential spawn jobs; G=0 Q=8 I_sec=0.00)
+Jul 20 14:15:53 codypc python3[146757]: [2026-07-20T21:15:53Z] [WARNING] executive load E=0.960 band=hard_ceiling_zone — load-reduction active (deferring non-essential spawn jobs; G=0 Q=8 I_sec=0.00)
+Jul 20 14:16:23 codypc python3[146757]: [2026-07-20T21:16:23Z] [WARNING] executive load E=0.960 band=hard_ceiling_zone — load-reduction active (deferring non-essential spawn jobs; G=0 Q=8 I_sec=0.00)
+Jul 20 14:16:23 codypc python3[146757]: [2026-07-20T21:16:23Z] [INFO] executive_goal_cycle: running /home/cody/.openclaw/workspace/skills/executive-function/scripts/run-cycle.sh
+Jul 20 14:16:23 codypc python3[146757]: [2026-07-20T21:16:23Z] [INFO] executive_goal_cycle: completed
+Jul 20 14:16:53 codypc python3[146757]: [2026-07-20T21:16:53Z] [WARNING] executive load E=0.960 band=hard_ceiling_zone — load-reduction active (deferring non-essential spawn jobs; G=0 Q=8 I_sec=0.00)
+Jul 20 14:17:23 codypc python3[146757]: [2026-07-20T21:17:23Z] [WARNING] executive load E=0.960 band=hard_ceiling_zone — load-reduction active (deferring non-essential spawn jobs; G=0 Q=8 I_sec=0.00)
+Jul 20 14:17:23 codypc python3[146757]: [2026-07-20T21:17:23Z] [WARNING] amygdala_encoding: due now but executive load reduction is active — deferring spawn

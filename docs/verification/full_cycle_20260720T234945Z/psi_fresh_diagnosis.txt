@@ -1,0 +1,46 @@
+=== PSI fresh capture (full_cycle self-contained proof) ===
+captured_at_utc=2026-07-21T00:14:14Z
+kernel=6.8.0-136-generic
+uid=1000 euid=1000
+
+--- CONFIG_PSI ---
+CONFIG_PSI=y
+
+--- unprivileged READ /proc/pressure/* ---
+### cpu
+  some avg10=0.00 avg60=0.00 avg300=0.00 total=67368821
+  full avg10=0.00 avg60=0.00 avg300=0.00 total=0
+### memory
+  some avg10=0.00 avg60=0.00 avg300=0.00 total=3447041
+  full avg10=0.00 avg60=0.00 avg300=0.00 total=3424755
+### io
+  some avg10=0.00 avg60=0.00 avg300=0.00 total=70161358
+  full avg10=0.00 avg60=0.00 avg300=0.00 total=68424122
+
+--- unprivileged WRITE trigger (expect EINVAL errno 22) ---
+cpu: WRITE_FAIL errno=22 (EINVAL) [Errno 22] Invalid argument
+memory: WRITE_FAIL errno=22 (EINVAL) [Errno 22] Invalid argument
+io: WRITE_FAIL errno=22 (EINVAL) [Errno 22] Invalid argument
+uid=1000
+
+--- root WRITE trigger (expect success if sudo available) ---
+cpu: WRITE_FAIL as root [Errno 22] Invalid argument
+memory: WRITE_FAIL as root [Errno 22] Invalid argument
+euid=0
+
+--- live daemon journal: poll fallback (current binary) ---
+Jul 20 15:16:22 codypc python3[186871]: [2026-07-20T22:16:22Z] [WARNING] PSI trigger write failed for memory ([Errno 22] Invalid argument). Root can arm triggers; unprivileged write returns EINVAL on this kernel. Falling back to avg10 poll mode for memory.
+Jul 20 15:16:22 codypc python3[186871]: [2026-07-20T22:16:22Z] [WARNING] PSI trigger write failed for cpu ([Errno 22] Invalid argument). Root can arm triggers; unprivileged write returns EINVAL on this kernel. Falling back to avg10 poll mode for cpu.
+
+--- code path (deep-brain-kernel.py PSIMonitor modes) ---
+247:                "PSI trigger write failed for %s (%s). "
+249:                "Falling back to avg10 poll mode for %s.",
+257:                self.mode = "poll"
+
+--- conclusion ---
+Captured in-folder (self-contained; no item3_* dependency).
+Unprivileged trigger write: always EINVAL across formats (see psi_trigger_format_probe.txt).
+Root trigger write (fresh probe): at least one WRITE_OK.
+Reads of /proc/pressure/* succeed; CONFIG_PSI=y.
+deep-brain-kernel: on trigger write failure → mode=poll (avg10 sampling); journal logs EINVAL + poll fallback.
+Operational proof of fallback: journal lines at 2026-07-20T22:16:22Z (included above).

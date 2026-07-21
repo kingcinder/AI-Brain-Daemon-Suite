@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "module": "self-mod-runner",
+  "version": "0.1.0",
+  "capabilities": [
+    "post_deploy_monitor",
+    "pipeline_entry"
+  ],
+  "inputs": [
+    {
+      "name": "deploy_records",
+      "type": "state_file",
+      "source": "memory/self-mod/deploys/",
+      "required": false
+    },
+    {
+      "name": "live_metrics",
+      "type": "state_file",
+      "source": "memory/self-mod/live-metrics.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "monitor_actions",
+      "type": "log_entry",
+      "target": "memory/self-mod/deploys/"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/run_phase3_harness.sh",
+      "kind": "regression"
+    }
+  ],
+  "immutable": false
+}

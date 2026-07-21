@@ -1,0 +1,19 @@
+OK: model_vram 89.6
+OK: health
+OK: phase1
+OK: phase2
+OK: phase3
+OK: skill_units
+OK: manifests
+OK: daemon_check
+OK: aibrain_active
+OK: llm_generate
+OK: llm_raw_is_json
+OK: evaluate_accepted
+OK: latency_checked
+OK: deploy
+OK: deploy_marker_present
+OK: rollback
+OK: rollback_marker_removed
+OK: psi_fallback_logged_or_active
+OK: immutable_decide_rejected

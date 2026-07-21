@@ -1,0 +1,16 @@
+{
+  "accepted": true,
+  "reason": "",
+  "U": 0.384617,
+  "latency_checked": true,
+  "latency_sec": 6.1534,
+  "latency_increase": -0.0007145409074669207,
+  "breaches": [],
+  "baseline_file": {
+    "task_success": 0.7,
+    "latency_sec": 6.1578,
+    "memory_kv_norm": 1.0,
+    "source": "evaluate-proposal-measured",
+    "measured_at": "2026-07-20T23:08:54Z"
+  }
+}

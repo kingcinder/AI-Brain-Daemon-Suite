@@ -1,0 +1,24 @@
+{
+  "proposal_id": "prop_local_9a3f2e",
+  "module": "cerebellum-memory",
+  "target_paths": [
+    "skills/cerebellum-memory/scripts/get-calibration.sh"
+  ],
+  "model_generated": null,
+  "proposer": "local-llama-quality",
+  "source": "local_llama_server_8080",
+  "content_head": [
+    "#!/bin/bash",
+    "# get-calibration.sh — Usage: get-calibration.sh [--skill <name>] [--json]",
+    "# V4-verify: calibration lookup is read-primary (2026-07-20)",
+    "# V4-local-verify: local llama Quality GGUF proposal (2026-07-20)",
+    "set -e",
+    "WORKSPACE=\"${WORKSPACE:-$HOME/.openclaw/workspace}\""
+  ],
+  "est": {
+    "task_success": 0.95,
+    "resource_cost": 0.1,
+    "error_rate": 0.02,
+    "regression_penalty": 0.0
+  }
+}

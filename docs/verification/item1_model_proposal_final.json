@@ -1,0 +1,26 @@
+{
+  "proposal_id": "prop_8a7b9c1d",
+  "module": "cerebellum-memory",
+  "target_paths": [
+    "skills/cerebellum-memory/scripts/get-calibration.sh"
+  ],
+  "insert_after_line": 3,
+  "insert_lines": [
+    "# V4-llm-gen: model-proposed annotation (2026-07-20)"
+  ],
+  "estimated_components": {
+    "task_success": 0.95,
+    "resource_cost": 0.02,
+    "error_rate": 0.01,
+    "regression_penalty": 0.0
+  },
+  "patch_mode": "insert_lines",
+  "model_insert_after_line": 3,
+  "model_insert_lines": [
+    "# V4-llm-gen: model-proposed annotation (2026-07-20)"
+  ],
+  "content": "#!/bin/bash\n# get-calibration.sh \u2014 Usage: get-calibration.sh [--skill <name>] [--json]\n# V4-verify: calibration lookup is read-primary (2026-07-20)\n# V4-llm-gen: model-proposed annotation (2026-07-20)\nset -e\nWORKSPACE=\"${WORKSPACE:-$HOME/.openclaw/workspace}\"\nSTATE_FILE=\"$WORKSPACE/memory/cerebellum-state.json\"\nexec 200>\"$STATE_FILE.lock\"\nflock 200\n[ ! -f \"$STATE_FILE\" ] && { echo \"\u274c No cerebellum state found\"; exit 1; }\n{ jq --arg now \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" '.lastConsultedAt = $now' \"$STATE_FILE\" > \"$STATE_FILE.tmp.$$\" && mv \"$STATE_FILE.tmp.$$\" \"$STATE_FILE\"; } 2>/dev/null || true\n\nSKILL=\"\"; JSON_OUT=false\nwhile [[ $# -gt 0 ]]; do\n    case $1 in\n        --skill) SKILL=\"$2\"; shift 2 ;;\n        --json) JSON_OUT=true; shift ;;\n        *) shift ;;\n    esac\ndone\n\nif [ \"$JSON_OUT\" = true ]; then\n    if [ -n \"$SKILL\" ]; then\n        jq --arg s \"$SKILL\" '.skills[$s] // {}' \"$STATE_FILE\"\n    else\n        cat \"$STATE_FILE\"\n    fi\n    exit 0\nfi\n\nif [ -n \"$SKILL\" ]; then\n    EXISTS=$(jq --arg s \"$SKILL\" '.skills | has($s)' \"$STATE_FILE\")\n    [ \"$EXISTS\" != \"true\" ] && { echo \"No data yet for '$SKILL'\"; exit 0; }\n    jq -r --arg s \"$SKILL\" '.skills[$s] | \"\\($s // \"skill\"): precision=\\(.precision) smoothness=\\(.smoothness) reps=\\(.reps)\"' \"$STATE_FILE\" 2>/dev/null\n    jq -r --arg s \"$SKILL\" '.skills[$s].recentCorrections[:3][] | \"  note: \\(.note)\"' \"$STATE_FILE\" 2>/dev/null\nelse\n    echo \"\ud83c\udf9a\ufe0f Cerebellum Calibration\"\n    echo \"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\"\n    echo \"Global: $(jq -r '.globalCalibration' \"$STATE_FILE\")\"\n    echo \"\"\n    COUNT=$(jq '.skills | length' \"$STATE_FILE\")\n    if [ \"$COUNT\" -eq 0 ]; then\n        echo \"No skills tracked yet.\"\n    else\n        jq -r '.skills | to_entries[] | \"\\(.key): precision=\\(.value.precision) smoothness=\\(.value.smoothness) reps=\\(.value.reps)\"' \"$STATE_FILE\"\n    fi\nfi\n",
+  "proposer": "generate-proposals-llm",
+  "source": "llm",
+  "model_generated": true
+}

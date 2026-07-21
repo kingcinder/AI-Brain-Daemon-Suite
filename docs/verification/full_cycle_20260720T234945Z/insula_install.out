@@ -1,0 +1,11 @@
+🌡️ Installing insula-memory...
+   ✅ Memory directory: /home/cody/.openclaw/workspace/memory
+   ✅ Created interoceptive-state.json
+✅ INSULA_STATE.md updated
+   ✅ Generated INSULA_STATE.md
+🧠 Dashboard generated: /home/cody/.openclaw/workspace/brain-dashboard.html
+   ✅ Brain Dashboard updated
+
+🌡️ Insula installed!
+   View dashboard: /home/cody/.openclaw/workspace/brain-dashboard.html
+   Session start:  /home/cody/Documents/AI Brain Suite/AI_BRAIN_SUITE_COMPLETE/skills/insula-memory/scripts/load-sense.sh

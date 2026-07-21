@@ -1,0 +1,28 @@
+{
+  "evaluations": [
+    {
+      "proposal_id": "prop_cerebellum_v4verify_model_assist",
+      "accepted": false,
+      "reason": "rollback_threshold_breach",
+      "utility": {
+        "U": 0.384638,
+        "components": {
+          "task_success": 1.0,
+          "resource_cost": 0.10241333333333333,
+          "error_rate": 0.0,
+          "regression_penalty": 0.0
+        },
+        "weights": {
+          "alpha": 0.4,
+          "beta": 0.15,
+          "gamma": 0.25,
+          "delta": 0.2
+        },
+        "formula": "U = α(TS) - β(RC) - γ(ER) - δ(RP)"
+      },
+      "regression_exit": 0,
+      "elapsed_sec": 6.1448
+    }
+  ],
+  "deploy": null
+}

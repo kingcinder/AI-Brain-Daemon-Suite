@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "accepted": [
+    {
+      "target": "skills/cerebellum-memory/scripts/get-calibration.sh",
+      "module": "cerebellum-memory",
+      "manifest": "skills/cerebellum-memory/capability-manifest.json"
+    }
+  ],
+  "rejected": [],
+  "module": "cerebellum-memory"
+}

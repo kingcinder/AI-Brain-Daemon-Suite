@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "module": "executive-function",
+  "version": "0.1.0",
+  "capabilities": [
+    "isolated_reflection",
+    "goal_proposal",
+    "goal_promotion",
+    "daemon_cycle_entry"
+  ],
+  "inputs": [
+    {
+      "name": "workspace_memory",
+      "type": "state_file",
+      "source": "memory/",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "cycle_marker",
+      "type": "state_write",
+      "target": "memory/executive/last-cycle.json"
+    },
+    {
+      "name": "goal_proposals",
+      "type": "log_entry",
+      "target": "memory/executive/goal-proposals.jsonl"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/run_phase2_harness.sh",
+      "kind": "regression"
+    }
+  ],
+  "immutable": false
+}

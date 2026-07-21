@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "phase": 3,
+  "formula": "U = α(Task Success) - β(Resource Cost) - γ(Error Rate) - δ(Regression Penalty)",
+  "weights": {
+    "alpha_task_success": 0.40,
+    "beta_resource_cost": 0.15,
+    "gamma_error_rate": 0.25,
+    "delta_regression_penalty": 0.20
+  },
+  "normalization": "L1: alpha + beta + gamma + delta = 1",
+  "components": {
+    "task_success": "Percent of tasks/goals reaching complete within 50-tick post-deployment window",
+    "resource_cost": "Normalized 0-1 inference time + KV cache usage vs sibling-module baseline average",
+    "error_rate": "Fraction of sandbox/regression test runs that failed during proposal evaluation (pre-deployment)",
+    "regression_penalty": "Scaled 0-1 from count/severity of post-deploy regression failures; single rollback-triggering event maps to 1.0"
+  },
+  "notes": "Starting values for Phase 3; revisit after first real batch of ranked proposals."
+}

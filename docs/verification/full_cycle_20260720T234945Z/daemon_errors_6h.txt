@@ -1,0 +1,6 @@
+      1 Jul 20 16:37:22 codypc python3[186871]: [2026-07-20T23:37:22Z] [ERROR] heartbeat_beat: exited with status 1 — output: ❌ No heartbeat state found at /home/cody/.openclaw/workspace/memory/heartbeat-state.json
+      1 Jul 20 16:07:22 codypc python3[186871]: [2026-07-20T23:07:22Z] [ERROR] heartbeat_beat: exited with status 1 — output: ❌ No heartbeat state found at /home/cody/.openclaw/workspace/memory/heartbeat-state.json
+      1 Jul 20 15:37:22 codypc python3[186871]: [2026-07-20T22:37:22Z] [ERROR] heartbeat_beat: exited with status 1 — output: ❌ No heartbeat state found at /home/cody/.openclaw/workspace/memory/heartbeat-state.json
+      1 Jul 20 15:07:07 codypc python3[158342]: [2026-07-20T22:07:07Z] [ERROR] heartbeat_beat: exited with status 1 — output: ❌ No heartbeat state found at /home/cody/.openclaw/workspace/memory/heartbeat-state.json
+      1 Jul 20 14:40:06 codypc python3[158342]: [2026-07-20T21:40:06Z] [ERROR] insula_encoding: exited with status 1 — output: 🌡️ Insula Encode Pipeline — 2026-07-20T21:40:06Z
+      1 Jul 20 14:37:06 codypc python3[158342]: [2026-07-20T21:37:06Z] [ERROR] heartbeat_beat: exited with status 1 — output: ❌ No heartbeat state found at /home/cody/.openclaw/workspace/memory/heartbeat-state.json

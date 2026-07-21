@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "module": "amygdala-memory",
+  "version": "1.7.0",
+  "capabilities": [
+    "emotion_encoding",
+    "emotion_decay",
+    "valence_arousal_tracking"
+  ],
+  "inputs": [
+    {
+      "name": "emotional_events",
+      "type": "event",
+      "source": "workspace/events"
+    },
+    {
+      "name": "emotional_state",
+      "type": "state_file",
+      "source": "memory/emotional-state.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "emotional_state",
+      "type": "state_write",
+      "target": "memory/emotional-state.json"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "spawns_inference",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/test_amygdala_get_state.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}
