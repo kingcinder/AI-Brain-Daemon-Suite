@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: AI Brain Suite regression harnesses
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (jq)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Bash syntax check (all .sh files)
+        run: |
+          set -e
+          find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -n1 bash -n
+
+      - name: Python syntax check (daemon)
+        run: python3 -m py_compile deep-brain-kernel.py
+
+      - name: Skill unit tests (tests/test_*.sh)
+        run: bash tests/run_skill_unit_tests.sh
+
+      - name: Phase 1 harness (locks, schema, provenance, executive-load, semaphore, snapshot, sandbox, PFC decide)
+        run: bash tests/run_phase1_harness.sh
+
+      - name: Phase 2 harness (executive function, goal proposals, manifests)
+        run: bash tests/run_phase2_harness.sh
+
+      - name: Phase 3 harness (self-mod pipeline, deploy, rollback, monitor)
+        run: bash tests/run_phase3_harness.sh
