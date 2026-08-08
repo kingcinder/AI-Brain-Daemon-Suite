@@ -6,6 +6,14 @@
 # auto-deploy the top accepted proposal; in full_review it queues for human
 # approval instead. LLM provider failure is non-fatal — run-pipeline records
 # it and continues with whatever is already queued in the store.
+#
+# --defer-gate (added with the M8 audit trail): when the refreshed autonomy
+# contract is steward_mode + full_review, the cycle DEFERS the whole run
+# instead of churning through generation/evaluation only to skip the deploy
+# at the end. The deferral is written to pipeline-runs/latest.json and logged
+# as a provenance event (autonomy.gate.deferred), so the weekly cycle's
+# behavior is fully auditable — the human is the operator until they grant
+# auto_mode or relax review.
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
@@ -42,6 +50,7 @@ bash "$PIPELINE" \
   --workspace "$WORKSPACE" \
   --generate-llm \
   --autonomy-gate \
+  --defer-gate \
   2>"$WORKSPACE/memory/self-mod/proposal-cycle.err" &
 PIPE_PID=$!
 trap 'kill "$PIPE_PID" 2>/dev/null || true' TERM INT

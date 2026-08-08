@@ -13,7 +13,7 @@
 #   run-pipeline.sh [--workspace PATH] [--suite-root PATH] [--top-k N]
 #                   [--proposal PATH] [--proposals-dir DIR]
 #                   [--no-deploy] [--dry-run]
-#                   [--autonomy-gate]
+#                   [--autonomy-gate] [--defer-gate]
 #
 # --autonomy-gate (ROADMAP M2 + M8): reads graduation-tracker
 #   review-frequency and, under the M8 autonomy contract, the persisted
@@ -25,6 +25,14 @@
 #   with a reason). A missing/unreadable autonomy-state.json is treated as
 #   steward_mode (fail-safe: never over-grant autonomy on absent evidence).
 #   Without this flag, behavior is unchanged (deploy first accepted proposal).
+#
+# --defer-gate (weekly cycle): when combined with --autonomy-gate, a
+#   steward_mode + full_review contract DEFERS the whole run — the pipeline
+#   exits 0 early with a deferred summary instead of churning through
+#   baseline/generate/rank/evaluate only to skip the deploy at the end. The
+#   weekly cycle defers until the human either grants auto_mode or relaxes
+#   review; the deferred decision is recorded in pipeline-runs and as a
+#   provenance event (autonomy.gate.deferred).
 #
 # Does not modify Immutable Core modules. Pipeline code under core/self-mod
 # is never a legal proposal target.
@@ -42,6 +50,7 @@ NO_DEPLOY=0
 DRY=0
 GENERATE_LLM=0
 AUTONOMY_GATE=0
+DEFER_GATE=0
 LLM_MODULE=""
 LLM_PROVIDER=""
 
@@ -56,6 +65,7 @@ while [[ $# -gt 0 ]]; do
     --dry-run) DRY=1; NO_DEPLOY=1; shift ;;
     --generate-llm) GENERATE_LLM=1; shift ;;
     --autonomy-gate) AUTONOMY_GATE=1; shift ;;
+    --defer-gate) DEFER_GATE=1; shift ;;
     --llm-module) LLM_MODULE="$2"; shift 2 ;;
     --llm-provider) LLM_PROVIDER="$2"; shift 2 ;;
     -h|--help)
@@ -70,6 +80,38 @@ export WORKSPACE
 mkdir -p "$WORKSPACE/memory/self-mod/proposals" \
          "$WORKSPACE/memory/self-mod/deploys" \
          "$WORKSPACE/memory/self-mod/pipeline-runs"
+
+# ── 0. Defer gate (weekly cycle): steward_mode + full_review defers early ───
+# The cycle passes --defer-gate; a direct --proposal invocation without it
+# keeps the M2 skip-deploy behavior (proposal still evaluated, then queued
+# for human approval). With the flag, the contract is consulted BEFORE any
+# baseline/generate/rank/evaluate churn, and a steward_mode + full_review
+# contract defers the entire run: explicit deferred summary in pipeline-runs
+# + a provenance event, exit 0 (a defer is a successful, auditable no-op,
+# not a failure — the daemon must not flag the weekly cycle as broken).
+# --defer-gate is documented as "when combined with --autonomy-gate"; require
+# both so a lone --defer-gate can never silently change deploy behavior.
+if [ "$DEFER_GATE" -eq 1 ] && [ "$AUTONOMY_GATE" -eq 1 ]; then
+  DEFER_RM=$(WORKSPACE="$WORKSPACE" bash "$SELF_DIR/graduation-tracker.sh" review-frequency \
+    2>/dev/null | jq -r '.review_mode // "full_review"' 2>/dev/null || echo "full_review")
+  DEFER_RM="${DEFER_RM:-full_review}"
+  DEFER_AM=$(jq -r '.mode // "steward_mode"' "$WORKSPACE/memory/self-mod/autonomy-state.json" 2>/dev/null || echo "steward_mode")
+  DEFER_AM="${DEFER_AM:-steward_mode}"
+  if [ "$DEFER_AM" != "auto_mode" ] && [ "$DEFER_RM" != "relaxed_review" ]; then
+    TS_DEF=$(date -u +"%Y%m%dT%H%M%SZ")
+    DEF_SUMMARY=$(jq -nc --arg ts "$TS_DEF" --arg am "$DEFER_AM" --arg rm "$DEFER_RM" \
+      '{pipeline:"phase3-self-mod", timestamp:$ts, autonomy_gate:true, deferred:true, reason:"steward_full_review_deferred", autonomy_mode:$am, review_mode:$rm}')
+    echo "$DEF_SUMMARY" > "$WORKSPACE/memory/self-mod/pipeline-runs/run_${TS_DEF}.json"
+    echo "$DEF_SUMMARY" | tee "$WORKSPACE/memory/self-mod/pipeline-runs/latest.json"
+    if [ -f "$ROOT/core/provenance/log-provenance.sh" ]; then
+      WORKSPACE="$WORKSPACE" bash "$ROOT/core/provenance/log-provenance.sh" event \
+        --event "autonomy.gate.deferred" --actor "run-pipeline" \
+        --detail "$(jq -nc --arg am "$DEFER_AM" --arg rm "$DEFER_RM" '{autonomy_mode:$am, review_mode:$rm, reason:"steward_full_review_deferred"}')" \
+        >/dev/null 2>&1 || true
+    fi
+    exit 0
+  fi
+fi
 
 # ── 1. Baseline ─────────────────────────────────────────────────────────────
 BASE_SNAP=$(WORKSPACE="$WORKSPACE" bash "$ROOT/core/snapshot/snapshot.sh" create --label "pipeline-baseline")
@@ -153,6 +195,13 @@ if [ "$NO_DEPLOY" -eq 0 ] && [ -n "$DEPLOY_CANDIDATE" ]; then
     # M2/M8: steward_mode + full_review queues for human approval — no auto-deploy
     DEPLOY_RESULT=$(jq -nc --arg p "$DEPLOY_CANDIDATE" --arg m "${REVIEW_MODE:-full_review}" --arg a "${AUTONOMY_MODE:-steward_mode}" \
       '{skipped:true, reason:"full_review_human_approval_required", review_mode:$m, autonomy_mode:$a, would_deploy:$p}')
+    # Audit trail: every autonomy-mode gate outcome is a provenance event.
+    if [ -f "$ROOT/core/provenance/log-provenance.sh" ]; then
+      WORKSPACE="$WORKSPACE" bash "$ROOT/core/provenance/log-provenance.sh" event \
+        --event "autonomy.gate.deploy_blocked" --actor "run-pipeline" \
+        --detail "$(jq -nc --arg p "$DEPLOY_CANDIDATE" --arg m "${REVIEW_MODE:-full_review}" --arg a "${AUTONOMY_MODE:-steward_mode}" '{proposal:$p, autonomy_mode:$a, review_mode:$m, reason:"full_review_human_approval_required"}')" \
+        >/dev/null 2>&1 || true
+    fi
   else
     # attach baseline metrics into deploy record path via env file
     DEPLOY_RESULT=$(bash "$SELF_DIR/deploy-proposal.sh" \
@@ -160,6 +209,15 @@ if [ "$NO_DEPLOY" -eq 0 ] && [ -n "$DEPLOY_CANDIDATE" ]; then
       --suite-root "$SUITE_ROOT" \
       --workspace "$WORKSPACE" \
       --skip-eval)
+    # Audit trail: auto/relaxed deploy decision is a provenance event. Only
+    # when the gate was actually consulted — a no-gate run (--autonomy-gate
+    # absent) makes no autonomy decision and must not pollute the audit trail.
+    if [ "$AUTONOMY_GATE" -eq 1 ] && [ -f "$ROOT/core/provenance/log-provenance.sh" ]; then
+      WORKSPACE="$WORKSPACE" bash "$ROOT/core/provenance/log-provenance.sh" event \
+        --event "autonomy.gate.deploy_allowed" --actor "run-pipeline" \
+        --detail "$(jq -nc --arg p "$DEPLOY_CANDIDATE" --arg m "${REVIEW_MODE:-}" --arg a "${AUTONOMY_MODE:-}" '{proposal:$p, autonomy_mode:$a, review_mode:$m, reason:"autonomy_gate_passed"}')" \
+        >/dev/null 2>&1 || true
+    fi
     # Store baseline metrics on deploy record
     DPID=$(echo "$DEPLOY_RESULT" | jq -r .proposal_id)
     if [ -f "$WORKSPACE/memory/self-mod/deploys/${DPID}.json" ]; then

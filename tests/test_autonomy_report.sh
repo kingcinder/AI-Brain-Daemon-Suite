@@ -120,5 +120,19 @@ assert e3["mode"] == "steward_mode" and e3["transition"] == "revoked", f"e3: {e3
 assert e3["evidence"]["unhealthy_jobs"] == 1, f"e3 evidence: {e3}"
 print("autonomy history ledger tags granted/revoked/steady transitions: ok")
 
+# ── provenance events: every autonomy-mode decision is auditable ─────────────
+# print_autonomy() also appends an autonomy.mode.decided event (with the
+# transition) to memory/provenance/events.jsonl via log-provenance.sh event.
+prov = ws / "memory/provenance/events.jsonl"
+assert prov.exists(), f"provenance events.jsonl written: {prov}"
+ev_lines = prov.read_text().splitlines()
+assert len(ev_lines) == 3, f"one event per --autonomy run: {ev_lines}"
+ev = json.loads(ev_lines[0])
+assert ev["event"] == "autonomy.mode.decided" and ev["actor"] == "deep-brain-kernel", f"ev: {ev}"
+assert ev["detail"]["transition"] == "initial" and ev["detail"]["mode"] == "auto_mode", f"ev detail: {ev}"
+assert json.loads(ev_lines[1])["detail"]["transition"] == "steady", ev_lines[1]
+assert json.loads(ev_lines[2])["detail"]["transition"] == "revoked" and json.loads(ev_lines[2])["detail"]["mode"] == "steward_mode", ev_lines[2]
+print("provenance events logged per autonomy-mode decision: ok")
+
 print("PASS: autonomy-report")
 PY

@@ -181,6 +181,107 @@ else
 fi
 rm -f "$PROP"
 
+# ── M8: --defer-gate defers the whole run in steward + full_review ─────────
+section "M8-defer-gate-defers"
+# Fresh workspace slice to avoid deploy pollution from the auto_mode run
+WD=$(mktemp -d)
+mkdir -p "$WD/memory/self-mod"
+cat > "$WD/memory/self-mod/graduation-streak.json" << 'EOF'
+{
+  "clean_streak": 3,
+  "clean_streak_target": 20,
+  "last_event": "harness",
+  "last_updated": "2026-08-08T00:00:00Z",
+  "history": []
+}
+EOF
+cat > "$WD/memory/self-mod/autonomy-state.json" << 'EOF'
+{
+  "mode": "steward_mode",
+  "auto": false,
+  "computed_at": "2026-08-08T00:00:00Z",
+  "evidence": {"graduated": false, "clean_streak": 3, "unhealthy_jobs": 0, "auto_rollbacks_in_window": 0}
+}
+EOF
+PROPD=$(make_proposal prop_m8_deferred '#!/bin/bash
+# demo
+echo "hello-v2-deferred"')
+PIPED=$(WORKSPACE="$WD" bash "$SM/run-pipeline.sh" \
+  --suite-root "$SUITE" --workspace "$WD" --proposal "$PROPD" \
+  --autonomy-gate --defer-gate 2>/tmp/p9_def_err.$$) || {
+  cat /tmp/p9_def_err.$$ >&2
+  fail "pipeline exit 0 with --defer-gate in steward/full_review"
+  PIPED="{}"
+}
+rm -f /tmp/p9_def_err.$$
+if echo "$PIPED" | jq -e '.deferred==true and .reason=="steward_full_review_deferred" and .autonomy_mode=="steward_mode" and .review_mode=="full_review"' >/dev/null; then
+  pass "--defer-gate: steward+full_review defers with explicit reason + modes"
+else
+  fail "--defer-gate: deferral summary ($PIPED)"
+fi
+if [ -f "$WD/memory/self-mod/pipeline-runs/latest.json" ] && echo "$PIPED" | grep -q deferred; then
+  pass "--defer-gate: deferred run recorded in pipeline-runs/latest.json"
+else
+  fail "--defer-gate: latest.json deferred record ($PIPED)"
+fi
+if grep -q 'autonomy.gate.deferred' "$WD/memory/provenance/events.jsonl" 2>/dev/null; then
+  pass "--defer-gate: provenance event autonomy.gate.deferred logged"
+else
+  fail "--defer-gate: provenance event missing ($(cat "$WD/memory/provenance/events.jsonl" 2>/dev/null || echo 'no events file'))"
+fi
+if ! grep -q 'hello-v2-deferred' "$SUITE/skills/demo-mod/scripts/hello.sh"; then
+  pass "--defer-gate: no deploy on deferral (content not applied)"
+else
+  fail "--defer-gate: content applied despite deferral"
+fi
+rm -f "$PROPD"
+rm -rf "$WD"
+
+# ── M8: --defer-gate must NOT defer when auto_mode (contract wins) ──────────
+section "M8-defer-gate-auto-mode-deploys"
+WA=$(mktemp -d)
+mkdir -p "$WA/memory/self-mod"
+cat > "$WA/memory/self-mod/graduation-streak.json" << 'EOF'
+{
+  "clean_streak": 3,
+  "clean_streak_target": 20,
+  "last_event": "harness",
+  "last_updated": "2026-08-08T00:00:00Z",
+  "history": []
+}
+EOF
+cat > "$WA/memory/self-mod/autonomy-state.json" << 'EOF'
+{
+  "mode": "auto_mode",
+  "auto": true,
+  "computed_at": "2026-08-08T00:00:00Z",
+  "evidence": {"graduated": true, "clean_streak": 25, "unhealthy_jobs": 0, "auto_rollbacks_in_window": 0}
+}
+EOF
+PROPA=$(make_proposal prop_m8_deferauto '#!/bin/bash
+# demo
+echo "hello-v2-deferauto"')
+PIPEA=$(WORKSPACE="$WA" bash "$SM/run-pipeline.sh" \
+  --suite-root "$SUITE" --workspace "$WA" --proposal "$PROPA" \
+  --autonomy-gate --defer-gate 2>/tmp/p9_defa_err.$$) || {
+  cat /tmp/p9_defa_err.$$ >&2
+  fail "pipeline exit 0 with --defer-gate in auto_mode"
+  PIPEA="{}"
+}
+rm -f /tmp/p9_defa_err.$$
+if echo "$PIPEA" | jq -e '.deferred != true and .deploy.proposal_id=="prop_m8_deferauto"' >/dev/null; then
+  pass "--defer-gate: auto_mode still deploys (contract overrides deferral)"
+else
+  fail "--defer-gate: auto_mode deploy ($PIPEA)"
+fi
+if grep -q 'hello-v2-deferauto' "$SUITE/skills/demo-mod/scripts/hello.sh"; then
+  pass "--defer-gate auto_mode: content applied"
+else
+  fail "--defer-gate auto_mode: content applied"
+fi
+rm -f "$PROPA"
+rm -rf "$WA"
+
 # ── M8: steward_mode + full_review → human approval required (M2 preserved) ─
 section "M8-steward-full-review-blocks"
 # Fresh workspace slice to avoid deploy pollution from the auto_mode run
@@ -231,6 +332,13 @@ if ! grep -q 'hello-v2-steward' "$SUITE/skills/demo-mod/scripts/hello.sh"; then
   pass "steward full_review: proposal content NOT applied (no auto-deploy)"
 else
   fail "steward full_review: proposal content applied despite block"
+fi
+# Every autonomy-mode gate outcome is a provenance event — the skip (queue
+# for human approval) must be auditable too.
+if grep -q 'autonomy.gate.deploy_blocked' "$W2/memory/provenance/events.jsonl" 2>/dev/null; then
+  pass "steward full_review: provenance event autonomy.gate.deploy_blocked logged"
+else
+  fail "steward full_review: deploy_blocked provenance event missing ($(cat "$W2/memory/provenance/events.jsonl" 2>/dev/null || echo 'no events file'))"
 fi
 rm -f "$PROP2"
 rm -rf "$W2"
@@ -338,6 +446,14 @@ if echo "$PIPE5" | jq -e '.autonomy_mode=="" or .autonomy_mode==null' >/dev/null
   pass "no gate: autonomy_mode unset (not consumed)"
 else
   fail "no gate: autonomy_mode unset ($PIPE5)"
+fi
+# A no-gate run makes no autonomy decision — it must NOT write an autonomy
+# gate provenance event (the audit trail stays truthful: only real gate
+# decisions are recorded).
+if [ ! -f "$W5/memory/provenance/events.jsonl" ] || ! grep -q 'autonomy.gate' "$W5/memory/provenance/events.jsonl" 2>/dev/null; then
+  pass "no gate: no autonomy provenance event written (no decision made)"
+else
+  fail "no gate: autonomy provenance event written without a gate ($(cat "$W5/memory/provenance/events.jsonl" 2>/dev/null))"
 fi
 rm -f "$PROP5"
 rm -rf "$W5"

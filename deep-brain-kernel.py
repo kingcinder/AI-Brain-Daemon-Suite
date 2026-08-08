@@ -1824,6 +1824,7 @@ def print_autonomy() -> int:
     # mode differs from the previous computation, so the dashboard can show
     # WHEN and WHY auto_mode was granted or revoked. Best-effort — a ledger
     # write failure must never change the exit code or the persisted state.
+    transition = "initial"
     try:
         hist_file = WORKSPACE / "memory" / "self-mod" / "autonomy-history.jsonl"
         prev_mode = None
@@ -1853,6 +1854,32 @@ def print_autonomy() -> int:
         with open(hist_file, "a", encoding="utf-8") as hf:
             hf.write(_json.dumps(entry) + "\n")
     except OSError:
+        pass
+    # Explicit provenance event: every autonomy-mode decision is auditable in
+    # memory/provenance/events.jsonl (core/provenance/log-provenance.sh event),
+    # alongside the history ledger. Best-effort — the audit trail must never
+    # be able to change the exit code.
+    try:
+        prov_script = Path(__file__).resolve().parent / "core" / "provenance" / "log-provenance.sh"
+        if prov_script.is_file():
+            detail = _json.dumps({
+                "mode": mode["mode"],
+                "auto": mode["auto"],
+                "transition": transition,
+                "computed_at": mode["computed_at"],
+            })
+            subprocess.run(
+                ["bash", str(prov_script), "event",
+                 "--event", "autonomy.mode.decided",
+                 "--actor", "deep-brain-kernel",
+                 "--detail", detail],
+                env={**os.environ, "WORKSPACE": str(WORKSPACE)},
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=15,
+                check=False,
+            )
+    except (OSError, subprocess.SubprocessError, ValueError):
         pass
     print(_json.dumps(mode, indent=2))
     return 0 if mode["auto"] else 1
