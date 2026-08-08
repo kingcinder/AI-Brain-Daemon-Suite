@@ -763,6 +763,21 @@ class DaemonState:
             "last_success_utc": None, "last_failure_utc": None, "last_error": None,
         })
         now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        # M5: append this real run's outcome to the per-run history ledger
+        # (memory/daemon-job-history.jsonl) so the dashboard's /__daemon can
+        # render a per-job success-rate trend over time — the cumulative
+        # job_stats counters alone can't show whether a job is improving.
+        # Best-effort only: a write failure must never fail the job record.
+        try:
+            history_path = self.path.parent / "daemon-job-history.jsonl"
+            # The memory dir may not exist yet on the first real run (before
+            # any save() call) — create it so the first outcome line is never
+            # silently dropped by the FileNotFoundError path.
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with open(history_path, "a", encoding="utf-8") as hf:
+                hf.write(json.dumps({"ts": now, "job": job_name, "success": success}) + "\n")
+        except OSError:
+            pass
         if success:
             stats["success"] += 1
             stats["consecutive_failures"] = 0

@@ -65,18 +65,44 @@ mapfile -t MODULES < <(
   done
 )
 
+# ROADMAP M5: brain-health context for outcome-driven proposals. Gathered
+# BEFORE target-module selection so a module with real verification failures
+# can steer where proposals are aimed, and injected into the PROMPT below so
+# the model proposes fixes for what is actually breaking. Missing sources
+# degrade to empty/zero inside health-context.sh — never aborts generation.
+HEALTH_CTX=""
+if [ -x "$SELF_DIR/health-context.sh" ]; then
+  HEALTH_CTX=$(WORKSPACE="$WORKSPACE" bash "$SELF_DIR/health-context.sh" 2>/dev/null || true)
+fi
+HEALTH_MODULE=""
+if [ -n "$HEALTH_CTX" ]; then
+  # First module named in the latest sweep's failure list, e.g.
+  # "acc-error-memory:tests/test_x.sh (exit 1)" → acc-error-memory.
+  HEALTH_MODULE=$(printf '%s' "$HEALTH_CTX" | jq -r \
+    '.verification.failures[]? | split(":")[0]' 2>/dev/null | head -1)
+fi
+
 if [ -n "$MODULE" ]; then
   ok=0
   for m in "${MODULES[@]}"; do [ "$m" = "$MODULE" ] && ok=1; done
   [ "$ok" -eq 1 ] || { echo "module not allowed: $MODULE" >&2; exit 1; }
   TARGET_MODULE="$MODULE"
 else
+  # M5: prefer the module with a real verification failure over the static
+  # preference list — target what is breaking, not what is convenient.
   TARGET_MODULE=""
-  for pref in cerebellum-memory insula-memory social-memory heartbeat-memory; do
+  if [ -n "$HEALTH_MODULE" ]; then
     for m in "${MODULES[@]}"; do
-      if [ "$m" = "$pref" ]; then TARGET_MODULE="$pref"; break 2; fi
+      if [ "$m" = "$HEALTH_MODULE" ]; then TARGET_MODULE="$m"; break; fi
     done
-  done
+  fi
+  if [ -z "$TARGET_MODULE" ]; then
+    for pref in cerebellum-memory insula-memory social-memory heartbeat-memory; do
+      for m in "${MODULES[@]}"; do
+        if [ "$m" = "$pref" ]; then TARGET_MODULE="$pref"; break 2; fi
+      done
+    done
+  fi
   TARGET_MODULE="${TARGET_MODULE:-${MODULES[0]}}"
 fi
 
@@ -144,6 +170,11 @@ Rules:
 - insert_lines: 1-3 lines only; must be shell comments starting with # ; no code changes.
 - Prefer a comment similar to: ${COMMENT_LINE}
 - Never target decide.sh or core/self-mod, core/locks, core/concurrency, core/sandbox, core/executive-load.
+- If the health context shows a real failure for this module, orient the comment
+  toward mitigating it; otherwise keep the annotation general.
+
+CURRENT BRAIN HEALTH CONTEXT (JSON — use it to decide what deserves a fix):
+${HEALTH_CTX:-null}
 
 NUMBERED FILE EXCERPT (${TARGET_REL}):
 ${NUMBERED}

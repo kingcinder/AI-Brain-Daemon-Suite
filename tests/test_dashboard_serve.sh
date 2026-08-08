@@ -155,6 +155,23 @@ else
     fail "/__daemon malformed: $DAEMON"
 fi
 
+# M5: seed a per-run outcome ledger, then /__daemon must surface a per-job
+# success-rate trend (the daemon-health sparkline source).
+mkdir -p "$TEST_WORKSPACE/memory"
+cat > "$TEST_WORKSPACE/memory/daemon-job-history.jsonl" << 'EOF'
+{"ts":"2026-08-08T07:00:00Z","job":"heartbeat_beat","success":true}
+{"ts":"2026-08-08T08:00:00Z","job":"verification_pass","success":true}
+{"ts":"2026-08-08T09:00:00Z","job":"verification_pass","success":false}
+{"ts":"2026-08-08T10:00:00Z","job":"verification_pass","success":true}
+EOF
+DAEMON2=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/__daemon")
+if echo "$DAEMON2" | jq -e '(.jobs.history.verification_pass.runs == 3) and (.jobs.history.verification_pass.success_rate | type) == "number" and (.jobs.history.heartbeat_beat.recent | type) == "array"' >/dev/null 2>&1; then
+    pass "/__daemon computes per-job success-rate history from the ledger"
+else
+    fail "/__daemon history malformed: $DAEMON2"
+fi
+rm -f "$TEST_WORKSPACE/memory/daemon-job-history.jsonl"
+
 # The regenerate endpoint must reject anonymous POSTs (token-gated mutation).
 REGEN_NO_TOKEN=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 -X POST "http://127.0.0.1:$PORT/__regenerate")
 if [ "$REGEN_NO_TOKEN" = "403" ]; then
@@ -187,6 +204,11 @@ if [[ "$BODY2" == *'id="statusDot"'* ]] && [[ "$BODY2" == *'id="regenBtn"'* ]]; 
     pass "rebuilt dashboard carries live status bar + regenerate button"
 else
     fail "rebuilt dashboard missing status bar or regenerate button"
+fi
+if [[ "$BODY2" == *'id="statusSpark"'* ]] && [[ "$BODY2" == *'renderJobSparkline'* ]]; then
+    pass "rebuilt dashboard carries the daemon-health sparkline"
+else
+    fail "rebuilt dashboard missing the daemon-health sparkline"
 fi
 
 # ── Test 7: status / stop lifecycle ─────────────────────────────────────

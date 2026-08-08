@@ -238,6 +238,11 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
         .regen-btn { margin-left: auto; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.72rem; font-weight: 600; padding: 6px 14px; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
         .regen-btn:hover { border-color: var(--accent); color: var(--text); box-shadow: 0 0 12px var(--accent-glow); }
         .regen-btn:disabled { opacity: 0.5; cursor: wait; }
+        .sparkline { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+        .spark-bar { width: 4px; border-radius: 1px; background: var(--text-muted); transition: height 0.4s ease; }
+        .spark-bar.ok { background: var(--emerald); }
+        .spark-bar.warn { background: var(--amber); }
+        .spark-bar.bad { background: #ef4444; }
     </style>
 </head>
 <body>
@@ -265,6 +270,7 @@ cat >> "$OUTPUT_FILE" << HEADER
         <div class="statusbar-item"><span class="beat-dot" id="statusDot"></span><span id="statusBeat">💓 beat —</span></div>
         <div class="statusbar-item"><span id="statusJob">⚙️ job —</span></div>
         <div class="statusbar-item"><span id="statusFrags">🧩 fragments —</span></div>
+        <div class="statusbar-item" id="statusSparkWrap" title="per-job success rate, most recent runs"><span id="statusSparkLabel">📈 —</span><span class="sparkline" id="statusSpark"></span></div>
         <div class="statusbar-item"><span id="statusHealth">✅ —</span></div>
         <button class="regen-btn" id="regenBtn" title="Run every skill's sync-state.sh, then rebuild the dashboard">🔄 Regenerate</button>
     </div>
@@ -387,6 +393,30 @@ function setStatus(id, text, cls) {
   el.className = 'statusbar-item' + (cls ? ' ' + cls : '');
 }
 
+function renderJobSparkline(d) {
+  const wrap = document.getElementById('statusSparkWrap');
+  const spark = document.getElementById('statusSpark');
+  const label = document.getElementById('statusSparkLabel');
+  if (!wrap || !spark) return;
+  const hist = (d.jobs && d.jobs.history) || {};
+  const jobs = Object.keys(hist).sort((a, b) => (hist[b].runs - hist[a].runs) || a.localeCompare(b));
+  if (!jobs.length) {
+    label.textContent = '📈 no runs yet';
+    spark.innerHTML = '';
+    return;
+  }
+  const shown = jobs.slice(0, 6);
+  const bars = shown.map(j => {
+    const h = hist[j];
+    const pct = Math.round((h.success_rate || 0) * 100);
+    const cls = pct >= 90 ? 'ok' : pct >= 50 ? 'warn' : 'bad';
+    const height = Math.max(2, Math.round((h.success_rate || 0) * 12));
+    return '<span class="spark-bar ' + cls + '" style="height:' + height + 'px" title="' + j + ': ' + pct + '% (' + h.runs + ' runs)"></span>';
+  }).join('');
+  label.textContent = '📈 ' + shown.length + ' job' + (shown.length === 1 ? '' : 's');
+  spark.innerHTML = bars;
+}
+
 function pollStatus() {
   fetch('/__daemon?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.json())
@@ -406,6 +436,7 @@ function pollStatus() {
       } else {
         setStatus('statusHealth', '✅ all healthy');
       }
+      renderJobSparkline(d);
     })
     .catch(() => { setStatus('statusBeat', '💓 daemon offline'); });
 

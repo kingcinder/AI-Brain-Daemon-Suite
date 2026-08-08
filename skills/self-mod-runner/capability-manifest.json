@@ -40,6 +40,10 @@
     {
       "path": "tests/run_phase4_harness.sh",
       "kind": "regression"
+    },
+    {
+      "path": "tests/test_health_context.sh",
+      "kind": "unit"
     }
   ],
   "immutable": false

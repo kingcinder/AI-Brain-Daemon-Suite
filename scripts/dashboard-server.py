@@ -141,7 +141,38 @@ class Handler(SimpleHTTPRequestHandler):
         return {"count": len(frags), "fragments": frags, "lastChanged_ns": last}
 
     def _daemon_payload(self):
-        payload = {"heartbeat": None, "jobs": {"stats": {}, "lastFired": {}}, "summary": {"lastJobRun": None, "unhealthyJobs": []}}
+        payload = {"heartbeat": None, "jobs": {"stats": {}, "lastFired": {}, "history": {}}, "summary": {"lastJobRun": None, "unhealthyJobs": []}}
+        # M5: per-job success-rate trend from the daemon's per-run outcome
+        # ledger (memory/daemon-job-history.jsonl, appended by the kernel on
+        # every real job run). Mirrors the verification tab's sparkline.
+        hist_path = os.path.join(WORKSPACE, "memory", "daemon-job-history.jsonl")
+        by_job = {}
+        try:
+            with open(hist_path, encoding="utf-8") as hf:
+                for line in hf:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        e = json.loads(line)
+                    except ValueError:
+                        continue
+                    job = e.get("job")
+                    if not job:
+                        continue
+                    by_job.setdefault(job, []).append(1 if e.get("success") else 0)
+        except OSError:
+            pass
+        history = {}
+        for job, points in by_job.items():
+            recent = points[-10:]  # sparkline window: last 10 real runs
+            ok = sum(recent)
+            history[job] = {
+                "runs": len(recent),  # runs in the 10-run window, not lifetime
+                "success_rate": round(ok / len(recent), 3) if recent else 0.0,
+                "recent": recent,
+            }
+        payload["jobs"]["history"] = history
         hb = self._load_json(os.path.join(WORKSPACE, "memory", "heartbeat-state.json"))
         if isinstance(hb, dict):
             payload["heartbeat"] = {
