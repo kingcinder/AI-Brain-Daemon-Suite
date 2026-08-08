@@ -98,7 +98,10 @@ vulkaninfo | grep -A3 heapBudget
 Compare what you see against the key paths `_parse_vulkaninfo_json()` /
 `_parse_vulkaninfo_text()` look for in `deep-brain-kernel.py`
 (`VkPhysicalDeviceMemoryBudgetPropertiesEXT` / `heapBudget` /
-`heapUsage`) and adjust the parsing there if your version's output shape
+`heapUsage` for stdout JSON; per-heap `size =` / `budget =` lines under
+`memoryHeaps[N]:` for plain text — this host's schema, summed only over
+`MEMORY_HEAP_DEVICE_LOCAL_BIT` heaps with `percent = (size − budget) /
+size × 100`) and adjust the parsing there if your version's output shape
 differs. If `vulkaninfo` doesn't parse cleanly for any reason, the amdgpu
 sysfs fallback needs no verification at all — it reads the kernel's own
 stable `mem_info_vram_used`/`mem_info_vram_total` files directly:
@@ -166,13 +169,14 @@ systemctl --user show -p DelegateControllers aibrain.service
 **2c. GPU VRAM parsing resolves real usage:**
 
 ```bash
-vulkaninfo --json 2>/dev/null | grep -c heapBudget   # parser's expected key path
-cat /sys/class/drm/card*/device/mem_info_vram_total   # amdgpu sysfs fallback
+vulkaninfo --json 2>/dev/null | grep -c heapBudget   # this build: 0 (empty stdout; VP artifact carries no budget data)
+vulkaninfo | grep -A5 memoryHeaps                     # live schema: per-heap `budget =` / `usage =` lines
+cat /sys/class/drm/card*/device/mem_info_vram_total   # amdgpu sysfs fallback (no longer needed on this host)
 cat /sys/class/drm/card*/device/mem_info_vram_used
 ```
 
-- [x] ▶ 2026-08-08: `vulkaninfo` present, but this Vulkan-Tools version emits **no `heapBudget`** (`grep -c` = 0) — exactly the version-drift the NOTE above warns about — so the daemon logs `vulkaninfo found but neither --json nor plain-text output yielded a usable memory-budget reading — falling back to amdgpu sysfs` and reads the kernel's own files: `vram_total=8573157376` (~8 GB RX 5700 XT), `vram_used=11677696`. VRAM gating is live via the fallback. (Optional hardening: update `_parse_vulkaninfo_*()` in `deep-brain-kernel.py` for this Vulkan-Tools schema, or accept the sysfs path.)
-- [ ] ▶ GPU *deferral firing*: not yet observed — current VRAM use is tiny (~11 MB of 8 GB); no spawn job has been deferred on the VRAM gate since the restart. Re-check while a Quality GGUF is loaded.
+- [x] ▶ 2026-08-08: **Vulkan memory-budget path is LIVE** (post-fix, daemon restarted onto the corrected formula 10:10:58 PDT): `_parse_vulkaninfo_text()` in `deep-brain-kernel.py` now matches this Vulkan-Tools version's per-heap schema — `memoryHeaps[N]:` blocks with `size =`/`budget =` lines, summing **only** `MEMORY_HEAP_DEVICE_LOCAL_BIT` heaps (actual VRAM; the 27 GiB host-RAM heap is excluded). Percent is `(size − budget) / size × 100` — Vulkan's `budget` is *remaining allocatable for this process* (accounts for everyone's usage), NOT total capacity, so it is used, and `usage` is deliberately ignored (it's only vulkaninfo's own trivial allocation). Live-verified against this heap while `llama-server` holds ~7.16 GiB: `size=8573157376` (7.98 GiB), `budget=881659904` (840.82 MiB free) → **~89.7%** — matching sysfs `mem_info_vram_used=7691493376` (7.16 GiB). Journal shows **no** `falling back to amdgpu sysfs` warning since the restart. The `--json` artifact (`VP_VULKANINFO_*.json`) is written to a temp cwd, so it no longer accumulates in the daemon home. Covered by `tests/test_vulkaninfo_parse.sh` (per-heap `(size−budget)/size`, host-heap exclusion, budget==size→0.0, usage-ignored, host-only→None, legacy-flat→None, VP-json→None, garbage→None).
+- [ ] ▶ GPU *deferral firing*: not yet observed — VRAM is now genuinely under load (~7.16 of 8 GiB held by `llama-server`), so the gate is actually triggerable; no spawn job has yet hit the VRAM deferral threshold since the restart. Re-check while a Quality GGUF is loaded.
 
 ### Criterion 3 — `--status` clean after 24h
 

@@ -217,10 +217,16 @@ lives in `SETUP_COMMANDS.md` §5. On this host, criterion 1 (all 29 jobs
 verified/armed across all three sub-checks: PSI poll-mode fallback active
 (`/proc/pressure/*` readable), rootless cgroup delegation confirmed
 (`DelegateControllers=cpu cpuset io memory pids`), and GPU VRAM resolved
-via the amdgpu sysfs fallback (`vulkaninfo` on this Vulkan-Tools version
-emits no `heapBudget`). The two observation-based checks — a deferral
-*actually firing* during a spawn job, and the 24h clean `--status` window
-— remain pending.
+via the **Vulkan memory-budget path** — `_parse_vulkaninfo_text()` now
+matches this Vulkan-Tools version's per-heap `size`/`budget` schema,
+summed only over `MEMORY_HEAP_DEVICE_LOCAL_BIT` heaps with `percent =
+(size − budget) / size × 100` (budget = remaining allocatable; usage
+deliberately ignored) — corrected 2026-08-08, daemon restarted onto it;
+previously it used the amdgpu sysfs fallback because the build emits no
+`heapBudget`. Live-verified at ~89.7% with `llama-server` holding ~7.16
+GiB (matches sysfs `mem_info_vram_used`). The two
+observation-based checks — a deferral *actually firing* during a spawn
+job, and the 24h clean `--status` window — remain pending.
 
 ---
 

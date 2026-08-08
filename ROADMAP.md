@@ -51,9 +51,17 @@ into its machinery parts). This host so far — criterion 1 ✅ (all 29 jobs
 `ok` via `--check`); criterion 2's **machinery** verified/armed: PSI
 poll-mode fallback active (`/proc/pressure/*` readable), rootless cgroup
 delegation confirmed (`DelegateControllers=cpu cpuset io memory pids`),
-and GPU VRAM resolved via the amdgpu sysfs fallback (`vulkaninfo` on this
-Vulkan-Tools version emits no `heapBudget`, so the documented fallback
-path is the live one). Still pending: a deferral *actually firing* during
+and GPU VRAM resolved via the **Vulkan memory-budget path** —
+`_parse_vulkaninfo_text()` now matches this Vulkan-Tools version's
+per-heap plain-text schema: `size =`/`budget =` lines summed only over
+`MEMORY_HEAP_DEVICE_LOCAL_BIT` heaps, `percent = (size − budget) / size
+× 100` (Vulkan's `budget` = remaining allocatable for this process, so it
+is used; `usage` is deliberately ignored — it's only vulkaninfo's own
+allocation). Previously it fell back to amdgpu sysfs because the build
+emits no `heapBudget`; corrected 2026-08-08 and the daemon restarted
+onto it, covered by `tests/test_vulkaninfo_parse.sh`. Live-verified at
+~89.7% with `llama-server` holding ~7.16 GiB (matches sysfs
+`mem_info_vram_used`). Still pending: a deferral *actually firing* during
 a spawn job, and the 24h `--status` clean-run window.
 
 ---

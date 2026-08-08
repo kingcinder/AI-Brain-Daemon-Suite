@@ -97,6 +97,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
@@ -335,14 +336,24 @@ def gpu_vram_percent() -> Optional[float]:
     """
     # ── 1. Vulkan (primary) ──────────────────────────────────────────────
     if shutil.which("vulkaninfo"):
+        # Run --json in a temp cwd: some Vulkan-Tools builds (incl. this
+        # host's) emit EMPTY stdout for --json and instead write a
+        # VP_VULKANINFO_*.json artifact into the cwd — which previously
+        # accumulated in the daemon's working directory on every spawn
+        # dispatch (verified: three had landed in $HOME). Parse stdout when
+        # a build does emit it; the VP artifact itself carries no
+        # memory-budget data (verified 2026-08-08), so it is not parsed —
+        # the plain-text path below is the live one on this host.
         try:
-            out = subprocess.run(
-                ["vulkaninfo", "--json"], capture_output=True, text=True, timeout=5,
-            )
-            if out.returncode == 0 and out.stdout.strip():
-                pct = _parse_vulkaninfo_json(out.stdout)
-                if pct is not None:
-                    return pct
+            with tempfile.TemporaryDirectory(prefix="aibrain-vulkaninfo-") as tmp:
+                out = subprocess.run(
+                    ["vulkaninfo", "--json"], capture_output=True, text=True,
+                    timeout=5, cwd=tmp,
+                )
+                if out.returncode == 0 and out.stdout.strip():
+                    pct = _parse_vulkaninfo_json(out.stdout)
+                    if pct is not None:
+                        return pct
         except (subprocess.SubprocessError, ValueError) as e:
             log.warning("vulkaninfo --json didn't parse as expected: %s", e)
 
@@ -460,11 +471,17 @@ def _search_vram_percent(node) -> Optional[float]:
 
 def _parse_vulkaninfo_json(raw: str) -> Optional[float]:
     """Best-effort parse of vulkaninfo --json's memory budget reporting.
-    NOT tested against a real Vulkan/RADV install (no GPU in the build
-    sandbox) — this schema has changed across Vulkan-Tools versions, so
-    this tries several plausible shapes and returns None (fail open) if
-    none match, rather than guessing. Verify with `vulkaninfo --json` on
-    the real machine and adjust the key paths here if needed.
+    The schema has changed across Vulkan-Tools versions, so this tries
+    several plausible shapes and returns None (fail open) if none match,
+    rather than guessing.
+
+    Verified on this host (2026-08-08): this Vulkan-Tools build emits
+    EMPTY stdout for --json and writes a VP_VULKANINFO_*.json artifact
+    whose schema (VP format: $schema/capabilities/profiles) carries NO
+    memory-budget data — so this parser legitimately returns None here and
+    the plain-text parser (_parse_vulkaninfo_text) is the live path.
+    The candidates below still cover builds that DO emit budget data on
+    stdout, including under the VP `capabilities.device` path.
     """
     try:
         data = json.loads(raw)
@@ -474,8 +491,12 @@ def _parse_vulkaninfo_json(raw: str) -> Optional[float]:
     candidates = []
     if isinstance(data, dict):
         candidates.append(data)
-        if "capabilities" in data and isinstance(data["capabilities"], dict):
-            candidates.append(data["capabilities"])
+        caps = data.get("capabilities")
+        if isinstance(caps, dict):
+            candidates.append(caps)
+            dev = caps.get("device")
+            if isinstance(dev, dict):
+                candidates.append(dev)
         devices = data.get("devices") if isinstance(data.get("devices"), list) else None
         if devices:
             candidates.extend(d for d in devices if isinstance(d, dict))
@@ -523,18 +544,40 @@ def _parse_vulkaninfo_json(raw: str) -> Optional[float]:
 
 
 def _parse_vulkaninfo_text(raw: str) -> Optional[float]:
-    """Fallback for vulkaninfo builds without full --json memory-budget
-    support: scan plain-text output for heapBudget/heapUsage lines. Also
-    NOT tested against a real install — same caveat as the JSON parser.
+    """Parses `memoryHeaps[N]:` blocks from real `vulkaninfo` plain-text
+    output, summing size/budget only across heaps flagged
+    MEMORY_HEAP_DEVICE_LOCAL_BIT (actual VRAM — excludes host-visible/
+    system-RAM heaps, which vulkaninfo lists separately with flags: None).
+
+    percent_used = (size - budget) / size * 100
+
+    NOT usage / budget: Vulkan's `budget` field is "how much this process
+    can still allocate right now" (accounts for everyone's usage), not
+    total heap capacity, and `usage` is only vulkaninfo's own trivial
+    allocation. Verified against real vulkaninfo output on RX 5700 XT
+    (RADV navi10), 2026-08-08 — heap[1], 7.98 GiB, DEVICE_LOCAL_BIT,
+    budget 840.82 MiB free == ~7.14 GiB already in use.
     """
     import re
-    budgets = [float(m) for m in re.findall(r"heapBudget\s*=\s*(\d+)", raw)]
-    usages = [float(m) for m in re.findall(r"heapUsage\s*=\s*(\d+)", raw)]
-    if budgets and usages and len(budgets) == len(usages):
-        total_budget = sum(budgets)
-        total_usage = sum(usages)
-        if total_budget > 0:
-            return (total_usage / total_budget) * 100.0
+    heap_starts = [m.start() for m in re.finditer(r'memoryHeaps\[\d+\]:', raw)]
+    if not heap_starts:
+        return None
+    heap_starts.append(len(raw))
+
+    total_size = 0.0
+    total_budget = 0.0
+    for i in range(len(heap_starts) - 1):
+        block = raw[heap_starts[i]:heap_starts[i + 1]]
+        if 'MEMORY_HEAP_DEVICE_LOCAL_BIT' not in block:
+            continue
+        size_m = re.search(r'size\s*=\s*(\d+)', block)
+        budget_m = re.search(r'budget\s*=\s*(\d+)', block)
+        if size_m and budget_m:
+            total_size += float(size_m.group(1))
+            total_budget += float(budget_m.group(1))
+
+    if total_size > 0:
+        return ((total_size - total_budget) / total_size) * 100.0
     return None
 
 
