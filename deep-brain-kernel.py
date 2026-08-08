@@ -116,11 +116,13 @@ log = logging.getLogger("deep-brain-kernel")
 WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / ".hermes" / "workspace")))
 SKILLS_DIR = WORKSPACE / "skills"
 
-# ROADMAP M3: provider abstraction for spawn jobs. SPAWN_PROVIDER=hermes
-# (default, external harness) or local (suite's own llm-call.sh endpoint).
-# Unknown values fall back to hermes with a warning — never fail to launch.
+# ROADMAP M3 + Gap-2 follow-on: provider abstraction for spawn jobs.
+# SPAWN_PROVIDER=hermes (default, external harness), local (suite's own
+# llm-call.sh endpoint), or agentloop (internal agentic loop — tool use +
+# session memory, core/agent-loop/agent-loop.sh). Unknown values fall back to
+# hermes with a warning — never fail to launch.
 SPAWN_PROVIDER = os.environ.get("SPAWN_PROVIDER", "hermes").strip().lower()
-if SPAWN_PROVIDER not in ("hermes", "local"):
+if SPAWN_PROVIDER not in ("hermes", "local", "agentloop"):
     log.warning("unknown SPAWN_PROVIDER '%s' — defaulting to hermes", SPAWN_PROVIDER)
     SPAWN_PROVIDER = "hermes"
 SPAWN_PROVIDER_SHIM = Path(__file__).resolve().parent / "core" / "spawn" / "spawn-provider.sh"
@@ -1411,6 +1413,12 @@ async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
         env = os.environ.copy()
         env["WORKSPACE"] = str(WORKSPACE)
         env["SPAWN_PROVIDER"] = SPAWN_PROVIDER
+        # AUDIT Gap 2: the agentloop provider gets a STABLE session id derived
+        # from the job name, so a recurring spawn job (e.g. acc_error_analysis)
+        # remembers its prior turns across scheduled runs — session memory is
+        # a daemon-level feature, not just a direct-invocation one.
+        if SPAWN_PROVIDER == "agentloop":
+            env["AGENT_SESSION_ID"] = job.name
         cmd = ["bash", str(SPAWN_PROVIDER_SHIM), "--task", task_text]
         if enable_yolo:
             cmd.append("--yolo")
