@@ -142,7 +142,7 @@ class Handler(SimpleHTTPRequestHandler):
         return {"count": len(frags), "fragments": frags, "lastChanged_ns": last}
 
     def _daemon_payload(self):
-        payload = {"heartbeat": None, "jobs": {"stats": {}, "lastFired": {}, "history": {}}, "summary": {"lastJobRun": None, "unhealthyJobs": []}, "autonomy": None}
+        payload = {"heartbeat": None, "jobs": {"stats": {}, "lastFired": {}, "history": {}}, "summary": {"lastJobRun": None, "unhealthyJobs": []}, "autonomy": None, "lastDeferral": None}
         # M7/M8: the operational autonomy contract (auto_mode vs steward_mode)
         # persisted by deep-brain-kernel.py --autonomy, so the status bar can
         # show the mode + evidence the suite is (or isn't) self-deploying under.
@@ -218,6 +218,22 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
         payload["provenanceEvents"] = prov[-30:]
+        # Deferral alert: the weekly self_mod_proposal_cycle defers under
+        # steward_mode + full_review (proposal-cycle-tick.sh writes this
+        # marker) — so the status bar can tell a steward who expected the
+        # cycle to run that it waited instead. Read-only marker; a missing
+        # file just means no pending deferral.
+        defer = self._load_json(os.path.join(WORKSPACE, "memory", "self-mod", "last-deferral.json"))
+        if isinstance(defer, dict) and defer.get("deferred") is True:
+            payload["lastDeferral"] = {
+                "deferred": True,
+                "at": defer.get("at"),
+                "autonomy_mode": defer.get("autonomy_mode"),
+                "review_mode": defer.get("review_mode"),
+                "reason": defer.get("reason"),
+            }
+        else:
+            payload["lastDeferral"] = None
         # M5: per-job success-rate trend from the daemon's per-run outcome
         # ledger (memory/daemon-job-history.jsonl, appended by the kernel on
         # every real job run). Mirrors the verification tab's sparkline.

@@ -56,6 +56,43 @@ PIPE_PID=$!
 trap 'kill "$PIPE_PID" 2>/dev/null || true' TERM INT
 wait "$PIPE_PID" || rc=$?
 trap - TERM INT
+# Alert on deferral: a steward who expected the weekly cycle to run must
+# notice it waited. The pipeline's --defer-gate writes pipeline-runs/latest.json
+# with deferred:true (and a provenance event) when steward_mode + full_review.
+# Detect that, publish a brain-events.jsonl signal (the suite-wide event log
+# the other regions write), and bump the daemon status via a last-deferral
+# marker the dashboard's /__daemon + status bar read.
+#
+# Gated on the pipeline's own rc: a deferral is a successful no-op (rc=0), and
+# only a genuinely completed run may write or clear the alert. A HARD failure
+# (rc!=0) must neither mint a fresh deferral signal from a stale latest.json
+# nor clear an existing marker — the daemon records the failure itself.
+# Everything here is best-effort; a signal write must never flip the tick's
+# own exit code (set -e: every mkdir/jq guarded with || true).
+if [ "$rc" -eq 0 ]; then
+  LATEST="$WORKSPACE/memory/self-mod/pipeline-runs/latest.json"
+  if [ -f "$LATEST" ] && [ "$(jq -r '.deferred // false' "$LATEST" 2>/dev/null || echo false)" = "true" ]; then
+    DEF_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || true)
+    DEF_AM=$(jq -r '.autonomy_mode // "steward_mode"' "$LATEST" 2>/dev/null || echo steward_mode)
+    DEF_RM=$(jq -r '.review_mode // "full_review"' "$LATEST" 2>/dev/null || echo full_review)
+    # 1) brain-events.jsonl signal — same shape as every other region's log-event.sh.
+    mkdir -p "$WORKSPACE/memory" 2>/dev/null || true
+    jq -nc --arg ts "$DEF_TS" --arg am "$DEF_AM" --arg rm "$DEF_RM" \
+      '{ts:$ts, type:"self-mod", event:"cycle_deferred", autonomy_mode:$am, review_mode:$rm, reason:"steward_full_review_deferred"}' \
+      >> "$WORKSPACE/memory/brain-events.jsonl" 2>/dev/null || true
+    # 2) daemon-status bump: marker the kernel --status + dashboard /__daemon read.
+    mkdir -p "$WORKSPACE/memory/self-mod" 2>/dev/null || true
+    jq -nc --arg ts "$DEF_TS" --arg am "$DEF_AM" --arg rm "$DEF_RM" \
+      '{deferred:true, at:$ts, autonomy_mode:$am, review_mode:$rm, reason:"steward_full_review_deferred"}' \
+      > "$WORKSPACE/memory/self-mod/last-deferral.json.tmp" 2>/dev/null && \
+      mv "$WORKSPACE/memory/self-mod/last-deferral.json.tmp" "$WORKSPACE/memory/self-mod/last-deferral.json" 2>/dev/null || true
+  else
+    # The cycle ran (auto_mode / relaxed_review): clear any stale deferral
+    # marker so the status bar doesn't keep flagging a deferral that resolved.
+    rm -f "$WORKSPACE/memory/self-mod/last-deferral.json" 2>/dev/null || true
+  fi
+fi
+
 # Keep the 🛠️ Self-Mod tab fresh with the updated proposal store + streak.
 [ -x "$SCRIPT_DIR/generate-dashboard.sh" ] && bash "$SCRIPT_DIR/generate-dashboard.sh" >/dev/null 2>&1 || true
 if [ "$rc" -ne 0 ]; then

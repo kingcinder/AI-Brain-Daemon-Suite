@@ -1668,6 +1668,26 @@ def print_status() -> int:
     right minute. Returns the count of jobs at or above UNHEALTHY_STREAK
     consecutive failures, so this can double as a monitoring check
     (`--status; [ $? -eq 0 ] || alert`)."""
+    # Deferral alert: the weekly self_mod_proposal_cycle defers (steward_mode
+    # + full_review) instead of churning the pipeline — proposal-cycle-tick.sh
+    # writes this marker so a steward who expected the cycle to run notices it
+    # waited. Printed BEFORE the state-file check: a deferral must be visible
+    # even if the daemon hasn't ticked yet (the marker is the tick's own write,
+    # independent of daemon state). A defer is NOT a failure (the daemon
+    # recorded the tick as success), so it never counts toward UNHEALTHY_STREAK.
+    defer_path = WORKSPACE / "memory" / "self-mod" / "last-deferral.json"
+    try:
+        _defer = json.loads(defer_path.read_text())
+        if _defer.get("deferred") is True:
+            print(
+                f"⏸ self_mod_proposal_cycle DEFERRED at {_defer.get('at') or '?'} "
+                f"({_defer.get('autonomy_mode') or '?'} + {_defer.get('review_mode') or '?'}) — "
+                "the weekly cycle waited for the human; grant auto_mode or relax review to resume."
+            )
+            print()
+    except (OSError, ValueError, TypeError):
+        pass
+
     daemon_state = DaemonState(DAEMON_STATE_FILE)
     if daemon_state.last_tick_utc is None:
         print(f"No state file found at {DAEMON_STATE_FILE} (daemon never ticked, or state file "

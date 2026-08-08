@@ -247,6 +247,19 @@ if echo "$DAEMON3" | jq -e '(.provenanceEvents | length) == 3 and .provenanceEve
 else
     fail "/__daemon provenanceEvents malformed: $DAEMON3"
 fi
+# Deferral alert: when the weekly cycle defers, the tick writes the
+# last-deferral.json marker and /__daemon must surface it so the status bar
+# can tell the steward the cycle waited instead of silently no-op'ing.
+cat > "$TEST_WORKSPACE/memory/self-mod/last-deferral.json" << 'EOF'
+{"deferred":true,"at":"2026-08-08T10:00:00Z","autonomy_mode":"steward_mode","review_mode":"full_review","reason":"steward_full_review_deferred"}
+EOF
+DAEMON4=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/__daemon")
+if echo "$DAEMON4" | jq -e '.lastDeferral.deferred == true and .lastDeferral.autonomy_mode == "steward_mode" and .lastDeferral.review_mode == "full_review"' >/dev/null 2>&1; then
+    pass "/__daemon exposes the deferral marker (cycle waited for the human)"
+else
+    fail "/__daemon lastDeferral malformed: $DAEMON4"
+fi
+rm -f "$TEST_WORKSPACE/memory/self-mod/last-deferral.json"
 
 # The status bar + regenerate button must be part of the REBUILT dashboard
 # (regenerate rebuilds via the shared builder — the minimal fixture page had
@@ -282,6 +295,13 @@ if [[ "$BODY2" == *'Autonomy Gate · Provenance'* ]] && [[ "$BODY2" == *'smProvT
     pass "rebuilt dashboard carries the autonomy gate provenance timeline card"
 else
     fail "rebuilt dashboard missing the gate provenance timeline card"
+fi
+# The deferral alert must be part of the rebuilt status bar (id=statusDefer,
+# driven by /__daemon's lastDeferral in pollStatus).
+if [[ "$BODY2" == *'id="statusDefer"'* ]] && [[ "$BODY2" == *'d.lastDeferral'* ]]; then
+    pass "rebuilt dashboard carries the deferral alert pill"
+else
+    fail "rebuilt dashboard missing the deferral alert pill"
 fi
 rm -f "$TEST_WORKSPACE/memory/self-mod/autonomy-state.json" "$TEST_WORKSPACE/memory/self-mod/autonomy-history.jsonl" "$TEST_WORKSPACE/memory/provenance/events.jsonl"
 

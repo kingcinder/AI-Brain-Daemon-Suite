@@ -278,6 +278,7 @@ cat >> "$OUTPUT_FILE" << HEADER
         <div class="statusbar-item" id="statusSparkWrap" title="per-job success rate, most recent runs"><span id="statusSparkLabel">📈 —</span><span class="sparkline" id="statusSpark"></span></div>
         <div class="statusbar-item"><span id="statusHealth">✅ —</span></div>
         <div class="statusbar-item" id="statusAutoWrap" title="autonomy contract mode (deep-brain-kernel.py --autonomy)"><span id="statusAuto"><span class="autonomy-pill steward">🛡 steward</span></span></div>
+        <div class="statusbar-item" id="statusDeferWrap" title="weekly self-mod cycle deferral"><span id="statusDefer">⏸ cycle —</span></div>
         <button class="regen-btn" id="regenBtn" title="Run every skill's sync-state.sh, then rebuild the dashboard">🔄 Regenerate</button>
     </div>
 
@@ -453,6 +454,20 @@ function pollStatus() {
         autoEl.innerHTML = '<span class="autonomy-pill ' + mode + '">' + (mode === 'auto' ? '🤖 auto' : '🛡 steward') + '</span>';
         const wrap = document.getElementById('statusAutoWrap');
         if (wrap) wrap.title = (mode === 'auto' ? 'auto_mode: pipeline may self-deploy on schedule' : 'steward_mode: human consulted for deploys') + ' — ' + evTxt;
+      }
+      // Deferral alert: when the weekly self-mod cycle deferred (steward_mode
+      // + full_review), proposal-cycle-tick.sh bumps this marker so a steward
+      // who expected the cycle to run sees it waited instead of silently no-op'ing.
+      const deferEl = document.getElementById('statusDefer');
+      if (deferEl) {
+        const df = d.lastDeferral;
+        if (df && df.deferred !== false) {
+          setStatus('statusDefer', '⏸ cycle deferred', 'warn');
+          const dw = document.getElementById('statusDeferWrap');
+          if (dw) dw.title = (df.autonomy_mode || '?') + ' + ' + (df.review_mode || '?') + ' — the weekly cycle waited for the human at ' + (df.at ? fmtAgo(df.at) : '?') + ' (' + (df.reason || '') + ')';
+        } else {
+          setStatus('statusDefer', '⏸ cycle —');
+        }
       }
       renderJobSparkline(d);
     })
