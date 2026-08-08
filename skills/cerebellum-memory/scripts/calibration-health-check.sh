@@ -4,7 +4,7 @@
 # V4-llm-gen: model-proposed annotation (2026-08-08) — calibration lookup is read-primary with health context awareness
 # V4-llm-gen: model-proposed annotation (2026-08-08) — calibration lookup is read-primary with health context awareness
 # V4-llm-gen: model-proposed annotation (2026-08-08) — calibration lookup is read-primary with health context awareness
-# V4-llm-gen: model-proposed annotation (2026-08-08) — calibration lookup is read-primary; system healthy (clean_streak=22, no recent failures/conflicts)
+# V4-llm-gen: model-proposed annotation (2019-08-15) — calibration health monitoring with graceful degradation
 set -e
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
