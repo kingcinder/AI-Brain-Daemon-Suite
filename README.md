@@ -40,11 +40,13 @@ scattered across 11 separate `install.sh` files. See
 `BRAIN_DAEMON_SCHEDULE.md` for the full old-cron → new-daemon mapping.
 
 This package reconciles two previously-separate lines of work into one
-product: the skills bundle (all 11 skills, with a fixed ACC encoding script —
-see below) and the daemon engine itself, which has moved from a bash
-implementation to a more capable Python one (`deep-brain-kernel.py` +
-`aibrain.service`). The bash version is retained, working and unmodified,
-under `legacy-IGNORE/` for rollback only — see `legacy-IGNORE/README.md`.
+product: the skills bundle (all 15 skill packages — 11 memory skills plus
+executive-function, self-mod-runner, verification-memory, and
+thalamus-memory — with a fixed ACC encoding script, see below) and the
+daemon engine itself, which has moved from a bash implementation to a more
+capable Python one (`deep-brain-kernel.py` + `aibrain.service`). The bash
+version is retained, working and unmodified, under `legacy-IGNORE/` for
+rollback only — see `legacy-IGNORE/README.md`.
 
 ## Contents
 
@@ -56,7 +58,7 @@ under `legacy-IGNORE/` for rollback only — see `legacy-IGNORE/README.md`.
 | `HERMES_COMPATIBILITY.md` | **Hermes Agent compatibility audit.** File-by-file inspection of the whole suite against the installed `hermes` binary — CLI invocations, skill packaging, and nomenclature — with per-file verdicts and open items. |
 | `deep-brain-kernel.py` | **The engine.** Async scheduler + pressure supervisor: epoll-driven PSI monitoring, GPU VRAM checking, cgroups v2 throttling, pidfd-based process tracking, single-instance locking. `--check` validates the job table without starting anything. |
 | `aibrain.service` | Systemd (user) unit supervising `deep-brain-kernel.py`, using systemd's own delegated cgroup controls rather than hand-rolled cgroup paths. |
-| `skills/` | All 12 skill packages (11 memory skills + `verification-memory`). `anterior-cingulate-memory` includes a fix (see below) so every skill's LLM-backed encoding runs against your local model, none against a paid cloud API. |
+| `skills/` | All 15 skill packages (11 memory skills + `executive-function`, `self-mod-runner`, `verification-memory`, `thalamus-memory`). `anterior-cingulate-memory` includes a fix (see below) so every skill's LLM-backed encoding runs against your local model, none against a paid cloud API. |
 | `SETUP_COMMANDS.md` | Host-level verification steps (PSI, cgroup v2 delegation, GPU tooling) to run once before or after enabling the service. |
 | `docs/V4_STATUS.md` | V4.0 phase ledger (plumbing vs live-exercised; full-cycle close-out pointer). |
 | `docs/verification/` | Verification evidence; canonical GREEN pack: `full_cycle_20260720T234945Z/`. |
@@ -173,14 +175,14 @@ dependency — consistent with the rest of the suite. State writes go through
    1. **Initializes the workspace** — `~/.hermes/workspace/skills/` and
       `~/.config/systemd/user/`.
    2. **Deploys artifacts** — `deep-brain-kernel.py` to the workspace root,
-      `aibrain.service` to the systemd user directory, all 11 skills into
-      `~/.hermes/workspace/skills/`.
+      `aibrain.service` to the systemd user directory, all 15 skill packages
+      into `~/.hermes/workspace/skills/`.
    3. **Sets permissions** on the engine and every skill script.
    4. **Checks host prerequisites** — PSI availability, cgroup v2, GPU
       tooling — printing a warning (not a hard failure) for anything
       missing, since the engine degrades gracefully either way.
-   5. **Runs `--check`** — validates all 20 jobs' script paths, minute uniqueness, and day-of-week
-      uniqueness. Stops here if anything's actually broken.
+   5. **Runs `--check`** — validates all 28 jobs (20 direct + 8 spawn): the 20 direct jobs' script paths, and minute + day-of-week
+      uniqueness across all. Stops here if anything's actually broken.
    6. **Pauses** so you can review/edit `aibrain.service` for the gotchas
       below.
    7. **Integrates with systemd** (`daemon-reload`) and **activates** the

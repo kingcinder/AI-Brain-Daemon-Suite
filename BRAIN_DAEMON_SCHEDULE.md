@@ -54,9 +54,9 @@ collapsing them into one would be a real regression, not a simplification:
   will handle X." There is no phase 2 without a real reasoning agent turn
   over free text — deciding what's memory-worthy, what's an emotion,
   what's a conflict pattern. A bash daemon cannot invent that judgment.
-  These jobs shell out to `openclaw sessions:spawn --task "..."`, reusing
+  These jobs shell out to `hermes chat -q "..." --source daemon`, reusing
   the exact task text each skill's own `install.sh` already used for
-  `openclaw cron add --agent-turn "..."`.
+  `hermes cron create ... --name <job>`.
 
 **Known caveat:** `acc-conflict-encoding` is classified `direct` because
 it's self-contained — but "self-contained" here means it calls the real
@@ -91,6 +91,43 @@ change to that script, not something the daemon can paper over).
 | `social_decay` | direct | 0 | 0 | **24** |
 | `social_encoding` | spawn | 0,3,6,9,12,15,18,21 | 50 | **52** *(was colliding with acc_conflict_encoding)* |
 | `cerebellum_refine` | direct | 0,8,16 | 0 | **26** |
+| `transcript_export` | direct | 5,11,17,23 | **58** |
+
+`transcript_export` is the Open Item 5 Hermes-session bridge (added 2026-08-04):
+it runs `hermes sessions export --format jsonl` and rewrites the output into
+per-message JSONL for the memory preprocess pipelines. Minute 58 is unique in
+the table; it fires 4× daily at hours 5/11/17/23 — just before the 6/12/18/0
+encoding blocks — so each encoding run sees fresh transcripts. It is `direct`
+(fully self-contained, no spawn lock). If `hermes` is absent from PATH the
+job fails loudly (exit 3) rather than silently skipping, so `--status` shows
+it.
+
+## New: daily verification pass (verification-memory, proprioception)
+
+`verification-memory` is the suite's verification region: it walks every
+module's `capability-manifest.json`, runs whatever each module declared in its
+`tests` array, and publishes `tests_passed` / `test_failure` signals that the
+routing table turns into VTA rewards, ACC error patterns, and amygdala
+frustration. It was added 2026-08-07 — before that, the harnesses were the one
+part of the suite with no module, no manifest, and no consumer of their
+results.
+
+| Job | Kind | Days | Hour | Minute |
+|---|---|---|---|---|
+| `verification_pass` | direct | * | 7 | 56 |
+
+Minute 56 is unique in the table; hour 7 has no other job besides heartbeat's
+`:07`/`:37` beats, so the daily full-suite sweep never contends for resources.
+It is `direct` (no spawn lock, no inference). A red suite makes the script
+exit non-zero, which `--status` surfaces exactly like any other failing job —
+the brain now fails loudly when its own tests break.
+
+**Timeout interaction:** the daemon applies one global `--direct-timeout`
+(default 300s) to every direct job. A full sweep runs all phase harnesses
+sequentially and can exceed 300s on a slow machine, in which case the pidfd
+timeout kills it and `--status` shows `verification_pass` as failed. Raise
+`--direct-timeout` in `aibrain.service` if this appears; the sweep finishes
+well under the default on this host.
 
 Every hour-set above is exactly what was already configured — only minutes
 changed, and only for jobs that were actually colliding with something
@@ -152,14 +189,14 @@ did not).
 
 ## Before decommissioning the old cron entries
 
-1. Run `python3 deep-brain-kernel.py --check` (or workspace copy under `~/.openclaw/workspace/`) — confirms every script path resolves and
-   flags whether `openclaw` is on PATH (needed for the 6 `spawn` jobs).
+1. Run `python3 deep-brain-kernel.py --check` (or workspace copy under `~/.hermes/workspace/`) — confirms every script path resolves and
+   flags whether `hermes` is on PATH (needed for the 8 `spawn` jobs).
 2. Let the daemon run for at least one full day so every job (including the
    once-daily ones) gets a chance to fire, and check
    `journalctl --user -u aibrain.service` for clean `completed` lines
    rather than repeated `ERROR`/`WARN`.
-3. Only then remove the old entries: `openclaw cron list` to see what's
-   registered, `openclaw cron remove --name <job>` for each one this
+3. Only then remove the old entries: `hermes cron list` to see what's
+   registered, `hermes cron remove <job_id>` for each one this
    daemon now covers (or `crontab -e` and delete the corresponding lines
    for anything installed via raw crontab).
 

@@ -1252,7 +1252,7 @@ async def _await_with_timeout(proc: "asyncio.subprocess.Process", tracked: Track
     with NO timeout while holding _spawn_lock, so one hung
     `hermes chat` call (network stall, model stuck generating, etc.)
     silently starved every other spawn-type job forever — nothing errored,
-    nothing logged, the daemon just stopped doing 8 of its 20 jobs until a
+    nothing logged, the daemon just stopped doing all 8 spawn-type jobs until a
     manual restart. Confirmed with an isolated asyncio.Lock repro before
     this fix. Returns (output_bytes, timed_out)."""
     try:
