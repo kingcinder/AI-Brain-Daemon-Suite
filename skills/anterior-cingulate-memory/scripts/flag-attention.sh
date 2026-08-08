@@ -36,6 +36,11 @@ if [[ ! -f "$STATE_FILE" ]]; then
   echo "ERROR: conflict-state.json not found. Run ./install.sh first." >&2; exit 1
 fi
 
+# Serialize read-modify-write against the other conflict-state.json writers
+# (log-conflict, decay-load, resolve-conflict, encode-pipeline).
+exec 200>"$STATE_FILE.lock"
+flock 200
+
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 case "$ACTION" in
@@ -69,7 +74,8 @@ case "$ACTION" in
       .stats.totalAttentionFlags += 1
       ' "$STATE_FILE")
 
-    echo "$UPDATED" > "$STATE_FILE"
+    echo "$UPDATED" > "$STATE_FILE.tmp.$$"
+    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
     "$SKILL_DIR/scripts/sync-state.sh" --quiet
     echo "⚡ Flagged for attention: $TOPIC"
     [[ -n "$REASON" ]] && echo "   Reason: $REASON"
@@ -86,7 +92,8 @@ case "$ACTION" in
       .lastUpdated = $now
       ' "$STATE_FILE")
 
-    echo "$UPDATED" > "$STATE_FILE"
+    echo "$UPDATED" > "$STATE_FILE.tmp.$$"
+    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
     "$SKILL_DIR/scripts/sync-state.sh" --quiet
     echo "⚡ Removed attention flag: $TOPIC"
     ;;

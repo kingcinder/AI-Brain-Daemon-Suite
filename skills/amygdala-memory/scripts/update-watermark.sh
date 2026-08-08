@@ -59,6 +59,9 @@ fi
 OLD_WATERMARK=$(STATE_FILE="$STATE_FILE" python3 -c "import os
 import json; print(json.load(open(os.environ['STATE_FILE'])).get('lastProcessedSignal','(none)'))" 2>/dev/null || echo "(none)")
 
+# Lock around the read-modify-write — same lock file as update-state.sh /
+# decay-emotion.sh (all three write emotional-state.json).
+exec 200>"$STATE_FILE.lock"; flock 200
 SPECIFIC_ID="$SPECIFIC_ID" STATE_FILE="$STATE_FILE" python3 -c "import os
 
 import json
@@ -70,8 +73,12 @@ with open(os.environ['STATE_FILE']) as f:
 state['lastProcessedSignal'] = os.environ['SPECIFIC_ID']
 state['lastUpdated'] = datetime.now().isoformat()
 
-with open(os.environ['STATE_FILE'], 'w') as f:
+# Atomic tmp+replace so a crash mid-write can't corrupt the state file.
+tmp = os.environ['STATE_FILE'] + '.tmp.$$'
+with open(tmp, 'w') as f:
     json.dump(state, f, indent=2)
+os.replace(tmp, os.environ['STATE_FILE'])
 "
+exec 200>&-
 
 echo "✅ Watermark updated: $OLD_WATERMARK → $SPECIFIC_ID"

@@ -45,10 +45,14 @@ fi
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+# Serialize against the other reward-state.json writers.
+exec 200>"$STATE_FILE.lock"
+flock 200
+
 # Update watermark
 jq --arg id "$SIGNAL_ID" --arg now "$NOW" \
    '.lastProcessedSignal = $id | .lastUpdated = $now' \
-   "$STATE_FILE" > "$STATE_FILE.tmp"
-mv "$STATE_FILE.tmp" "$STATE_FILE"
+   "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
 
 echo "✅ Watermark updated: $SIGNAL_ID"

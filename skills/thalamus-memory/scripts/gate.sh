@@ -27,6 +27,12 @@ GATE_CHECKPOINT="$CHECKPOINT_DIR/thalamus-gate"
 
 mkdir -p "$CHECKPOINT_DIR" "$(dirname "$STATE_FILE")"
 
+# Serialize read-modify-write against decay.sh and concurrent gate
+# invocations (thalamus_gate + signal_dispatch jobs, manual runs) — all
+# write thalamus-state.json.
+exec 200>"$STATE_FILE.lock"
+flock 200
+
 MODE="process"
 
 while [[ $# -gt 0 ]]; do
@@ -113,10 +119,12 @@ _score_signal() {
         local combined="$source $signal_name $(echo "$signal_json" | jq -r '.payload | tostring' 2>/dev/null || echo '')"
         while IFS= read -r goal; do
             [[ -z "$goal" ]] && continue
-            # Simple word overlap scoring
+            # Simple word overlap scoring — literal substring match (glob with
+            # quoted RHS), NOT regex: goal words containing regex metacharacters
+            # (., +, [, etc.) must match literally.
             local overlap=0
             for word in $goal; do
-                [[ "$combined" =~ $word ]] && overlap=$((overlap + 1))
+                [[ "$combined" == *"$word"* ]] && overlap=$((overlap + 1))
             done
             # Normalize: each overlapping word adds 0.15, capped at 1.0
             local gscore
@@ -209,7 +217,7 @@ _score_signal() {
 # ── Update state stats ──────────────────────────────────────────────────
 _update_stats() {
     local action="$1"
-    local tmp="$STATE_FILE.tmp"
+    local tmp="$STATE_FILE.tmp.$$"
     jq --arg action "$action" \
        --arg now "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
     '.stats.totalSignalsProcessed += 1 |
@@ -228,7 +236,7 @@ _dispatch() {
 
     # Suppressed signals go to the pending queue, not dispatched
     if [[ "$action" = "suppress" ]]; then
-        local tmp="$STATE_FILE.tmp"
+        local tmp="$STATE_FILE.tmp.$$"
         jq --arg src "$source" --arg sig "$signal_name" --argjson intensity "$intensity" \
            --arg now "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
            --arg retry "$(date -u -d '+1 hour' +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" \
@@ -274,7 +282,21 @@ _dispatch() {
 
             local target_path="$WORKSPACE/skills/$tgt/$script"
             if [[ -x "$target_path" ]]; then
-                bash "$target_path" $resolved_args 2>/dev/null &
+                # Split the arg template on whitespace while honoring the quoted
+                # values route-signals.sh emits (e.g. --trigger "gut discord")
+                # instead of word-splitting them into broken fragments.
+                local -a dispatch_args=()
+                if [ -n "$resolved_args" ]; then
+                    # xargs -n 1 emits one token per line so mapfile builds a
+                    # real array (plain `xargs` would join every token onto one
+                    # line → a single mangled argument).
+                    mapfile -t dispatch_args < <(printf '%s\n' "$resolved_args" | xargs -n 1)
+                fi
+                # Drop the inherited gate lock in the background child so the
+                # flock never outlives this gate run (children holding the
+                # inherited fd would otherwise delay decay.sh / gate.sh).
+                ( exec 200>&- 2>/dev/null || true
+                  bash "$target_path" "${dispatch_args[@]}" 2>/dev/null ) &
             fi
         done
     fi
@@ -317,7 +339,7 @@ _process() {
     echo "$total_lines" > "$GATE_CHECKPOINT"
 
     # Update last run timestamp
-    local tmp="$STATE_FILE.tmp"
+    local tmp="$STATE_FILE.tmp.$$"
     jq --arg now "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" '.lastGateRun = $now' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
 }
 
@@ -381,7 +403,7 @@ _status() {
 # ── Boost a goal's attention weight ─────────────────────────────────────
 _boost() {
     _init_state
-    local tmp="$STATE_FILE.tmp"
+    local tmp="$STATE_FILE.tmp.$$"
     jq --arg goal "$BOOST_GOAL" \
     'if (.attentionFocus | index($goal)) then . else .attentionFocus += [$goal] end' \
     "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"

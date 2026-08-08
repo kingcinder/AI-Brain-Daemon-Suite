@@ -31,7 +31,7 @@ Available tools (reply with ONE tool call per turn, JSON: {"tool":"<name>","args
 - get_heartbeat            args: {}            Read daemon heartbeat state (last beat, beat count, chosen action)
 - get_verification_report  args: {}            Most recent verification sweep: totals + failing modules
 - list_memory_state        args: {}            List memory/*.json state files with sizes (what exists)
-- record_goal_outcome      args: {"goal":"<desc>","outcome":"success|failure|deferred"}  Record a goal outcome to PFC state
+- record_goal_outcome      args: {"goal":"<desc>","outcome":"success|failure"}  Record a goal outcome to PFC state
 Rules: call at most one tool per turn. Never invent tools. Finish with an {"answer":...} only when the task is done.
 TOOLS
 }
@@ -89,19 +89,22 @@ agent_tool_run() {
       fi
       ;;
     record_goal_outcome)
-      # args: {"goal":"<desc>","outcome":"success|failure|deferred"}
+      # args: {"goal":"<desc>","outcome":"success|failure"}
       jq_extract=$(printf '%s' "$args" | jq -r '{goal: (.goal // ""), outcome: (.outcome // "success")}' 2>/dev/null) || {
         echo '{"error":"bad args"}'; return 0; }
       local goal outcome
       goal=$(printf '%s' "$jq_extract" | jq -r '.goal')
       outcome=$(printf '%s' "$jq_extract" | jq -r '.outcome')
-      if [ -z "$goal" ] || [ "$outcome" != "success" ] && [ "$outcome" != "failure" ] && [ "$outcome" != "deferred" ]; then
-        echo '{"error":"record_goal_outcome requires goal + outcome in {success,failure,deferred}"}'
+      if [ -z "$goal" ] || { [ "$outcome" != "success" ] && [ "$outcome" != "failure" ]; }; then
+        echo '{"error":"record_goal_outcome requires goal + outcome in {success,failure}"}'
         return 0
       fi
       if [ -x "$AGENT_ROOT/core/executive/record-goal-outcome.sh" ]; then
+        # The recorder's CLI contract is: outcome --goal-description <desc>
+        # --outcome success|failure. The old --goal/--outcome shape made the
+        # tool fail on every call (usage exit).
         WORKSPACE="${WORKSPACE:-}" bash "$AGENT_ROOT/core/executive/record-goal-outcome.sh" \
-          --goal "$goal" --outcome "$outcome" 2>/dev/null && echo "{\"recorded\":\"$outcome\",\"goal\":$(printf '%s' "$goal" | jq -Rs .)}" \
+          outcome --goal-description "$goal" --outcome "$outcome" 2>/dev/null && echo "{\"recorded\":\"$outcome\",\"goal\":$(printf '%s' "$goal" | jq -Rs .)}" \
           || echo '{"error":"record-goal-outcome failed"}'
       else
         echo '{"error":"record-goal-outcome.sh not found"}'

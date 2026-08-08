@@ -14,6 +14,11 @@ if [ ! -f "$STATE_FILE" ]; then
   exit 1
 fi
 
+# Serialize the per-dimension read-modify-write loop against the other
+# emotional-state.json writers (update-state.sh, update-watermark.sh).
+exec 200>"$STATE_FILE.lock"
+flock 200
+
 DRY_RUN=false
 [ "$1" = "--dry-run" ] && DRY_RUN=true
 
@@ -45,16 +50,16 @@ for DIM in $DIMENSIONS; do
     echo "$DIM: $CURRENT → $NEW (baseline: $BASELINE, rate: $DECAY_RATE)"
   else
     # Update the state file
-    jq ".dimensions.$DIM = $NEW" "$STATE_FILE" > "$STATE_FILE.tmp"
-    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    jq ".dimensions.$DIM = $NEW" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
     echo "$DIM: $CURRENT → $NEW (rate: $DECAY_RATE)"
   fi
 done
 
 # Update timestamp
 if [ "$DRY_RUN" = false ]; then
-  jq ".lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp"
-  mv "$STATE_FILE.tmp" "$STATE_FILE"
+  jq ".lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+  mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
   echo ""
   echo "✅ State decayed toward baseline"
 else
@@ -65,7 +70,7 @@ fi
 # Clear old emotions from recent list (older than 24h)
 if [ "$DRY_RUN" = false ]; then
   CUTOFF=$(date -u -v-24H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "24 hours ago" +"%Y-%m-%dT%H:%M:%SZ")
-  jq ".recentEmotions = [.recentEmotions[] | select(.timestamp > \"$CUTOFF\")]" "$STATE_FILE" > "$STATE_FILE.tmp" 2>/dev/null && mv "$STATE_FILE.tmp" "$STATE_FILE" || true
+  jq ".recentEmotions = [.recentEmotions[] | select(.timestamp > \"$CUTOFF\")]" "$STATE_FILE" > "$STATE_FILE.tmp.$$" 2>/dev/null && mv "$STATE_FILE.tmp.$$" "$STATE_FILE" || true
   
   # Sync to AMYGDALA_STATE.md for auto-injection
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

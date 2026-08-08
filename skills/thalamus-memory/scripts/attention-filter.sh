@@ -36,7 +36,10 @@ if [[ -f "$PFC_STATE" ]]; then
         combined="$source $signal_name"
         overlap=0
         for word in $goals_json; do
-            [[ "$combined" =~ $word ]] && overlap=$((overlap + 1))
+            # Literal substring match (quoted RHS), not regex — same fix as
+            # gate.sh's _score_signal: goal words with regex metacharacters
+            # must match literally.
+            [[ "$combined" == *"$word"* ]] && overlap=$((overlap + 1))
         done
         goal_relevance=$(echo "scale=4; if ($overlap > 0) $(echo "scale=4; if ($overlap * 0.15 > 1.0) 1.0 else $overlap * 0.15" | bc) else 0" | bc 2>/dev/null || echo "0")
     fi

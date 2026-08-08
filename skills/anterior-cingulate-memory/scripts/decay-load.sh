@@ -11,6 +11,10 @@ STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 
 if [[ ! -f "$STATE_FILE" ]]; then exit 0; fi
 
+# Serialize read-modify-write against the other conflict-state.json writers.
+exec 200>"$STATE_FILE.lock"
+flock 200
+
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 CURRENT=$(jq -r '.conflictLoad' "$STATE_FILE")
@@ -38,7 +42,8 @@ UPDATED=$(jq \
   --arg now "$NOW" \
   '.conflictLoad = $newLoad | .lastUpdated = $now' \
   "$STATE_FILE")
-echo "$UPDATED" > "$STATE_FILE"
+echo "$UPDATED" > "$STATE_FILE.tmp.$$"
+mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
 
 "$SKILL_DIR/scripts/sync-state.sh" --quiet
 

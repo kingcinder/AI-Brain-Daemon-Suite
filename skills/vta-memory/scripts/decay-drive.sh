@@ -14,6 +14,10 @@ if [ ! -f "$STATE_FILE" ]; then
   exit 1
 fi
 
+# Serialize read-modify-write against the other reward-state.json writers.
+exec 200>"$STATE_FILE.lock"
+flock 200
+
 DRY_RUN=false
 [ "$1" = "--dry-run" ] && DRY_RUN=true
 
@@ -55,8 +59,8 @@ else
      .anticipating = (if .anticipatingMeta then
        [.anticipatingMeta[].item]
      else .anticipating end)
-     ' "$STATE_FILE" > "$STATE_FILE.tmp"
-  mv "$STATE_FILE.tmp" "$STATE_FILE"
+     ' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+  mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
   
   echo ""
   echo "✅ Drive decayed"

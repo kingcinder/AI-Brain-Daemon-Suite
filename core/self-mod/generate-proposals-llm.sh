@@ -231,7 +231,17 @@ fi
 if [ -z "$MODEL" ] && [ "$local_ok" -eq 1 ]; then
   MODEL=$(curl -sS -m 3 "${LOCAL_URL}/models" | jq -r '.data[0].id // .models[0].name // empty')
 fi
-MODEL="${MODEL:-/home/cody/AI_MODELS/Carnice-Qwen3.6-MoE-35B-A3B-APEX-MTP-I-Quality.gguf}"
+# No machine-specific default: MODEL / HERMES_MODEL / --model / the local
+# server's /v1/models are the only model sources — a host-specific path as a
+# silent fallback would only work on the machine it was hardcoded for. The
+# check is scoped to the local-API path: an explicit --provider openrouter
+# has its own openrouter/auto default and must not be blocked by a healthy
+# but model-less local server.
+if [ "$local_ok" -eq 1 ] && [ -z "$MODEL" ] && { [ -z "$PROVIDER" ] || [ "$PROVIDER" = "llamaserver" ] || [ "$PROVIDER" = "local" ]; }; then
+  echo "generate-proposals-llm: no model id — set MODEL/HERMES_MODEL or --model (local server /v1/models returned none)" >&2
+  exit 1
+fi
+MODEL="${MODEL:-}"
 
 set +e
 if [ "$local_ok" -eq 1 ] && { [ -z "$PROVIDER" ] || [ "$PROVIDER" = "llamaserver" ] || [ "$PROVIDER" = "local" ]; }; then
@@ -477,7 +487,12 @@ if [ "$PARSE_RC" -ne 0 ]; then
   exit 1
 fi
 
-if ! bash "$CHECK" --suite-root "$SUITE_ROOT" --proposal "$PROP_FILE" | tee /tmp/llm_check.json; then
+# NOTE: under `set -o pipefail` the pipeline's rc is $CHECK's rc — a check
+# PASS is rc 0. The historical `if ! ...` inverted that, rejecting good
+# proposals and silently storing bad ones; test the positive form.
+if bash "$CHECK" --suite-root "$SUITE_ROOT" --proposal "$PROP_FILE" | tee /tmp/llm_check.json; then
+  : # check-target accepted the proposal — continue to store/emit
+else
   echo "generate-proposals-llm: check-target rejected model proposal" >&2
   exit 1
 fi

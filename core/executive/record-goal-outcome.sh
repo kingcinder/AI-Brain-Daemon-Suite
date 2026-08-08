@@ -129,7 +129,7 @@ defer_stale() {
   DAYS="${DAYS:-30}"
   # Active goals past their deadline, or with no deadline and untouched for N days
   python3 - "$PFC" "$DAYS" "$NOW" << 'PY'
-import json, sys
+import json, os, sys
 from datetime import datetime, timezone
 pfc_path, days, now = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 with open(pfc_path) as f:
@@ -160,8 +160,12 @@ for g in pfc.get("goals", []):
         g["deferredAt"] = now
         deferred.append(g.get("id"))
 pfc["lastUpdated"] = now
-with open(pfc_path, "w") as f:
+# Atomic tmp+replace (same guarantee as the outcome path's jq tmp+mv) — a
+# crash mid-write must not corrupt PFC. The caller holds the flock already.
+tmp = pfc_path + ".tmp"
+with open(tmp, "w") as f:
     json.dump(pfc, f, indent=2, sort_keys=True)
+os.replace(tmp, pfc_path)
 print("\n".join(deferred))
 PY
 }

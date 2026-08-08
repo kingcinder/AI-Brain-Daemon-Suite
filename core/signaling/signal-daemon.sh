@@ -74,8 +74,14 @@ process_signals() {
 
                 local target_path="$WORKSPACE/skills/$tgt/$script"
                 if [[ -x "$target_path" ]]; then
-                    # Fire and forget — don't block the dispatcher
-                    bash "$target_path" $resolved_args 2>/dev/null &
+                    # Fire and forget — don't block the dispatcher. Split the
+                    # template honoring quotes (same xargs -n 1 fix as gate.sh):
+                    # plain word-splitting mangles values like --trigger "a b".
+                    local -a dispatch_args=()
+                    if [ -n "$resolved_args" ]; then
+                        mapfile -t dispatch_args < <(printf '%s\n' "$resolved_args" | xargs -n 1)
+                    fi
+                    bash "$target_path" "${dispatch_args[@]}" 2>/dev/null &
                 fi
             done
         fi

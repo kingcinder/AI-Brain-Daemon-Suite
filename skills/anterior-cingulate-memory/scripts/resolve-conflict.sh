@@ -46,6 +46,11 @@ if [[ -z "$CONFLICT_ID" && "$RESOLVE_ALL" == false ]]; then
   exit 0
 fi
 
+# Serialize read-modify-write against the other conflict-state.json writers
+# (log-conflict, flag-attention, decay-load, encode-pipeline).
+exec 200>"$STATE_FILE.lock"
+flock 200
+
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 resolve_one() {
@@ -85,7 +90,8 @@ resolve_one() {
     .stats.totalResolved += 1
     ' "$STATE_FILE")
 
-  echo "$UPDATED" > "$STATE_FILE"
+  echo "$UPDATED" > "$STATE_FILE.tmp.$$"
+  mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
 
   local DELTA
   DELTA=$(echo "$NEW_LOAD - $CURRENT_LOAD" | bc -l)

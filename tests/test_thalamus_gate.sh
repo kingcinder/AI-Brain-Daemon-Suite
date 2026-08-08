@@ -229,6 +229,15 @@ else
     fail "thalamus decay.sh should leave 1 signal, got $REMAINING"
 fi
 
+# The retry contract: the expired signal is re-injected into the signal bus
+# (re-scored on the next gate run), not silently dropped.
+REINJECTED=$(grep -c 'thalamus_retry' "$TEST_WORKSPACE/memory/brain-signals.jsonl" 2>/dev/null || echo "0")
+if [[ "${REINJECTED:-0}" -ge 1 ]]; then
+    pass "thalamus decay.sh re-injects expired signals into the signal bus"
+else
+    fail "thalamus decay.sh should re-inject the expired signal (got $REINJECTED retry lines)"
+fi
+
 # ── Summary ─────────────────────────────────────────────────────────────
 echo ""
 echo "─────────────────────────────────────────"

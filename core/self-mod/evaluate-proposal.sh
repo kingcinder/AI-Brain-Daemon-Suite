@@ -98,17 +98,17 @@ if [ -z "$BASE_LAT_SEC" ] || [ "$BASE_LAT_SEC" = "null" ] || [ "$BASELINE_METHOD
     # without GNU timeout, rely on the sweep's own per-test timeout.
     set +e
     if [ "$HAVE_TIMEOUT" -eq 1 ]; then
-      (cd "$SUITE_ROOT" && WORKSPACE="$BWS" timeout 600 bash "$SWEEP_SH" --quiet --timeout "$GATE_TIMEOUT" >/tmp/baseline_sweep.out 2>&1)
+      (cd "$SUITE_ROOT" && WORKSPACE="$BWS" timeout 600 bash "$SWEEP_SH" --quiet --timeout "$GATE_TIMEOUT" >"$BWS/baseline_sweep.out" 2>&1)
     else
-      (cd "$SUITE_ROOT" && WORKSPACE="$BWS" bash "$SWEEP_SH" --quiet --timeout "$GATE_TIMEOUT" >/tmp/baseline_sweep.out 2>&1)
+      (cd "$SUITE_ROOT" && WORKSPACE="$BWS" bash "$SWEEP_SH" --quiet --timeout "$GATE_TIMEOUT" >"$BWS/baseline_sweep.out" 2>&1)
     fi
     set -e
   elif [ -f "$SUITE_ROOT/tests/run_phase1_harness.sh" ]; then
     set +e
     if [ "$HAVE_TIMEOUT" -eq 1 ]; then
-      (cd "$SUITE_ROOT" && timeout 90 bash tests/run_phase1_harness.sh >/tmp/baseline_harness.out 2>&1)
+      (cd "$SUITE_ROOT" && timeout 90 bash tests/run_phase1_harness.sh >"$BWS/baseline_harness.out" 2>&1)
     else
-      (cd "$SUITE_ROOT" && bash tests/run_phase1_harness.sh >/tmp/baseline_harness.out 2>&1)
+      (cd "$SUITE_ROOT" && bash tests/run_phase1_harness.sh >"$BWS/baseline_harness.out" 2>&1)
     fi
     set -e
   else

@@ -54,8 +54,10 @@ else:
 echo "💓 Heartbeat — $(date -u +"%H:%M UTC") (phase: $PHASE)"
 
 # ── Build candidate option list ──────────────────────────────────────────────
-HAS_UNFINISHED=$(jq '[.projects[] | select(.type == "unfinished" and .status == "active")] | length > 0' "$STATE_FILE")
-HAS_OWN=$(jq '[.projects[] | select(.type == "own" and .status == "active")] | length > 0' "$STATE_FILE")
+# `[]?` guards a missing .projects (freshly-initialized state file): jq would
+# otherwise error on the null iteration and kill the heartbeat under set -e.
+HAS_UNFINISHED=$(jq '[.projects[]? | select(.type == "unfinished" and .status == "active")] | length > 0' "$STATE_FILE")
+HAS_OWN=$(jq '[.projects[]? | select(.type == "own" and .status == "active")] | length > 0' "$STATE_FILE")
 
 CANDIDATES=$(HAS_OWN="$HAS_OWN" HAS_UNFINISHED="$HAS_UNFINISHED" NOW="$NOW" PHASE="$PHASE" STATE_FILE="$STATE_FILE" python3 -c "import os
 

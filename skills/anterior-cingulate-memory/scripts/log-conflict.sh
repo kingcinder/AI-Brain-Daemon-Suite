@@ -61,6 +61,12 @@ if [[ ! -f "$STATE_FILE" ]]; then
   echo "ERROR: conflict-state.json not found. Run ./install.sh first." >&2; exit 1
 fi
 
+# ── Serialize the read-modify-write against concurrent writers ────────────────
+# (encode-pipeline spawn job, decay job, manual resolve) — same lock
+# safe-write.sh takes for this state file.
+exec 200>"$STATE_FILE.lock"
+flock 200
+
 # ── Derive intensity from severity if not explicitly set ──────────────────────
 if [[ -z "$INTENSITY" ]]; then
   case "$SEVERITY" in
@@ -107,7 +113,8 @@ UPDATED=$(jq \
   .stats.totalConflictsLogged += 1
   ' "$STATE_FILE")
 
-echo "$UPDATED" > "$STATE_FILE"
+echo "$UPDATED" > "$STATE_FILE.tmp.$$"
+mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
 
 # ── Sync inject file ──────────────────────────────────────────────────────────
 "$SKILL_DIR/scripts/sync-state.sh" --quiet

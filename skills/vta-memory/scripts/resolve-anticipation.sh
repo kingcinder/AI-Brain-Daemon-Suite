@@ -54,7 +54,11 @@ if [ "$EXISTS" = "-1" ]; then
   exit 0
 fi
 
-# Remove from anticipating
+# Remove from anticipating — lock only around our own write. log-reward.sh
+# (below, when --reward is passed) and sync-motivation.sh re-enter the same
+# state file and take their own locks; holding this lock across them would
+# deadlock the child.
+exec 200>"$STATE_FILE.lock"; flock 200
 jq --arg item "$ITEM" --arg now "$NOW" \
    '
    .anticipating = [.anticipating[] | select((. | ascii_downcase) != ($item | ascii_downcase))] |
@@ -62,8 +66,9 @@ jq --arg item "$ITEM" --arg now "$NOW" \
      [.anticipatingMeta[] | select((.item | ascii_downcase) != ($item | ascii_downcase))]
    else [] end) |
    .lastUpdated = $now
-   ' "$STATE_FILE" > "$STATE_FILE.tmp"
-mv "$STATE_FILE.tmp" "$STATE_FILE"
+   ' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+exec 200>&-
 
 echo "✨ Anticipation resolved!"
 echo "   '$ITEM' happened!"

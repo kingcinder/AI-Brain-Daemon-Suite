@@ -1512,8 +1512,11 @@ async def dispatch(job: Job, vram_limit: float, cgroup: CgroupThrottle, pressure
                     direct_timeout: float, spawn_timeout: float, psi_threshold: float,
                     enable_yolo: bool, daemon_state: DaemonState) -> None:
     if job.kind == "spawn" and pressure_active:
+        # The scheduler consumes last_fired_key before dispatch, so a deferred
+        # job does NOT retry "next tick within this matching minute" — it skips
+        # to its next scheduled slot. Log what actually happens.
         log.warning("%s: due now but system is under pressure — deferring (will retry "
-                    "next tick if still within this matching minute)", job.name)
+                    "at the next scheduled slot)", job.name)
         return
     # V4.0 load-reduction: when executive load is at/above hard ceiling, defer
     # spawn (inference) jobs. Direct non-inference jobs remain exempt.

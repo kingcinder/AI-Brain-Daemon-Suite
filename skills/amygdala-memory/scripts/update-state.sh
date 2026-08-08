@@ -64,14 +64,22 @@ if [ -n "$DIMENSION" ]; then
   if [ -n "$SET_VALUE" ]; then
     # Clamp between 0 and 1
     NEW_VAL=$(awk -v val="$SET_VALUE" 'BEGIN {if(val<0)print 0; else if(val>1)print 1; else printf "%.2f", val}')
-    jq ".dimensions.$DIMENSION = $NEW_VAL | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp"
-    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    # Per-write lock, released before any re-entry — the emotion→dimension
+    # cascade below re-invokes this script as subprocesses which take their
+    # own locks; holding the lock across the cascade would deadlock.
+    exec 200>"$STATE_FILE.lock"; flock 200
+    jq ".dimensions.$DIMENSION = $NEW_VAL | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+    exec 200>&-
     echo "✅ Set $DIMENSION = $NEW_VAL"
   elif [ -n "$DELTA" ]; then
+    # Read-modify-write under the lock (read and write must be atomic together).
+    exec 200>"$STATE_FILE.lock"; flock 200
     OLD_VAL=$(jq -r ".dimensions.$DIMENSION" "$STATE_FILE")
     NEW_VAL=$(awk -v old="$OLD_VAL" -v delta="$DELTA" 'BEGIN {v=old+delta; if(v<0)print 0; else if(v>1)print 1; else printf "%.2f", v}')
-    jq ".dimensions.$DIMENSION = $NEW_VAL | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp"
-    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    jq ".dimensions.$DIMENSION = $NEW_VAL | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+    exec 200>&-
     echo "✅ $DIMENSION: $OLD_VAL → $NEW_VAL (delta: $DELTA)"
   fi
   exit 0
@@ -90,9 +98,12 @@ if [ -n "$EMOTION" ]; then
     --arg ts "$NOW" \
     '{label: $label, intensity: ($intensity|tonumber), trigger: $trigger, timestamp: $ts}')
   
-  # Add to recent emotions (keep last 10)
-  jq ".recentEmotions = ([$ENTRY] + .recentEmotions | .[0:10]) | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp"
-  mv "$STATE_FILE.tmp" "$STATE_FILE"
+  # Add to recent emotions (keep last 10) — lock released before the cascade
+  # subprocesses below re-enter this script.
+  exec 200>"$STATE_FILE.lock"; flock 200
+  jq ".recentEmotions = ([$ENTRY] + .recentEmotions | .[0:10]) | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+  mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+  exec 200>&-
   
   # Also log to JSONL
   echo "$ENTRY" >> "$LOG_FILE"

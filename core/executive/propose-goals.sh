@@ -62,6 +62,11 @@ if [ ! -f "$REFLECTION" ]; then
   exit 1
 fi
 
+# PFC is written concurrently by record-goal-outcome.sh / deploy-proposal.sh —
+# take the same $PFC.lock they take before the read-modify-write below.
+exec 200>"$PFC.lock"
+flock 200
+
 # Rank + append proposals
 RESULT=$(
   WORKSPACE="$WORKSPACE" REFLECTION="$REFLECTION" PROP_LOG="$PROP_LOG" \

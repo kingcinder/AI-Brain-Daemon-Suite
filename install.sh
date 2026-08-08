@@ -67,8 +67,10 @@ if command -v nvidia-smi >/dev/null 2>&1; then
     echo "  OK: nvidia-smi found."
 elif command -v rocm-smi >/dev/null 2>&1; then
     echo "  OK: rocm-smi found — verify its JSON output matches what the script expects (SETUP_COMMANDS.md §3)."
+elif command -v vulkaninfo >/dev/null 2>&1; then
+    echo "  OK: vulkaninfo found — the kernel's primary VRAM path (heap-budget parsing, SETUP_COMMANDS.md §3)."
 else
-    echo "  WARN: neither nvidia-smi nor rocm-smi found — VRAM-based spawn deferral will"
+    echo "  WARN: none of nvidia-smi, rocm-smi, or vulkaninfo found — VRAM-based spawn deferral will"
     echo "        fail open (never blocks). Fine if you don't run local GPU inference."
 fi
 

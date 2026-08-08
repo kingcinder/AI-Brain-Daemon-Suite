@@ -14,6 +14,10 @@ if [ ! -f "$STATE_FILE" ]; then
   exit 1
 fi
 
+# Serialize read-modify-write against the other reward-state.json writers.
+exec 200>"$STATE_FILE.lock"
+flock 200
+
 # Parse arguments
 TYPE=""
 SOURCE=""
@@ -79,8 +83,8 @@ jq --argjson reward "$REWARD_ENTRY" \
    .recentRewards = ([$reward] + .recentRewards | .[0:10]) |
    .rewardHistory.totalRewards += 1 |
    .rewardHistory.byType[$type] += 1
-   ' "$STATE_FILE" > "$STATE_FILE.tmp"
-mv "$STATE_FILE.tmp" "$STATE_FILE"
+   ' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
 
 # Append to persistent reward log
 LOG_FILE="$WORKSPACE/memory/reward-log.jsonl"
