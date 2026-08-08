@@ -61,8 +61,10 @@ allocation). Previously it fell back to amdgpu sysfs because the build
 emits no `heapBudget`; corrected 2026-08-08 and the daemon restarted
 onto it, covered by `tests/test_vulkaninfo_parse.sh`. Live-verified at
 ~89.7% with `llama-server` holding ~7.16 GiB (matches sysfs
-`mem_info_vram_used`). Still pending: a deferral *actually firing* during
-a spawn job, and the 24h `--status` clean-run window.
+`mem_info_vram_used`). **Deferral firing observed 2026-08-08 11:00:29
+PDT** — `hippocampus_encoding` was deferred on the VRAM gate (89.7% >
+80% limit, protecting active inference). Still pending: the 24h
+`--status` clean-run window.
 
 ---
 

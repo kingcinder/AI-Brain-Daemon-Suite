@@ -224,9 +224,11 @@ summed only over `MEMORY_HEAP_DEVICE_LOCAL_BIT` heaps with `percent =
 deliberately ignored) — corrected 2026-08-08, daemon restarted onto it;
 previously it used the amdgpu sysfs fallback because the build emits no
 `heapBudget`. Live-verified at ~89.7% with `llama-server` holding ~7.16
-GiB (matches sysfs `mem_info_vram_used`). The two
-observation-based checks — a deferral *actually firing* during a spawn
-job, and the 24h clean `--status` window — remain pending.
+GiB (matches sysfs `mem_info_vram_used`). **Deferral firing observed
+2026-08-08 11:00:29 PDT** — `hippocampus_encoding` (spawn job) was
+deferred on the VRAM gate at 89.7% (> 80% limit, protecting active
+inference). Of the two observation-based checks, only the 24h clean
+`--status` window remains pending.
 
 ---
 
