@@ -5,7 +5,8 @@
 **Note:** Earlier sessions used path name `ai-brain-suite-UNIFIED`; the live tree is `AI_BRAIN_SUITE_COMPLETE`.  
 **Process narrative:** [V4_IMPLEMENTATION_PROCESS.md](./V4_IMPLEMENTATION_PROCESS.md)  
 **Verification evidence (2026-07-20):** [verification/VERIFICATION_REPORT.md](./verification/VERIFICATION_REPORT.md)  
-**Full local-inference cycle (GREEN):** [verification/full_cycle_20260720T234945Z/CYCLE_REPORT.md](./verification/full_cycle_20260720T234945Z/CYCLE_REPORT.md)
+**Full local-inference cycle (GREEN):** [verification/full_cycle_20260720T234945Z/CYCLE_REPORT.md](./verification/full_cycle_20260720T234945Z/CYCLE_REPORT.md)  
+**Post-V4.0 milestone status (2026-08-04 → 08-08):** see [`ROADMAP.md`](../ROADMAP.md) (M5–M8 all **LANDED**) and [`AUDIT.md`](../AUDIT.md) (all three gaps **CLOSED**; internal agentic loop landed 2026-08-08). The ledger below covers the V4.0 (2026-07-20/21) phase only.
 
 ### Plumbing vs exercised (honest)
 

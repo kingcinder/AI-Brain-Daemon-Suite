@@ -10,7 +10,7 @@
 
 - **Stages** mirror `VISION.md` §3 (Experience synthesis → Eclipsing the
   external harness → Crystallized self-improvement).
-- **Milestones (M0–M7) are sequenced**: each row lists what exists, what's
+- **Milestones (M0–M8) are sequenced**: each row lists what exists, what's
   missing, the concrete change, and the acceptance check. A milestone is
   *done* only when its acceptance check passes and the full local test suite
   (all `tests/run_phase*_harness.sh` plus `tests/run_skill_unit_tests.sh`)
@@ -31,7 +31,7 @@ suite's own daemon, running under an external harness (Hermes).
 |---|---|---|
 | 11+ persistent memory skills | `skills/` | encode/decay/consolidate pipelines, LLM-backed via local `llm-call.sh` |
 | Unified scheduler + supervisor | `deep-brain-kernel.py` | PSI, GPU VRAM, cgroups v2, pidfd tracking, per-job timeouts, `--check`/`--status` |
-| 20-job schedule, collision-free minutes | `JOBS` table in `deep-brain-kernel.py` | documented in `BRAIN_DAEMON_SCHEDULE.md` |
+| 29-job schedule, collision-free minutes | `JOBS` table in `deep-brain-kernel.py` | documented in `BRAIN_DAEMON_SCHEDULE.md` |
 | Executive function cycle | `core/executive/run-executive-cycle.sh` → `isolated-reflect.sh` → `propose-goals.sh` | scheduled as `executive_goal_cycle` (direct job, minutes 28) |
 | Post-deploy self-mod monitoring | `self_mod_monitor` job → `skills/self-mod-runner/scripts/monitor-tick.sh` | scheduled (direct job, minutes 32) |
 | Regression + CI | `tests/` + `.github/workflows/ci.yml` (phase harnesses; same cadence as `verification.yml` — push/PR, nightly, weekly deep-verify, on demand) |
@@ -100,6 +100,16 @@ until the Suite *is* the harness. Two external functions are named today:
 - **Done when:** a `spawn`-type job can run with `SPAWN_PROVIDER=local`
   against the same local server the skills already use, a harness test runs
   a fake spawn via both providers, and `--status` still records outcomes.
+- **Status: LANDED.** `core/spawn/spawn-provider.sh` dispatches
+  `SPAWN_PROVIDER=hermes|local|agentloop`. The **agentloop** provider runs
+  the suite's own **internal agentic loop** (`core/agent-loop/agent-loop.sh`
+  + `tools.sh` — multi-turn tool use against the local LLM with an
+  allowlisted tool registry and session memory), which is the AUDIT Gap 2
+  follow-on: spawn jobs can now reason *and act* without hermes, not just
+  route to the local endpoint. Covered by `tests/run_phase6_harness.sh`
+  (hermes + local dispatch through the daemon) and
+  `tests/run_phase10_harness.sh` (tool-use loop, session memory, unknown-tool
+  rejection, `SPAWN_PROVIDER=agentloop` end-to-end).
 
 ### M4 — Closed goal-execution loop (goals become actions become lessons)
 
@@ -156,7 +166,8 @@ direction and safety, not operators.
   human is consulted only for (a) direction-setting (new goals), (b) new
   immutable-path exemptions, and (c) incident triage. Everything else —
   propose, evaluate, deploy, monitor, rollback, expand — runs on its own
-  schedule with full provenance.
+  schedule with full provenance. Every autonomy decision is audited as a
+  `log-provenance.sh event` entry (see M8).
 - **Done when:** a `status --autonomy` (or equivalent) reports the current
   mode with its evidence, the mode is persisted and logged, and the full
   local suite + CI remain green across every milestone.
@@ -178,13 +189,24 @@ direction and safety, not operators.
   for human approval). A missing/unreadable autonomy-state.json is treated as
   steward_mode (fail-safe: never over-grant autonomy on absent evidence).
   The scheduled cycle tick (`proposal-cycle-tick.sh`) refreshes the mode from
-  fresh evidence (`deep-brain-kernel.py --autonomy`) before each run.
+  fresh evidence (`deep-brain-kernel.py --autonomy`) before each run, and —
+  when steward_mode + full_review would force a defer — **defers the weekly
+  cycle entirely** rather than running it (no churn), logs an
+  `autonomy.gate.deferred` provenance event, and alerts: a
+  `{type:"self-mod", event:"cycle_deferred"}` signal in the shared
+  `brain-events.jsonl` plus a `memory/self-mod/last-deferral.json` marker
+  that `--status` and the dashboard's `⏸` pill surface.
 - **Done when:** a harness test proves auto_mode auto-deploys an accepted
   proposal even in full_review, steward_mode + full_review still queues, and
   the summary records `autonomy_mode`.
 - **Status: LANDED.** `tests/run_phase9_harness.sh` covers all four paths
   (auto deploys, steward/full blocks, steward/relaxed deploys, missing-state
-  fail-safe) plus no-gate back-compat.
+  fail-safe) plus no-gate back-compat; `tests/test_cycle_defer_alert.sh`
+  covers the deferral + alerting (signal + marker + `--status`);
+  `tests/test_autonomy_report.sh` covers the `--autonomy` report itself, and
+  `tests/test_provenance_events.sh` covers the `log-provenance.sh events`
+  audit CLI (`events --filter autonomy` renders every mode.decided / gate
+  outcome).
 
 ---
 

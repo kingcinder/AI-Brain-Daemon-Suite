@@ -33,7 +33,7 @@ daemon job table is intact — any drift rejects it and reddens the weekly run.
 The AI Brain Suite is a unified scheduling and pressure-management engine
 (`deep-brain-kernel.py`) for 11 neurologically-mapped memory skills
 (hippocampus, amygdala, VTA, basal ganglia, insula, anterior cingulate/ACC,
-PFC, social, cerebellum, heartbeat). It replaces the per-skill cron entries
+ACC error, PFC, social, cerebellum, heartbeat). It replaces the per-skill cron entries
 each skill originally shipped with — consolidating every job into one table
 surfaced 11 real, pre-existing schedule collisions that were invisible while
 scattered across 11 separate `install.sh` files. See
@@ -53,8 +53,8 @@ rollback only — see `legacy-IGNORE/README.md`.
 | Path | Purpose |
 |---|---|
 | `VISION.md` | **Official vision & scope.** Persistent skills → naturalized experience synthesis → self-directed evolution → eclipsing the external harness → crystallized self-improvement. Read this first. |
-| `ROADMAP.md` | **Roadmap to full autonomy.** Sequenced milestones (M0–M7) mapping the vision's three stages onto existing code — self-mod pipeline, executive cycle, daemon — each with acceptance criteria and CI-green verification. |
-| `AUDIT.md` | **Living vision-gap audit.** Tracks the three open gaps (scheduled self-mod, internalized inference, closed goal loop) against ROADMAP milestones, with per-gap status, code evidence, and closure criteria. |
+| `ROADMAP.md` | **Roadmap to full autonomy.** Sequenced milestones (M0–M8) mapping the vision's three stages onto existing code — self-mod pipeline, executive cycle, daemon — each with acceptance criteria and CI-green verification. |
+| `AUDIT.md` | **Living vision-gap audit.** Tracks the three vision gaps (scheduled self-mod, internalized inference, closed goal loop) — all **closed** as of 2026-08-08 — plus the agentic-loop follow-on, with per-gap status, code evidence, and closure criteria. |
 | `HERMES_COMPATIBILITY.md` | **Hermes Agent compatibility audit.** File-by-file inspection of the whole suite against the installed `hermes` binary — CLI invocations, skill packaging, and nomenclature — with per-file verdicts and open items. |
 | `deep-brain-kernel.py` | **The engine.** Async scheduler + pressure supervisor: epoll-driven PSI monitoring, GPU VRAM checking, cgroups v2 throttling, pidfd-based process tracking, single-instance locking. `--check` validates the job table without starting anything. |
 | `aibrain.service` | Systemd (user) unit supervising `deep-brain-kernel.py`, using systemd's own delegated cgroup controls rather than hand-rolled cgroup paths. |
@@ -72,6 +72,8 @@ rollback only — see `legacy-IGNORE/README.md`.
 | `scripts/ci-gate.sh` | One-command local replay of the CI Verification Gate — runs the same four commands with the exact CI env (`WORKSPACE` at the checkout + `DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1` for `--check`, isolated scratch workspace for the sweep). Run: `bash scripts/ci-gate.sh`. |
 | `scripts/deep-verify.sh` | One-command local replay of the weekly deep verify — runs the self-mod proposal pipeline's sandbox gate (`core/self-mod/evaluate-proposal.sh`) against HEAD with a no-op probe proposal, accepted iff every declared test passes and the daemon job table is intact (the workflow's weekly `47 4 * * 1` schedule entry). Run: `bash scripts/deep-verify.sh`. |
 | `scripts/serve-dashboard.sh` | **Always-on GUI serve mode for the Brain Dashboard.** Serves `$WORKSPACE/brain-dashboard.html` on a fixed port (default `8123`) with auto-refresh — the page polls the server and reloads itself the instant a job regenerates the file, instead of a one-off `python3 -m http.server` showing stale data. `start`/`stop`/`status`/`restart`/`foreground`; self-heals a missing dashboard on start. Run: `bash scripts/serve-dashboard.sh start`. |
+| `core/agent-loop/` | **Internal agentic loop** (AUDIT Gap 2 follow-on): a multi-turn tool-use loop (`agent-loop.sh`) with an allowlisted tool registry (`tools.sh`) and session memory, running against the suite's local LLM — `SPAWN_PROVIDER=agentloop` routes daemon spawn jobs through it with no hermes needed. |
+| `core/self-mod/acc-calibration.sh` | **ACC flag→error calibration** (Stage-1 proprioception): joins anterior-cingulate conflict flags to acc-error corrections over a rolling window and reports how often flagged uncertainty actually predicted a later error (hit rate, false-positive rate, per-type breakdown). Read-only; feeds `health-context.sh` and the proposal prompts. |
 
 ### Why are there two ACC skills?
 
@@ -95,7 +97,12 @@ not duplicate logging — for the same underlying issue to show up in both:
 the session, and `acc-error-memory` later recording "corrected on X" if the
 uncertain guess turned out wrong. That pairing is itself useful signal
 (calibration: how often does flagged uncertainty predict an actual error?),
-which is part of why both are kept separate rather than merged.
+which is part of why both are kept separate rather than merged. That
+question — "how often does flagged uncertainty predict an actual error?" —
+is now answered quantitatively by `core/self-mod/acc-calibration.sh`
+(Stage-1 proprioception), which joins the conflict flags to the error
+corrections over a rolling window and reports the hit rate per conflict
+type.
 
 
 ## Why the engine moved from bash to Python
@@ -183,7 +190,7 @@ dependency — consistent with the rest of the suite. State writes go through
    4. **Checks host prerequisites** — PSI availability, cgroup v2, GPU
       tooling — printing a warning (not a hard failure) for anything
       missing, since the engine degrades gracefully either way.
-   5. **Runs `--check`** — validates all 28 jobs (20 direct + 8 spawn): the 20 direct jobs' script paths, and minute + day-of-week
+   5. **Runs `--check`** — validates all 29 jobs (21 direct + 8 spawn): the 21 direct jobs' script paths, and minute + day-of-week
       uniqueness across all. Stops here if anything's actually broken.
    6. **Pauses** so you can review/edit `aibrain.service` for the gotchas
       below.
@@ -264,7 +271,14 @@ fresh workspace.
 The dashboard shell is **live**: a status bar under the header re-fetches
 `GET /__fragments` and `GET /__daemon` every 10s, showing the daemon
 heartbeat (last beat + age), the most recent successful job run, the live
-fragment count, and a health flag for jobs at 3+ consecutive failures. A
+fragment count, a per-job success-rate **sparkline**, the autonomy-contract
+pill (`🛡 steward` / auto) from `deep-brain-kernel.py --autonomy`, a health
+flag for jobs at 3+ consecutive failures, and a `⏸ cycle` pill that lights up
+when the weekly self-mod cycle deferred for a human (steward_mode +
+full_review). The 🩺 verification tab renders the **autonomy contract
+history** (when and why auto_mode was granted or revoked, from the
+provenance ledger), and the 🛠 Self-Mod tab shows the last 12 `autonomy.*`
+audit events as an **Autonomy Gate · Provenance** timeline. A
 **🔄 Regenerate** button POSTs to `POST /__regenerate`, which runs every
 skill's `sync-state.sh` (falling back to `generate-dashboard.sh`) across
 `skills/*` and rebuilds the dashboard in place — a live, token-gated

@@ -129,6 +129,29 @@ timeout kills it and `--status` shows `verification_pass` as failed. Raise
 `--direct-timeout` in `aibrain.service` if this appears; the sweep finishes
 well under the default on this host.
 
+## Daemon-native jobs (no old-cron equivalent)
+
+Not every job in the table replaced a per-skill cron entry — the jobs below
+were added by the V4.0 kernel itself (Phase 1/2/3 machinery + roadmap
+milestones) and never had an `install.sh --with-cron` counterpart. They live
+in the `JOBS` table only, and are documented here so the full 29-job table
+(21 direct + 8 spawn) has a single reference:
+
+| Job | Kind | Days | Hours | Minute | Runs |
+|---|---|---|---|---|---|
+| `executive_goal_cycle` | direct | * | 1,9,17 | 28 | `executive-function/scripts/run-cycle.sh` — Phase 2 isolated reflection + goal proposal; promote path gates on executive load < 0.75 |
+| `self_mod_monitor` | direct | * | 2,10,18 | 32 | `self-mod-runner/scripts/monitor-tick.sh` — post-deploy self-mod monitoring (auto-rollback on metric breach) |
+| `self_mod_proposal_cycle` | direct | Sun | 3 | 46 | `self-mod-runner/scripts/proposal-cycle-tick.sh` — ROADMAP M1 weekly cycle; M8 `--autonomy-gate --defer-gate` defers in steward+full_review and alerts (`cycle_deferred` brain-event signal + `--status`/dashboard `⏸` marker) |
+| `thalamus_gate` | direct | * | 0,2,4,6,8,10,12,14,16,18,20,22 | 42 | `thalamus-memory/scripts/gate.sh` — attention gate: five-dimensional relevance filter + signal routing |
+| `thalamus_decay` | direct | * | 0,4,8,12,16,20 | 48 | `thalamus-memory/scripts/decay.sh` — releases suppressed signals past their retryAfter window |
+| `signal_dispatch` | direct | * | 1,3,5,7,9,11,13,15,17,19,21,23 | 54 | `thalamus-memory/scripts/gate.sh` — polls `brain-signals.jsonl` and dispatches through the gate (opposite 2-hour cycle from `thalamus_gate`) |
+| `brain_snapshot` | direct | * | 23 | 3 | `hippocampus-memory/scripts/snapshot-tick.sh` — V4.1 daily state-preservation snapshot via `core/snapshot/snapshot.sh` (retention 14) |
+
+All three Phase-1 signaling/attention jobs share the attention machinery in
+`thalamus-memory`; `signal_dispatch` polls `brain-signals.jsonl` (written by
+`core/signaling/publish.sh`) and hands signals to `gate.sh` on the opposite
+2-hour phase so nothing waits more than 2h to be routed.
+
 Every hour-set above is exactly what was already configured — only minutes
 changed, and only for jobs that were actually colliding with something
 else.

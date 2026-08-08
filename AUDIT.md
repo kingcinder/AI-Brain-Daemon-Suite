@@ -22,7 +22,7 @@
 
 ## Gap 1 — Scheduled self-mod
 
-**Status: `CLOSED` (M1 + M2 landed 2026-08-04)
+**Status: `CLOSED` (M1 + M2 landed 2026-08-04; M8 landed 2026-08-08)
 
 **What exists today:**
 
@@ -47,10 +47,12 @@
   scheduled pipeline runs" — a forward reference to something that does not
   exist. The daemon will never, on its own, propose → evaluate → deploy a
   capability improvement.
-- The autonomy knob is computed but inert: `graduation-tracker.sh` derives
+- The autonomy knob was computed but inert at the time: `graduation-tracker.sh` derives
   `review_mode ∈ {full_review, relaxed_review}` from a 20-clean streak, but
-  **nothing consumes it** to change behavior. `thresholds.json` and
-  `utility-weights.json` are read for scoring, not for autonomy gating.
+  **nothing consumed it** to change behavior. `thresholds.json` and
+  `utility-weights.json` were read for scoring, not for autonomy gating.
+  (Closed by M2/M8: `run-pipeline.sh` now consumes `review_mode` and the
+  persisted autonomy mode; see the M2/M8 rows below.)
 
 **Closure criteria (ROADMAP):**
 
@@ -63,13 +65,13 @@
       divergence + monitor; harness proves both paths; any failure resets
       the streak to 0.
 
-**Last checked:** 2026-08-04. **Next check-in:** when M5 lands.
+**Last checked:** 2026-08-08. **Next check-in:** when M0 host-hardening lands.
 
 ---
 
 ## Gap 2 — Internalized inference
 
-**Status: `CLOSED` (M3 landed 2026-08-04; agentic-loop follow-on remains)
+**Status: `CLOSED` (M3 landed 2026-08-04; agentic-loop follow-on landed 2026-08-08)
 
 **What exists today:**
 
@@ -94,10 +96,10 @@
   to `hermes chat -q … --source daemon` in `deep-brain-kernel.py::run_spawn`
   (the `cmd = ["hermes", "chat", ...]` line). If `hermes` is not in PATH,
   the job is skipped (`run_spawn`'s `shutil.which("hermes")` guard).
-- So the Suite's *skills* already reason locally, but the *daemon* still
-  depends on the external harness for every spawn-type job. There is no
+- So the Suite's *skills* already reasoned locally, but the *daemon* still
+  depended on the external harness for every spawn-type job. There was no
   `SPAWN_PROVIDER` configuration anywhere.
-- The local server is a raw chat-completions endpoint only — there is no
+- The local server was a raw chat-completions endpoint only — there was no
   internal agentic loop (tool use, hooks, session memory) yet to fully
   replace hermes.
 
@@ -107,11 +109,17 @@
       the local `llm-call.sh` endpoint (`SPAWN_PROVIDER=hermes|local`),
       keeping pidfd/lock/timeout machinery intact; a harness test runs a
       fake spawn via both providers; `--status` still records outcomes.
-- [ ] Follow-on (not yet a milestone): internal agentic loop (tool use,
-      session memory) to fully replace hermes, not just route to local.
+- [x] Follow-on (**landed 2026-08-08**): internal agentic loop —
+      `core/agent-loop/agent-loop.sh` + `tools.sh` — a multi-turn tool-use
+      loop against the suite's local LLM with an allowlisted tool registry
+      and session memory (stable per-job session ids across scheduled runs).
+      `SPAWN_PROVIDER=agentloop` routes spawn jobs through it (alongside
+      `hermes` and `local`), so spawn jobs can reason *and act* without
+      hermes at all. Covered by `tests/run_phase10_harness.sh` (tool calls,
+      session accumulation, unknown-tool rejection, honest failure, daemon
+      dispatch via the shim).
 
-**Last checked:** 2026-08-04. **Next check-in:** when the agentic-loop
-follow-on lands.
+**Last checked:** 2026-08-08. **Next check-in:** when M0 host-hardening lands.
 
 ---
 
@@ -155,7 +163,7 @@ follow-on lands.
       next proposal cycle; a harness test proves the full
       goal → action → outcome → learn round trip.
 
-**Last checked:** 2026-08-04. **Next check-in:** when M5 lands.
+**Last checked:** 2026-08-08. **Next check-in:** when M0 host-hardening lands.
 
 ---
 
@@ -182,7 +190,7 @@ follow-on lands.
 | Vision requirement | Status | Closest roadmap step |
 |---|---|---|
 | Suite proposes its own changes on its own schedule | ✅ Weekly `self_mod_proposal_cycle` job; `review_mode` gates deploys | M1 + M2 (landed) |
-| Suite reasons without the external harness | ✅ Spawn jobs route via `spawn-provider.sh` (hermes or local `llm-call.sh`) | M3 (landed) |
+| Suite reasons without the external harness | ✅ Spawn jobs route via `spawn-provider.sh` — `hermes`, `local` `llm-call.sh`, or the **internal agentic loop** (`SPAWN_PROVIDER=agentloop`, tool use + session memory, no hermes needed) | M3 + Gap-2 follow-on (landed) |
 | Goals close the loop: set → act → learn → reset | ✅ Goal injection → outcome recorder → ACC calibration | M4 (landed) |
 | Suite learns what to improve from its own measured weaknesses | ✅ `health-context.sh` feeds failure streaks/lessons/sweep failures into proposal prompts | M5 (landed) |
 | Suite grows brand-new modules under the registry gate | ✅ `new_module` proposals (manifest + scripts + tests) evaluate/deploy/rollback | M6 (landed) |
@@ -197,10 +205,13 @@ Suite's own reasoning path is a first-class provider, not a hermes
 hardwire), M4 (goals close the loop: set → act → learn → reset), M5
 (outcome-driven proposals), M6 (self-directed new-module expansion), M7
 (steward-only autonomy mode), and M8 (the autonomy mode is consumed as a
-real control — auto_mode self-deploys on schedule). The remaining open items
-are the Stage-2 **agentic-loop follow-on** (internal tool use + session
-memory to fully replace hermes, not just route to local) and Stage-1
-hardening on a real host (M0).
+real control — auto_mode self-deploys on schedule, and a steward-gated
+weekly cycle defers with a visible alert instead of churning). The Gap-2
+**agentic-loop follow-on has also landed** (2026-08-08):
+`core/agent-loop/` gives spawn jobs internal tool use + session memory via
+`SPAWN_PROVIDER=agentloop`, so the daemon no longer needs hermes even for
+its agent turns. The remaining open item is Stage-1 hardening on a real
+host (M0).
 
 ---
 

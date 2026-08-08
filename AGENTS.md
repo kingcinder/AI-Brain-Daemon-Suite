@@ -25,6 +25,8 @@ Only peripheral modules with a valid `capability-manifest.json` are modifiable.
 | `core/executive/` | Phase 2 isolated reflection + goal proposal cycle |
 | `core/self-mod/` | Phase 3 self-mod pipeline (immutable as proposal target) |
 | `core/self-mod/generate-proposals-llm.sh` | LLM → proposal store (manifest allowlist only) |
+| `core/self-mod/acc-calibration.sh` | ACC flag→error calibration (Stage-1 proprioception): hit rate of flagged uncertainty predicting real errors; feeds `health-context.sh` |
+| `core/agent-loop/` | Internal agentic loop (AUDIT Gap 2 follow-on): multi-turn tool use + session memory against the local LLM; `SPAWN_PROVIDER=agentloop` |
 | `tests/run_skill_unit_tests.sh` | Per-skill unit suite (12 skills incl. verification-memory self-test) |
 | `skills/` | Peripheral modules (memory skills + executive-function + self-mod-runner + verification-memory) |
 | `skills/verification-memory/` | **Verification region (proprioception):** manifest-driven runner of every module's declared tests; publishes `tests_passed`/`test_failure` signals; self-mod's `evaluate-proposal.sh` runs it as the pre-deploy regression gate |
@@ -39,6 +41,7 @@ Only peripheral modules with a valid `capability-manifest.json` are modifiable.
 | `docs/verification/full_cycle_20260720T234945Z/` | **Canonical GREEN full local-inference cycle** (generate→rank→eval→deploy→rollback + PSI self-contained proof) |
 | `docs/verification/VERIFICATION_REPORT.md` | Verification ledger (historical + full-cycle pointer) |
 | `core/self-mod/graduation-tracker.sh` | Review-frequency clean streak (20); reset-on-failure |
+| `core/provenance/log-provenance.sh` | Per-patch DAG + generic `event`/`events` audit trail; `log-provenance.sh events --filter autonomy` shows every autonomy decision |
 
 ## Concurrency / KV
 
@@ -51,6 +54,7 @@ Only peripheral modules with a valid `capability-manifest.json` are modifiable.
 Run:
 
 ```bash
+bash scripts/ci-gate.sh   # one-command replay of the CI Verification Gate
 bash tests/run_phase1_harness.sh
 bash tests/run_phase2_harness.sh
 bash tests/run_phase3_harness.sh

@@ -20,7 +20,10 @@ harness. Compatibility has three concrete axes:
 
 1. **CLI invocation** — every place the suite shells out to the harness must
    use the real `hermes` binary and real flags (`hermes chat -q …`,
-   `hermes cron create …`, `hermes cron remove <id>`).
+   `hermes cron create …`, `hermes cron remove <id>`). Since M3 + the
+   Gap-2 follow-on, the suite can also route spawn jobs to its own local
+   inference (`SPAWN_PROVIDER=local`) or internal agentic loop
+   (`SPAWN_PROVIDER=agentloop`) — no harness binary required on that path.
 2. **Skill packaging** — each skill must be discoverable/installable by
    `hermes skills` (a `SKILL.md` with `name` + `description` frontmatter,
    the progressive-disclosure layout Hermes reads).
@@ -53,8 +56,9 @@ Legend: **✅ compatible** · **🔧 fixed in this pass** · **ℹ️ note (inte
 
 | File | Verdict | Notes |
 |---|---|---|
-| `deep-brain-kernel.py` | 🔧 | Spawn jobs route through `core/spawn/spawn-provider.sh` → `hermes chat -q … --source daemon` (M3). Fixed 3 legacy `sessions:spawn` comment/output strings → `hermes chat` (Job dataclass comment, `--check` column label, `_await_with_timeout` docstring). `--check` still validates `hermes` on PATH + the provider shim. |
-| `core/spawn/spawn-provider.sh` | ✅ | Hermes-native by construction: `exec hermes chat -q "$TASK" --source daemon [--accept-hooks --yolo]`; `local` provider uses the suite's own `llm-call.sh`. |
+| `deep-brain-kernel.py` | 🔧 | Spawn jobs route through `core/spawn/spawn-provider.sh` → `hermes chat -q … --source daemon` (M3, provider `hermes` default) or the suite's own local `llm-call.sh` / internal agentic loop (`SPAWN_PROVIDER=local|agentloop` — see the Gap-2 follow-on below). Fixed 3 legacy `sessions:spawn` comment/output strings → `hermes chat` (Job dataclass comment, `--check` column label, `_await_with_timeout` docstring). `--check` still validates `hermes` on PATH + the provider shim. |
+| `core/spawn/spawn-provider.sh` | ✅ | Hermes-native for `SPAWN_PROVIDER=hermes`: `exec hermes chat -q "$TASK" --source daemon [--accept-hooks --yolo]`. `SPAWN_PROVIDER=local` uses the suite's own `llm-call.sh`; `SPAWN_PROVIDER=agentloop` runs the internal agentic loop (`core/agent-loop/`) — spawn jobs can reason + act with no hermes at all (AUDIT Gap 2 follow-on). |
+| `core/agent-loop/` | ✅ | **Internal agentic loop** (Gap 2 follow-on, 2026-08-08): multi-turn tool-use loop (`agent-loop.sh`) against the suite's local LLM with an allowlisted tool registry (`tools.sh`) and session memory — suite-internal, never shells out to the harness. |
 | `install.sh` | 🔧 | Fixed gotcha (a) `openclaw/jq/curl` → `hermes/jq/curl` and the `which` hint; fixed an indentation regression on two `echo` lines. Still deploys to `~/.openclaw/workspace` (data dir, intentional). |
 | `aibrain.service` | 🔧 | GOTCHA (a) + PATH comment: `openclaw not found` → `hermes not found`; PATH comment lists `hermes` first. |
 | `README.md` | 🔧 | Fixed `openclaw sessions:spawn` → `hermes chat` (per-job timeout bullet) and the `openclaw`/`jq`/`curl` PATH gotcha. |
@@ -73,7 +77,7 @@ Legend: **✅ compatible** · **🔧 fixed in this pass** · **ℹ️ note (inte
 | `core/self-mod/generate-proposals-llm.sh` | ✅ | Uses `hermes chat -q "$PROMPT" --provider openrouter -m …` — valid Hermes flags; prefers local `llm-call.sh` otherwise. |
 | `core/executive/*` (run-executive-cycle, propose-goals, isolated-reflect, record-goal-outcome) | ✅ | No harness invocations — pure suite logic; `WORKSPACE` defaults are data-dir paths (intentional). |
 | `core/self-mod/*` (pipeline, monitor, graduation, etc.) | ✅ | Self-contained; `WORKSPACE` data-dir defaults only. |
-| `core/schema`, `core/locks`, `core/concurrency`, `core/sandbox`, `core/snapshot`, `core/utility`, `core/provenance`, `core/executive-load` | ✅ | No harness coupling. |
+| `core/schema`, `core/locks`, `core/concurrency`, `core/sandbox`, `core/snapshot`, `core/utility`, `core/provenance`, `core/executive-load` | ✅ | No harness coupling. `core/provenance/log-provenance.sh` also gained a generic `event`/`events` audit trail (every autonomy decision, viewable via `log-provenance.sh events --filter autonomy`). |
 
 ### `skills/*/` (11 skills)
 
@@ -208,8 +212,6 @@ decision.
 hermes skills list              # suite skills appear as enabled
 python3 deep-brain-kernel.py --check   # spawn-provider shim + hermes found
 # (default WORKSPACE is now ~/.hermes/workspace)
-bash tests/run_phase1_harness.sh && bash tests/run_phase2_harness.sh \
-  && bash tests/run_phase3_harness.sh && bash tests/run_phase4_harness.sh \
-  && bash tests/run_phase5_harness.sh && bash tests/run_phase6_harness.sh \
-  && bash tests/run_skill_unit_tests.sh
+bash scripts/ci-gate.sh         # one-command replay of the CI Verification Gate
+# or the full local suite: tests/run_phase{1..10}_harness.sh + tests/run_skill_unit_tests.sh
 ```
