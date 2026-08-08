@@ -2,76 +2,159 @@
 # AI Brain Suite — Unified Installer
 # Deploys deep-brain-kernel.py (the async scheduler/pressure-supervisor
 # engine) + skill packages + V4 core/ (locks, executive, sandbox, …) + aibrain.service.
-set -e
+#
+# Hardened installer:
+#   - set -euo pipefail; resolves its own directory so it runs from anywhere
+#   - --help; unknown args fail fast
+#   - single-instance flock so concurrent installs can't corrupt the deploy
+#   - backs up the current workspace + unit and restores them via an ERR trap
+#     if anything fails mid-deploy
+#   - replace-style deploy of the four shipped targets (skills/, core/, tests/,
+#     kernel) so stale files never survive; the daemon's runtime state dirs
+#     (e.g. $WS/memory/) are never touched
+#   - pre-flight --check gates the deploy; skill-file-count sanity check
+#   - TTY-safe conditional pause (never hangs CI); systemd-user-session
+#     detection so containers/WSL degrade gracefully instead of failing late
+set -euo pipefail
 
-# Non-interactive install: AIBRAIN_NONINTERACTIVE=1 or --yes skips the manual pause
-# and still enables the service (use for CI / verification).
+# ── CLI / env ──────────────────────────────────────────────────────────────
+# Non-interactive install: AIBRAIN_NONINTERACTIVE=1 or --yes skips the manual
+# pause and still enables the service (use for CI / verification).
 NONINTERACTIVE=0
 for arg in "$@"; do
   case "$arg" in
     --yes|-y|--noninteractive) NONINTERACTIVE=1 ;;
+    --help|-h)
+        cat <<'EOF'
+AI Brain Suite installer
+
+Usage: ./install.sh [--yes|-y|--noninteractive] [--help|-h]
+
+  --yes | -y | --noninteractive
+      Fully unattended: no interactive pause; still enables the service.
+      Same as AIBRAIN_NONINTERACTIVE=1.
+
+  --help | -h
+      Show this help and exit.
+
+Deploys deep-brain-kernel.py, skills/, core/ and tests/ into
+~/.hermes/workspace/, patches aibrain.service's Environment=PATH=, registers
+the skills with Hermes (Option B), and enables the systemd --user service.
+The previous install is preserved at ~/.hermes/workspace.bak-aibrain-install
+and restored automatically if the install fails.
+EOF
+        exit 0 ;;
+    *)
+        echo "Unknown argument: $arg (see --help)" >&2
+        exit 2 ;;
   esac
 done
 if [ "${AIBRAIN_NONINTERACTIVE:-0}" = "1" ]; then
   NONINTERACTIVE=1
 fi
 
-# ── resolve_tool_path: build the Environment=PATH= value for aibrain.service ─
-# systemd --user services do NOT inherit your interactive shell's PATH
-# (unit-file gotcha (a)), so the deployed unit's PATH must list every tool the
-# daemon shells out to. This dedupe-preserving join of the base PATH onto the
-# resolved dirs of each tool replaces the old manual 'edit the service file'
-# install step. nvidia-smi/rocm-smi are portability fallbacks only (not
-# expected on this box's RX 5700 XT / RDNA1 hardware) — included if present.
-resolve_tool_path() {
-    local base="/usr/bin:/bin:/usr/local/bin:%h/.local/bin"
-    local extra=""
-    for tool in hermes jq curl python3 vulkaninfo nvidia-smi rocm-smi; do
-        if p=$(command -v "$tool" 2>/dev/null); then
-            extra="$extra:$(dirname "$p")"
-        fi
-    done
-    python3 - "$base" "$extra" <<'PY'
-import sys
-base, extra = sys.argv[1], sys.argv[2]
-seen = []
-for p in (base + ":" + extra).split(":"):
-    if p and p not in seen:
-        seen.append(p)
-print(":".join(seen))
-PY
-}
+# Run from the suite directory regardless of how/where we were invoked.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-echo "--- Step 1: Initializing Workspace ---"
-mkdir -p ~/.hermes/workspace/skills
-mkdir -p ~/.hermes/workspace/core
-mkdir -p ~/.config/systemd/user/
-
-echo "--- Step 2: Deploying Artifacts ---"
+# Validate the suite layout up front — fail before we touch anything.
 if [ ! -f "deep-brain-kernel.py" ] || [ ! -f "aibrain.service" ] || [ ! -d "skills" ]; then
     echo "Error: deep-brain-kernel.py, aibrain.service, or skills/ not found in current directory."
     echo "Run this script from inside the extracted suite directory."
     exit 1
 fi
 
-cp deep-brain-kernel.py ~/.hermes/workspace/deep-brain-kernel.py
-cp aibrain.service ~/.config/systemd/user/aibrain.service
-cp -r skills/. ~/.hermes/workspace/skills/
+[ -n "${HOME:-}" ] || { echo "Error: HOME is not set." >&2; exit 1; }
+
+# ── Paths / rollback state ──────────────────────────────────────────────────
+WS="$HOME/.hermes/workspace"
+BK="$HOME/.hermes/workspace.bak-aibrain-install"
+UNIT_FILE="$HOME/.config/systemd/user/aibrain.service"
+UNIT_BK="$UNIT_FILE.bak-aibrain-install"
+
+ROLLED_BACK=0
+BK_CREATED=0
+UNIT_BK_CREATED=0
+WS_PREEXISTED=0
+SYSTEMD_OK=0
+[ -d "$WS" ] && WS_PREEXISTED=1
+
+# Restore the previous install if anything fails mid-deploy. Idempotent.
+# Intentional `exit 1` paths that should NOT roll back (e.g. the service
+# failing to activate — the deploy is valid, the environment is not) call
+# `exit` directly, which does not fire the ERR trap.
+rollback() {
+    [ "$ROLLED_BACK" -eq 1 ] && return 0
+    ROLLED_BACK=1
+    echo ""
+    echo "--- Rolling back to the previous install ---"
+    if [ "$BK_CREATED" -eq 1 ] && [ -d "$BK" ]; then
+        rm -rf "$WS"
+        mv "$BK" "$WS"
+        echo "  restored workspace from $BK"
+    elif [ "$WS_PREEXISTED" -eq 0 ]; then
+        rm -rf "$WS"
+        echo "  removed partial workspace (no previous install to restore)"
+    else
+        echo "  existing workspace left as-is (backup was not created)"
+    fi
+    if [ "$UNIT_BK_CREATED" -eq 1 ] && [ -f "$UNIT_BK" ]; then
+        cp "$UNIT_BK" "$UNIT_FILE"
+        echo "  restored aibrain.service from $UNIT_BK"
+    fi
+    echo "Rollback complete."
+}
+trap rollback ERR
+
+echo "--- Step 1: Initializing Workspace ---"
+mkdir -p "$WS/skills"
+mkdir -p "$WS/core"
+mkdir -p "$HOME/.config/systemd/user/"
+
+# Single-instance guard: only one install at a time may touch the workspace.
+# The lock fd stays open for the whole script and releases on exit.
+exec 9>"$HOME/.hermes/.aibrain-install.lock"
+if ! flock -n 9; then
+    echo "Error: another install is already running (lock ~/.hermes/.aibrain-install.lock is held)." >&2
+    exit 1
+fi
+
+# Back up the current state so a mid-deploy failure can be rolled back.
+if [ -d "$WS" ]; then
+    rm -rf "$BK"
+    cp -a "$WS" "$BK"
+    BK_CREATED=1
+    echo "  backed up existing workspace -> $BK"
+fi
+if [ -f "$UNIT_FILE" ]; then
+    cp "$UNIT_FILE" "$UNIT_BK"
+    UNIT_BK_CREATED=1
+    echo "  backed up existing unit -> $UNIT_BK"
+fi
+
+echo "--- Step 2: Deploying Artifacts ---"
+# Replace-style deploy: wipe and re-copy only the four shipped targets so no
+# stale files survive from older versions. Everything the daemon writes at
+# runtime (e.g. $WS/memory/, $WS/state/) is never touched.
+rm -rf "$WS/deep-brain-kernel.py" "$WS/skills" "$WS/core" "$WS/tests"
+cp deep-brain-kernel.py "$WS/deep-brain-kernel.py"
+cp aibrain.service "$UNIT_FILE"
+cp -r skills "$WS/skills"
 # V4.0: foundation + executive function live under core/ (Phase 1–2)
 if [ -d "core" ]; then
-    cp -r core/. ~/.hermes/workspace/core/
+    cp -r core "$WS/core"
 fi
 # Verification region: the declared-test harnesses ship with the suite so
 # verification-memory can run them in a deployed workspace, not just the repo.
 if [ -d "tests" ]; then
-    cp -r tests/. ~/.hermes/workspace/tests/
+    cp -r tests "$WS/tests"
 fi
 
 echo "--- Step 3: Configuring Permissions ---"
-chmod +x ~/.hermes/workspace/deep-brain-kernel.py
-find ~/.hermes/workspace/skills -name "*.sh" -exec chmod +x {} \;
-find ~/.hermes/workspace/core -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
-find ~/.hermes/workspace/tests -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+chmod +x "$WS/deep-brain-kernel.py"
+find "$WS/skills" -name "*.sh" -exec chmod +x {} \;
+find "$WS/core" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+find "$WS/tests" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
 
 echo "--- Step 4: Host Prerequisites (see SETUP_COMMANDS.md for detail) ---"
 echo "Checking PSI (pressure-based deferral)..."
@@ -111,25 +194,68 @@ else
 fi
 
 echo "--- Step 5: Pre-flight Check ---"
-if ! WORKSPACE="$HOME/.hermes/workspace" python3 ~/.hermes/workspace/deep-brain-kernel.py --check; then
+if ! WORKSPACE="$HOME/.hermes/workspace" python3 "$WS/deep-brain-kernel.py" --check; then
     echo ""
     echo "Pre-flight check reported problems (see above)."
     echo "Fix them before enabling the service, then re-run this script."
+    rollback
     exit 1
+fi
+# Deploy-count sanity: the deployed skill tree should mirror the repo exactly.
+REPO_SKILL_FILES=$(find skills -type f | wc -l)
+DEPLOYED_SKILL_FILES=$(find "$WS/skills" -type f | wc -l)
+if [ "$REPO_SKILL_FILES" -eq "$DEPLOYED_SKILL_FILES" ]; then
+    echo "  OK: $DEPLOYED_SKILL_FILES skill files deployed (matches repo)."
+else
+    echo "  WARN: skill file count mismatch (repo $REPO_SKILL_FILES vs deployed $DEPLOYED_SKILL_FILES)."
 fi
 
 echo ""
+# ── resolve_tool_path: build the Environment=PATH= value for aibrain.service ─
+# systemd --user services do NOT inherit your interactive shell's PATH
+# (unit-file gotcha (a)), so the deployed unit's PATH must list every tool the
+# daemon shells out to. This dedupe-preserving join of the base PATH onto the
+# resolved dirs of each tool replaces the old manual 'edit the service file'
+# install step. nvidia-smi/rocm-smi are portability fallbacks only (not
+# expected on this box's RX 5700 XT / RDNA1 hardware) — included if present.
+resolve_tool_path() {
+    local base="/usr/bin:/bin:/usr/local/bin:%h/.local/bin"
+    local extra=""
+    for tool in hermes jq curl python3 vulkaninfo nvidia-smi rocm-smi; do
+        if p=$(command -v "$tool" 2>/dev/null); then
+            extra="$extra:$(dirname "$p")"
+        fi
+    done
+    python3 - "$base" "$extra" <<'PY'
+import sys
+base, extra = sys.argv[1], sys.argv[2]
+seen = []
+for p in (base + ":" + extra).split(":"):
+    if p and p not in seen:
+        seen.append(p)
+print(":".join(seen))
+PY
+}
+
 echo "--- Step 5.5: Auto-configuring aibrain.service PATH ---"
 # Resolve every tool the daemon shells out to and patch the DEPLOYED unit's
 # Environment=PATH= line, so no manual service-file edit is needed. The repo
 # template keeps %h/.local/bin; the resolved tool dirs are appended after it.
-UNIT_FILE="$HOME/.config/systemd/user/aibrain.service"
-AUTO_PATH=$(resolve_tool_path)
+# The `|| base` fallback guards the bare assignment under set -e: resolve_tool_path
+# invokes bare `python3`, which may legitimately be absent from PATH (Step 4
+# checks the absolute /usr/bin/python3; MISSING_TOOLS below lists python3) —
+# without the fallback a missing PATH entry would abort and spuriously roll
+# back a fully valid deploy.
+AUTO_PATH=$(resolve_tool_path) || AUTO_PATH="/usr/bin:/bin:/usr/local/bin:%h/.local/bin"
 if [ -f "$UNIT_FILE" ]; then
     if grep -q '^Environment=PATH=' "$UNIT_FILE"; then
         sed -i "s|^Environment=PATH=.*|Environment=PATH=$AUTO_PATH|" "$UNIT_FILE"
-        echo "  OK: patched Environment=PATH= in $UNIT_FILE"
-        echo "      -> $AUTO_PATH"
+        if grep -Fq "Environment=PATH=$AUTO_PATH" "$UNIT_FILE"; then
+            echo "  OK: patched Environment=PATH= in $UNIT_FILE"
+            echo "      -> $AUTO_PATH"
+        else
+            echo "  WARN: PATH patch did not verify — check $UNIT_FILE manually."
+        fi
     else
         echo "  WARN: no Environment=PATH= line found in $UNIT_FILE — add one manually."
     fi
@@ -233,7 +359,7 @@ PY
             *)       echo "  WARN: skill registration produced an unexpected result ($RESULT) — see HERMES_COMPATIBILITY.md Option B." ;;
         esac
     else
-        echo "  WARN: no $HERMES_CONFIG — Hermes has no config yet; run \`hermes\` once or add"
+        echo "  WARN: no $HERMES_CONFIG — Hermes has no config yet; run `hermes` once or add"
         echo "        skills.external_dirs per HERMES_COMPATIBILITY.md Option B."
     fi
 else
@@ -244,6 +370,8 @@ fi
 echo ""
 # The PATH gotcha is auto-handled now (Step 5.5). Only pause when a tool the
 # daemon needs is genuinely missing and the user may want to fix it first.
+# The pause is TTY-only: with no terminal (CI, pipes) it degrades to a note
+# instead of aborting on an EOF'd `read`.
 MISSING_TOOLS=""
 for tool in hermes jq curl python3 vulkaninfo; do
     command -v "$tool" >/dev/null 2>&1 || MISSING_TOOLS="$MISSING_TOOLS $tool"
@@ -253,38 +381,70 @@ if [ -n "$MISSING_TOOLS" ]; then
     echo "      (warnings only — the daemon degrades gracefully, but spawn jobs / VRAM"
     echo "      checks need these; add them to Environment=PATH= in $UNIT_FILE manually"
     echo "      or export PATH before starting the service.)"
-    if [ "$NONINTERACTIVE" -eq 1 ]; then
-        echo "(noninteractive) continuing with warnings"
+    if [ "$NONINTERACTIVE" -eq 1 ] || [ ! -t 0 ]; then
+        echo "(noninteractive or no TTY) continuing with warnings"
     else
-        read -r -p "Press Enter to continue (or Ctrl-C to fix $UNIT_FILE first): " _
+        read -r -p "Press Enter to continue (or Ctrl-C to fix $UNIT_FILE first): " _ || true
     fi
 else
     echo "All daemon tools found on PATH — no manual service-file edit needed."
 fi
 
-echo "--- Step 6: Systemd Integration ---"
-systemctl --user daemon-reload
+# ── systemd --user availability ─────────────────────────────────────────────
+# A live user manager is present iff the private socket exists under
+# $XDG_RUNTIME_DIR. Containers, WSL, and not-yet-logged-in sessions lack it;
+# there the deploy still completes and the user enables the service later.
+systemd_available() {
+    command -v systemctl >/dev/null 2>&1 || return 1
+    [ -n "${XDG_RUNTIME_DIR:-}" ] || return 1
+    [ -S "$XDG_RUNTIME_DIR/systemd/private" ] || return 1
+    return 0
+}
 
-echo "--- Step 7: Activation ---"
-systemctl --user enable --now aibrain.service
-
-echo "--- Step 8: Verification & Status ---"
-sleep 1
-if systemctl --user is-active --quiet aibrain.service; then
-    echo "Installation Successful: Suite is active."
-    systemctl --user status aibrain.service --no-pager | head -n 5
-    echo ""
-    echo "Tail logs with: journalctl --user -u aibrain.service -f"
-    echo "Confirm cgroup delegation: systemctl --user show -p DelegateControllers aibrain.service"
-    if command -v hermes >/dev/null 2>&1; then
-        SKILL_COUNT=$(hermes skills list 2>/dev/null | grep -coE 'acc-error-memory|amygdala-memory|anterior-cingulate-memory|basal-ganglia-memory|cerebellum-memory|heartbeat-memory|hippocampus-memory|insula-memory|prefrontal-cortex-memory|social-memory|vta-memory' || echo "0")
-        echo "Hermes skills: $SKILL_COUNT/11 brain skills visible to hermes skills list"
+if systemd_available; then
+    SYSTEMD_OK=1
+    echo "--- Step 6: Systemd Integration ---"
+    systemctl --user daemon-reload
+    echo "--- Step 7: Activation ---"
+    systemctl --user enable --now aibrain.service
+    echo "--- Step 8: Verification & Status ---"
+    sleep 1
+    if systemctl --user is-active --quiet aibrain.service; then
+        echo "Installation Successful: Suite is active."
+        systemctl --user status aibrain.service --no-pager | head -n 5 || true
+        echo ""
+        echo "Tail logs with: journalctl --user -u aibrain.service -f"
+        systemctl --user show -p DelegateControllers aibrain.service || true
+        echo "Confirm cgroup delegation: systemctl --user show -p DelegateControllers aibrain.service"
+        echo "Let it run at least a full day before removing old cron entries, so every"
+        echo "once-daily job gets a chance to fire and be observed succeeding — see"
+        echo "BRAIN_DAEMON_SCHEDULE.md for the old-cron -> new-daemon mapping."
+    else
+        echo "Installation Error: Suite failed to activate."
+        echo "Check: journalctl --user -u aibrain.service -e"
+        exit 1
     fi
-    echo "Let it run at least a full day before removing old cron entries, so every"
-    echo "once-daily job gets a chance to fire and be observed succeeding — see"
-    echo "BRAIN_DAEMON_SCHEDULE.md for the old-cron -> new-daemon mapping."
 else
-    echo "Installation Error: Suite failed to activate."
-    echo "Check: journalctl --user -u aibrain.service -e"
-    exit 1
+    echo ""
+    echo "--- Step 6/7: Systemd Integration (skipped) ---"
+    echo "  WARN: no systemd --user session detected (container/WSL, or not logged in)."
+    echo "        The deploy is complete. Enable the service once a user session exists:"
+    echo "          systemctl --user daemon-reload"
+    echo "          systemctl --user enable --now aibrain.service"
+    echo "--- Step 8: Deploy Complete (service not activated) ---"
+    echo "  Workspace: $WS"
+    echo "  Unit:      $UNIT_FILE (PATH already patched)"
+fi
+
+# Hermes skill visibility check — runs whether or not systemd was available,
+# so the README quickstart's promise (install.sh verifies the registration)
+# holds on containers/WSL too.
+if command -v hermes >/dev/null 2>&1; then
+    SKILL_COUNT=$(hermes skills list 2>/dev/null | grep -coE 'acc-error-memory|amygdala-memory|anterior-cingulate-memory|basal-ganglia-memory|cerebellum-memory|heartbeat-memory|hippocampus-memory|insula-memory|prefrontal-cortex-memory|social-memory|vta-memory' || echo "0")
+    echo "Hermes skills: $SKILL_COUNT/11 brain skills visible to hermes skills list"
+fi
+
+echo ""
+if [ -d "$BK" ]; then
+    echo "Note: previous workspace preserved at $BK — remove it with: rm -rf $BK"
 fi

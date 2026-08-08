@@ -285,6 +285,14 @@ cd AI_BRAIN_SUITE_COMPLETE
    services don't inherit your shell PATH.
 4. **Verifies** — prints how many brain skills `hermes skills list` sees.
 
+Two behaviors worth knowing: on hosts without a systemd user session
+(containers, WSL) Steps 6–7 are skipped gracefully — the deploy, PATH patch,
+and skill registration still complete; enable the service later with
+`systemctl --user daemon-reload && systemctl --user enable --now aibrain.service`.
+And the previous install is preserved at
+`~/.hermes/workspace.bak-aibrain-install`, restored automatically if the
+install fails (remove the backup with `rm -rf` once you're happy).
+
 ### Verify
 
 ```bash
