@@ -212,6 +212,15 @@ Baseline latency for the rollback thresholds is measured with the same sweep
 harness is re-measured automatically — so the latency rule compares like for
 like instead of misreading the sweep's longer run as a regression.
 
+The same sandbox gate runs on a **weekly cadence in CI**: the Verification
+Gate workflow's `47 4 * * 1` schedule entry runs `scripts/deep-verify.sh`,
+which drives `evaluate-proposal.sh` with a no-op probe proposal against HEAD.
+The probe touches nothing tests cover and nothing the job table references, so
+it is accepted if and only if every declared test is green AND the daemon job
+table is intact on the default branch — with no PR open. Drift that would
+block a real proposal reddens the weekly run instead of surfacing only when
+the pipeline happens to fire.
+
 ## CI Integration
 
 `.github/workflows/verification.yml` makes this sweep the suite's CI gate: on
@@ -231,6 +240,13 @@ environment (`WORKSPACE` pointed at the checkout and
 `DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1` for `--check`, plus an isolated scratch
 workspace for the sweep, mirroring CI's `runner.temp`), so a green local gate
 is a green CI run; no special CI wiring exists beyond the manifests themselves.
+
+A second schedule entry (`47 4 * * 1`, weekly) adds the **deep verify**:
+`scripts/deep-verify.sh` runs the self-mod proposal pipeline's own sandbox
+gate — `core/self-mod/evaluate-proposal.sh` with a no-op probe proposal —
+against HEAD, so the proposal pipeline is drift-checked on a cadence, not just
+at PR time. The probe is accepted iff every declared test passes and the
+daemon job table is intact; any drift rejects it and reddens the weekly run.
 
 ## Companion skills
 

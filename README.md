@@ -21,6 +21,13 @@ the exact CI environment (`WORKSPACE` at the checkout and
 workspace for the sweep) — so a green local gate is a green CI run (see
 `skills/verification-memory/SKILL.md` → "CI Integration").
 
+A second schedule entry (`47 4 * * 1`, weekly Monday) runs the **deep verify**:
+`bash scripts/deep-verify.sh` drives the self-mod proposal pipeline's own
+sandbox gate (`core/self-mod/evaluate-proposal.sh`) with a no-op probe proposal
+against HEAD, so even the proposal pipeline is drift-checked on a cadence, not
+just at PR time. The probe is accepted iff every declared test passes and the
+daemon job table is intact — any drift rejects it and reddens the weekly run.
+
 ## Overview
 
 The AI Brain Suite is a unified scheduling and pressure-management engine
@@ -60,6 +67,7 @@ under `legacy-IGNORE/` for rollback only — see `legacy-IGNORE/README.md`.
 | `skills/verification-memory/` | **Verification region (the suite's proprioception):** runs every test each module declares in its `capability-manifest.json` `tests` array (manifest-driven, zero per-region wiring), publishes `tests_passed`/`test_failure` signals into the brain's routing table, is scheduled daily as `verification_pass` in `deep-brain-kernel.py`, and is the self-mod pre-deploy regression gate (`core/self-mod/evaluate-proposal.sh` runs the sweep + `deep-brain-kernel.py --check` in its sandbox; phase1 fallback). Long-term health: `query-history.sh` computes per-module pass-rate history over the report ledger, with a sparkline + healthiest/unhealthiest region in the dashboard tab. It also gates CI: `.github/workflows/verification.yml` runs manifest validation + the daemon job-table check (`deep-brain-kernel.py --check`) + the unit suite + this sweep on every pull request, nightly on the default branch, and on demand from the Actions tab. Run: `bash skills/verification-memory/scripts/run-declared-tests.sh`. |
 | `tests/test_verification_region.sh` | verification-memory self-test — the gate that gates the gate (auto-included in the unit suite). Run: `bash tests/test_verification_region.sh`. |
 | `scripts/ci-gate.sh` | One-command local replay of the CI Verification Gate — runs the same four commands with the exact CI env (`WORKSPACE` at the checkout + `DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1` for `--check`, isolated scratch workspace for the sweep). Run: `bash scripts/ci-gate.sh`. |
+| `scripts/deep-verify.sh` | One-command local replay of the weekly deep verify — runs the self-mod proposal pipeline's sandbox gate (`core/self-mod/evaluate-proposal.sh`) against HEAD with a no-op probe proposal, accepted iff every declared test passes and the daemon job table is intact (the workflow's weekly `47 4 * * 1` schedule entry). Run: `bash scripts/deep-verify.sh`. |
 
 ### Why are there two ACC skills?
 

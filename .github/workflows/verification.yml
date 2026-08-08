@@ -4,8 +4,12 @@ name: Verification Gate
 #
 # Triggers:
 #   - pull_request: gate every PR (fail before merge)
-#   - schedule (nightly): catch drift on the default branch between PRs —
-#     a red suite with no PR open is still a broken suite
+#   - schedule (nightly 04:17 UTC): catch drift on the default branch between
+#     PRs — a red suite with no PR open is still a broken suite
+#   - schedule (weekly 04:47 UTC Monday): the "deep verify" — additionally
+#     drives the self-mod proposal pipeline's OWN sandbox gate
+#     (core/self-mod/evaluate-proposal.sh) against HEAD, so the proposal
+#     pipeline is drift-checked on a cadence too, not just at PR time
 #   - workflow_dispatch: run the gate manually from the Actions tab
 #
 # Every run executes the same four commands:
@@ -20,16 +24,26 @@ name: Verification Gate
 #      module declared in its `tests` array — so a PR that breaks any declared
 #      test (or declares a test that doesn't exist) fails before merge.
 #
-# The same commands run locally as one command — scripts/ci-gate.sh — so a
-# green local gate is a green CI run.
+# The weekly deep verify adds a fifth step (scripts/deep-verify.sh): a no-op
+# probe proposal is run through evaluate-proposal.sh's sandbox gate — the
+# regression sweep + daemon job-table check applied to a patched sandbox copy
+# of HEAD — and must be ACCEPTED. The probe has no test coverage and no job
+# impact, so acceptance means every declared test is green AND the job table
+# is intact on the default branch, even with no PR open.
+#
+# The same commands run locally as one command — scripts/ci-gate.sh (and
+# scripts/deep-verify.sh for the weekly fifth step) — so a green local gate is
+# a green CI run.
 # See skills/verification-memory/SKILL.md → "CI Integration".
 
 on:
   pull_request:
-  # Nightly drift check on the default branch (04:17 UTC — GitHub schedules
-  # only fire against the default branch).
+  # Scheduled drift checks on the default branch (GitHub schedules only fire
+  # against the default branch). Nightly 04:17 UTC; weekly deep verify Monday
+  # 04:47 UTC (half an hour later so a nightly that overran won't collide).
   schedule:
     - cron: '17 4 * * *'
+    - cron: '47 4 * * 1'
   # Manual runs from the Actions tab (any branch).
   workflow_dispatch:
 
@@ -49,8 +63,9 @@ jobs:
   verification:
     name: Manifest-driven verification sweep
     runs-on: ubuntu-latest
-    # Headroom over the sweep's worst case (21 declared tests × 300s per-test)
-    timeout-minutes: 60
+    # Headroom over the sweep's worst case (21 declared tests × 300s per-test),
+    # plus the weekly deep verify's sandbox gate (another full sweep + --check).
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,3 +98,10 @@ jobs:
           # writes verification-state.json, the report ledger, and a dashboard.
           WORKSPACE: ${{ runner.temp }}/verification-workspace
         run: bash skills/verification-memory/scripts/run-declared-tests.sh --quiet
+
+      # Weekly only (the '47 4 * * 1' schedule entry — github.event.schedule
+      # carries the cron that fired). Every other trigger skips this step
+      # (skipped steps are shown as such and don't fail the job).
+      - name: Deep verify — self-mod sandbox gate against HEAD (weekly)
+        if: github.event_name == 'schedule' && github.event.schedule == '47 4 * * 1'
+        run: bash scripts/deep-verify.sh
