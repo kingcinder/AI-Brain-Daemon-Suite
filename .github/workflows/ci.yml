@@ -1,8 +1,38 @@
 name: CI
 
+# Phase-harness regression gate — the suite's other CI surface, complementing
+# the manifest-driven Verification Gate (.github/workflows/verification.yml).
+#
+# Triggers (mirrors verification.yml so both gates share the same cadence):
+#   - push / pull_request: gate every change as it lands
+#   - schedule (nightly 04:17 UTC): catch drift on the default branch between
+#     PRs — a red harness with no PR open is still a broken suite
+#   - schedule (weekly 04:47 UTC Monday): the same weekly cadence as the
+#     Verification Gate's deep-verify run, so the phase harnesses are
+#     drift-checked weekly too
+#   - workflow_dispatch: run manually from the Actions tab
+#
+# Runs the phase harnesses (1-7) plus bash/python syntax checks, the skill
+# unit suite, and the skill provenance check.
+
 on:
   push:
   pull_request:
+  # Scheduled drift checks on the default branch (GitHub schedules only fire
+  # against the default branch). Same crons as verification.yml: nightly
+  # 04:17 UTC, weekly deep-verify Monday 04:47 UTC.
+  schedule:
+    - cron: '17 4 * * *'
+    - cron: '47 4 * * 1'
+  # Manual runs from the Actions tab (any branch).
+  workflow_dispatch:
+
+# One in-flight run per event+ref: a new push to the same branch/PR cancels
+# the superseded run instead of queueing behind it; scheduled runs on the
+# default branch never pile up. Same pattern as verification.yml.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -11,6 +41,9 @@ jobs:
   test:
     name: AI Brain Suite regression harnesses
     runs-on: ubuntu-latest
+    # Headroom over the phase harnesses' worst case; the weekly deep-verify
+    # run covers the same harnesses.
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +64,9 @@ jobs:
       - name: Skill unit tests (tests/test_*.sh)
         run: bash tests/run_skill_unit_tests.sh
 
+      - name: Skill provenance check (all 11 brain skills → source=local, enabled)
+        run: bash tests/check_skill_provenance.sh
+
       - name: Phase 1 harness (locks, schema, provenance, executive-load, semaphore, snapshot, sandbox, PFC decide)
         run: bash tests/run_phase1_harness.sh
 
@@ -39,3 +75,15 @@ jobs:
 
       - name: Phase 3 harness (self-mod pipeline, deploy, rollback, monitor)
         run: bash tests/run_phase3_harness.sh
+
+      - name: Phase 4 harness (scheduled self-mod job + autonomy gate)
+        run: bash tests/run_phase4_harness.sh
+
+      - name: Phase 5 harness (goal-outcome loop + ACC calibration)
+        run: bash tests/run_phase5_harness.sh
+
+      - name: Phase 6 harness (spawn-provider abstraction, both providers)
+        run: bash tests/run_phase6_harness.sh
+
+      - name: "Phase 7 harness (transcript bridge: hermes sessions export + preprocess feed)"
+        run: bash tests/run_phase7_harness.sh
