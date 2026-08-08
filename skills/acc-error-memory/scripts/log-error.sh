@@ -4,7 +4,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
 
 exec 200>"$STATE_FILE.lock"
@@ -59,7 +59,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import os
 
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
 state_file = Path(workspace) / 'memory' / 'acc-state.json'
 
 pattern = os.environ.get('PATTERN', '')

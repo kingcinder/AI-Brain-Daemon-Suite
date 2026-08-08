@@ -8,14 +8,16 @@
 #   preprocess.sh --limit N          # Limit to last N signals
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
-#   AGENT_ID - Agent ID for transcript lookup (default: main)
+#   WORKSPACE - Hermes workspace directory (default: ~/.hermes/workspace)
+#   TRANSCRIPT_DIR - session transcript directory (default: ~/.hermes/sessions;
+#                    populate via `hermes sessions export --format jsonl <dir>`)
+#   AGENT_ID - retained for compatibility; transcripts are no longer per-agent by default
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 AGENT_ID="${AGENT_ID:-main}"
-TRANSCRIPT_DIR="$HOME/.openclaw/agents/$AGENT_ID/sessions"
+TRANSCRIPT_DIR="${TRANSCRIPT_DIR:-$HOME/.hermes/sessions}"
 OUTPUT="$WORKSPACE/memory/signals.jsonl"
 INDEX="$WORKSPACE/memory/index.json"
 
@@ -42,6 +44,7 @@ done
 SESSION_COUNT=$(find "$TRANSCRIPT_DIR" -maxdepth 1 -name '*.jsonl' 2>/dev/null | wc -l | tr -d ' ')
 if [ "$SESSION_COUNT" -eq 0 ]; then
     echo "No session transcripts found in $TRANSCRIPT_DIR"
+    echo "Hint: populate it with: hermes sessions export --format jsonl \"$TRANSCRIPT_DIR\""
     exit 1
 fi
 
@@ -178,7 +181,7 @@ for session_file in session_files:
                     continue
                 
                 # Skip file path messages
-                if '/Users/' in text and ('/.openclaw/' in text or '/media/' in text):
+                if '/Users/' in text and ('/.openclaw/' in text or '/.hermes/' in text or '/media/' in text):
                     continue
                 
                 all_messages.append({

@@ -1,0 +1,85 @@
+name: Verification Gate
+
+# The manifest-driven verification sweep as the suite's CI gate.
+#
+# Triggers:
+#   - pull_request: gate every PR (fail before merge)
+#   - schedule (nightly): catch drift on the default branch between PRs —
+#     a red suite with no PR open is still a broken suite
+#   - workflow_dispatch: run the gate manually from the Actions tab
+#
+# Every run executes the same four commands:
+#   1. Validates every capability-manifest.json (schema + registry rules)
+#   2. Validates the daemon JOBS table (deep-brain-kernel.py --check): every
+#      minute globally unique, every direct job's script present + executable
+#      + non-empty, spawn-provider shim intact — so a PR that collides a
+#      scheduled minute or breaks a job target fails before it can brick the
+#      daemon.
+#   3. Runs the per-skill unit suite (tests/test_*.sh)
+#   4. Runs the verification region's manifest-driven sweep — every test each
+#      module declared in its `tests` array — so a PR that breaks any declared
+#      test (or declares a test that doesn't exist) fails before merge.
+#
+# The same commands run locally as one command — scripts/ci-gate.sh — so a
+# green local gate is a green CI run.
+# See skills/verification-memory/SKILL.md → "CI Integration".
+
+on:
+  pull_request:
+  # Nightly drift check on the default branch (04:17 UTC — GitHub schedules
+  # only fire against the default branch).
+  schedule:
+    - cron: '17 4 * * *'
+  # Manual runs from the Actions tab (any branch).
+  workflow_dispatch:
+
+# One in-flight run per event+ref: a new push to the same PR cancels the
+# superseded run instead of queueing behind it, nightlies never overlap
+# themselves, and manual runs on the same branch cancel each other. Manual
+# runs are deliberately a different group from the nightly (different
+# event_name), so a manual dispatch never cancels an in-flight scheduled check.
+concurrency:
+  group: verification-gate-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verification:
+    name: Manifest-driven verification sweep
+    runs-on: ubuntu-latest
+    # Headroom over the sweep's worst case (21 declared tests × 300s per-test)
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (jq)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Validate capability manifests (schema + registry rules)
+        run: bash core/schema/validate-manifest.sh --all
+
+      - name: Validate daemon job table (minute uniqueness + script paths)
+        env:
+          # Point SKILLS_DIR at the checkout so --check resolves every direct
+          # job's script under <repo>/skills instead of ~/.hermes/workspace.
+          WORKSPACE: ${{ github.workspace }}
+          # hermes can't exist on the runner — that's a host-environment
+          # concern, not a job-table-integrity one. The gate must fail on
+          # table problems only; see deep-brain-kernel.py check_schedule_table().
+          DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK: "1"
+        run: python3 deep-brain-kernel.py --check
+
+      - name: Skill unit tests (tests/test_*.sh)
+        run: bash tests/run_skill_unit_tests.sh
+
+      - name: Manifest-driven verification sweep (every module's declared tests)
+        env:
+          # Isolate the region's state/signals from the runner home; the sweep
+          # writes verification-state.json, the report ledger, and a dashboard.
+          WORKSPACE: ${{ runner.temp }}/verification-workspace
+        run: bash skills/verification-memory/scripts/run-declared-tests.sh --quiet

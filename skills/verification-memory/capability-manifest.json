@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "module": "verification-memory",
+  "version": "1.0.0",
+  "capabilities": [
+    "declared_test_discovery",
+    "regression_execution",
+    "verification_state"
+  ],
+  "inputs": [
+    {
+      "name": "capability_manifests",
+      "type": "state_file",
+      "source": "skills/*/capability-manifest.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "verification_state",
+      "type": "state_write",
+      "target": "memory/verification-state.json"
+    },
+    {
+      "name": "verification_report",
+      "type": "log_entry",
+      "target": "memory/verification-report.jsonl"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/test_verification_region.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

@@ -113,8 +113,17 @@ logging.basicConfig(
 logging.Formatter.converter = time.gmtime
 log = logging.getLogger("deep-brain-kernel")
 
-WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / ".openclaw" / "workspace")))
+WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / ".hermes" / "workspace")))
 SKILLS_DIR = WORKSPACE / "skills"
+
+# ROADMAP M3: provider abstraction for spawn jobs. SPAWN_PROVIDER=hermes
+# (default, external harness) or local (suite's own llm-call.sh endpoint).
+# Unknown values fall back to hermes with a warning — never fail to launch.
+SPAWN_PROVIDER = os.environ.get("SPAWN_PROVIDER", "hermes").strip().lower()
+if SPAWN_PROVIDER not in ("hermes", "local"):
+    log.warning("unknown SPAWN_PROVIDER '%s' — defaulting to hermes", SPAWN_PROVIDER)
+    SPAWN_PROVIDER = "hermes"
+SPAWN_PROVIDER_SHIM = Path(__file__).resolve().parent / "core" / "spawn" / "spawn-provider.sh"
 
 # XDG runtime dir for this user — correct place for ephemeral daemon state
 # (pid lock, sockets), distinct from the persistent per-skill data in
@@ -776,6 +785,63 @@ def _count_active_goals() -> int:
         return 0
 
 
+def _active_goal_descriptions(max_goals: int = 3) -> list[str]:
+    """ROADMAP M4: top-priority active executive goals as short strings, for
+    injecting into spawn-job task text so agent turns actually work toward
+    promoted goals instead of running context-free. Best-effort: an empty
+    list when PFC state is missing/unreadable — never raises."""
+    try:
+        data = json.loads(PFC_STATE_FILE.read_text())
+        goals = data.get("goals") or []
+        active = [g for g in goals if isinstance(g, dict) and g.get("status") == "active"]
+        active.sort(key=lambda g: float(g.get("priority") or 0.0), reverse=True)
+        return [
+            str(g.get("description") or "").strip()
+            for g in active[:max_goals]
+            if str(g.get("description") or "").strip()
+        ]
+    except (OSError, json.JSONDecodeError, TypeError):
+        return []
+
+
+def _augment_spawn_task(task: str, goals: list[str]) -> str:
+    """ROADMAP M4: append active goals to a spawn job's task text as an
+    explicit executive-context block. Pure and testable: no goals → task
+    unchanged."""
+    if not goals:
+        return task
+    block = "\n".join(f"- {g}" for g in goals)
+    return f"{task}\n\n[Executive context — active goals to keep in mind:\n{block}\n]"
+
+
+async def _record_goal_outcomes(job_name: str, goal_descriptions: list[str],
+                                 outcome: str, task_text: str) -> None:
+    """ROADMAP M4: best-effort goal-outcome recording after a spawn job
+    finishes. Runs OUTSIDE the spawn lock (see run_spawn) and awaits each
+    recorder call with a timeout, so a slow recorder can never starve other
+    spawn jobs. task_text is the ORIGINAL job.target (not the augmented
+    text), so the recorder's relevance guard matches goals against the
+    actual task, not against the injected goal block itself.
+    Never raises; failures are logged only."""
+    recorder = Path(__file__).resolve().parent / "core" / "executive" / "record-goal-outcome.sh"
+    if not recorder.is_file():
+        return
+    env = {**os.environ, "WORKSPACE": str(WORKSPACE)}
+    for desc in goal_descriptions:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "bash", str(recorder), "outcome",
+                "--goal-description", desc, "--outcome", outcome,
+                "--job", job_name, "--task", task_text,
+                env=env,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(proc.communicate(), timeout=10)
+        except (OSError, subprocess.SubprocessError, asyncio.TimeoutError) as e:
+            log.warning("%s: goal-outcome recorder failed for '%s': %s", job_name, desc, e)
+
+
 def _decision_queue_depth() -> int:
     try:
         data = json.loads(DECISION_QUEUE_FILE.read_text())
@@ -893,7 +959,7 @@ class Job:
     kind: str  # "direct" or "spawn"
     hours: str  # "*" or comma-separated ints
     minutes: str  # comma-separated ints
-    target: str  # direct: path relative to SKILLS_DIR ; spawn: sessions:spawn task text
+    target: str  # direct: path relative to SKILLS_DIR ; spawn: task text sent to `hermes chat -q`
     days: str = "*"  # "*" or comma-separated weekday ints, Python convention:
                       # 0=Monday .. 6=Sunday (datetime.weekday()). "*" = every day,
                       # matching every job's behavior before this field existed.
@@ -975,6 +1041,44 @@ JOBS: list[Job] = [
     # Minute 32 unique. Direct / non-inference. Pipeline runs are on-demand (run-pipeline.sh).
     Job("self_mod_monitor", "direct", "2,10,18", "32",
         "self-mod-runner/scripts/monitor-tick.sh"),
+    # ROADMAP M1: scheduled self-mod proposal cycle (weekly, Sunday). Minute 46 unique.
+    # Runs run-pipeline.sh --generate-llm with the M2 autonomy gate: relaxed_review may
+    # auto-deploy; full_review queues for human approval. LLM provider failure is
+    # non-fatal — the pipeline continues with whatever is already queued.
+    Job("self_mod_proposal_cycle", "direct", "3", "46",
+        "self-mod-runner/scripts/proposal-cycle-tick.sh", days="6"),
+    # Open Item 5: Hermes session → suite transcript bridge. Refreshes the
+    # per-message transcripts the preprocess pipelines read from ~/.hermes/sessions
+    # by running `hermes sessions export --format jsonl` and transforming it to the
+    # parser shape. Minute 58 is unique in this table; runs 4× daily just before the
+    # encoding blocks (hours 6/12/18/0), so each encoding sees fresh transcripts.
+    Job("transcript_export", "direct", "5,11,17,23", "58",
+        "hippocampus-memory/scripts/export-transcripts.sh"),
+    # Phase 1 (Signaling & Attention): thalamus attention gate — processes
+    # pending signals through the five-dimensional relevance filter and
+    # dispatches passing signals to target skills via route-signals.sh.
+    # Minute 42 unique. Direct / non-inference. Runs every 2 hours.
+    Job("thalamus_gate", "direct", "0,2,4,6,8,10,12,14,16,18,20,22", "42",
+        "thalamus-memory/scripts/gate.sh"),
+    # Phase 1: thalamus suppressed-queue decay — releases deferred signals
+    # that have aged past their retryAfter window back into circulation.
+    # Minute 48 unique. Direct / non-inference. Runs every 4 hours.
+    Job("thalamus_decay", "direct", "0,4,8,12,16,20", "48",
+        "thalamus-memory/scripts/decay.sh"),
+    # Phase 1: signal dispatcher daemon — polls brain-signals.jsonl for new
+    # events and dispatches through the thalamus gate. Runs on the opposite
+    # 2-hour cycle from thalamus_gate so signals are processed within 2h.
+    # Minute 54 unique. Direct / non-inference.
+    Job("signal_dispatch", "direct", "1,3,5,7,9,11,13,15,17,19,21,23", "54",
+        "thalamus-memory/scripts/gate.sh"),
+    # Verification region (proprioception): runs every test each module
+    # declared in its capability-manifest.json (manifest-driven discovery in
+    # verification-memory/scripts/run-declared-tests.sh). A red suite exits
+    # non-zero, so --status flags it like any failing job. Minute 56 unique.
+    # Direct / non-inference. Daily at 07:56 UTC — hour 7 has no other job
+    # besides heartbeat's :07/:37 beats, so this never contends for resources.
+    Job("verification_pass", "direct", "7", "56",
+        "verification-memory/scripts/run-declared-tests.sh"),
 ]
 
 
@@ -1032,7 +1136,16 @@ def check_schedule_table() -> int:
         if job.kind == "direct":
             script_path = SKILLS_DIR / job.target
             if script_path.is_file() and os.access(script_path, os.X_OK):
-                status = "ok"
+                # An empty job script is broken even though it is executable:
+                # execve on a 0-byte file fails with ENOEXEC ("Exec format
+                # error"), so run_direct would fail it at every fire. Flag it
+                # so --check (CI gate + self-mod job-table gate) rejects such a
+                # proposal before deploy instead of at runtime.
+                if script_path.stat().st_size == 0:
+                    status = "EXISTS-BUT-EMPTY"
+                    problems += 1
+                else:
+                    status = "ok"
             elif script_path.is_file():
                 status = "EXISTS-BUT-NOT-EXECUTABLE"
                 problems += 1
@@ -1042,10 +1155,25 @@ def check_schedule_table() -> int:
             print(f"{job.name:<28} {job.kind:<8} {job.days:<10} {job.hours:<24} {job.minutes:<10} {status}")
         else:
             print(f"{job.name:<28} {job.kind:<8} {job.days:<10} {job.hours:<24} {job.minutes:<10} "
-                  f"(sessions:spawn task, {len(job.target)} chars)")
+                  f"(hermes chat task, {len(job.target)} chars)")
     print()
+    shim_ok = SPAWN_PROVIDER_SHIM.is_file() and os.access(SPAWN_PROVIDER_SHIM, os.X_OK)
+    if shim_ok:
+        print(f"spawn-provider shim (provider={SPAWN_PROVIDER}): ok ({SPAWN_PROVIDER_SHIM})")
+    else:
+        print(f"spawn-provider shim: MISSING or not executable ({SPAWN_PROVIDER_SHIM})")
+        problems += 1
     if shutil.which("hermes"):
         print(f"hermes: found ({shutil.which('hermes')})")
+    elif os.environ.get("DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK") == "1":
+        # hermes presence is a HOST-environment concern, not a job-table-
+        # integrity one: --check on a machine that legitimately has no hermes
+        # (CI runners, fresh sandboxes) should still fail on table problems.
+        # Opt-in downgrade (set DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1) so the
+        # problem count is untouched by something --check can't fix here.
+        print("hermes: NOT FOUND — downgraded to a warning "
+              "(DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1); spawn-type jobs will be "
+              "skipped with a warning on the real host until hermes is installed")
     else:
         print("hermes: NOT FOUND — spawn-type jobs will be skipped with a warning until this is fixed")
         problems += 1
@@ -1121,8 +1249,8 @@ async def _await_with_timeout(proc: "asyncio.subprocess.Process", tracked: Track
     process via its pidfd (race-free — Pillar 3), give it 5s to actually
     exit, and return (b"", True) rather than raising. This is the fix for a
     real starvation bug: run_spawn() previously awaited proc.communicate()
-    with NO timeout while holding _spawn_lock, so one hung `openclaw
-    sessions:spawn` call (network stall, model stuck generating, etc.)
+    with NO timeout while holding _spawn_lock, so one hung
+    `hermes chat` call (network stall, model stuck generating, etc.)
     silently starved every other spawn-type job forever — nothing errored,
     nothing logged, the daemon just stopped doing 8 of its 20 jobs until a
     manual restart. Confirmed with an isolated asyncio.Lock repro before
@@ -1192,6 +1320,7 @@ def _audit_spawn(job: Job, yolo_enabled: bool) -> None:
         "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "job": job.name,
         "yolo": yolo_enabled,
+        "provider": SPAWN_PROVIDER,
         "task": job.target,
     }
     try:
@@ -1204,9 +1333,18 @@ def _audit_spawn(job: Job, yolo_enabled: bool) -> None:
 
 async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
                      psi_threshold: float, enable_yolo: bool, daemon_state: "DaemonState") -> None:
-    if not shutil.which("hermes"):
+    # ROADMAP M3: the hermes guard only applies to the hermes provider — with
+    # SPAWN_PROVIDER=local the suite's own llm-call.sh endpoint replaces it, and
+    # an unavailable local server is a recorded job failure, not a silent skip.
+    if SPAWN_PROVIDER == "hermes" and not shutil.which("hermes"):
         log.warning("%s: due now, but hermes is not in PATH — skipped (this needs "
                     "real agent reasoning, not just a script)", job.name)
+        return
+    if not SPAWN_PROVIDER_SHIM.is_file():
+        log.error("%s: spawn-provider shim missing at %s — recording failure",
+                  job.name, SPAWN_PROVIDER_SHIM)
+        daemon_state.record_result(job.name, success=False,
+                                    error=f"spawn-provider shim missing at {SPAWN_PROVIDER_SHIM}")
         return
 
     vram = gpu_vram_percent()
@@ -1240,16 +1378,28 @@ async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
         _audit_spawn(job, enable_yolo)
         log.info("%s: spawning Hermes chat session%s", job.name,
                   " (--yolo/--accept-hooks enabled)" if enable_yolo else "")
-        cmd = ["hermes", "chat", "-q", job.target, "--source", "daemon"]
+        # ROADMAP M4: inject active executive goals so the agent turn works
+        # toward promoted goals; the outcome is recorded back into PFC/ACC.
+        # ROADMAP M3: dispatch through the spawn-provider shim (hermes or
+        # local llm-call.sh) — pidfd tracking, spawn lock, and timeout are
+        # unchanged; the shim `exec`s the real worker so the tracked pid is
+        # the actual hermes/llm-call process.
+        active_goals = _active_goal_descriptions()
+        task_text = _augment_spawn_task(job.target, active_goals)
+        env = os.environ.copy()
+        env["WORKSPACE"] = str(WORKSPACE)
+        env["SPAWN_PROVIDER"] = SPAWN_PROVIDER
+        cmd = ["bash", str(SPAWN_PROVIDER_SHIM), "--task", task_text]
         if enable_yolo:
-            cmd[4:4] = ["--accept-hooks", "--yolo"]
+            cmd.append("--yolo")
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
+            *cmd, env=env,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         )
         tracked = TrackedProcess(proc.pid)
         _running_procs[job.name] = tracked
         infer_t0 = time.monotonic()
+        spawn_outcome = "failure"
         try:
             # Bounded by spawn_timeout even though we're holding _spawn_lock —
             # this is the fix. A hung spawn used to block this `async with`
@@ -1264,6 +1414,7 @@ async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
             elif proc.returncode == 0:
                 log.info("%s: Hermes chat completed", job.name)
                 daemon_state.record_result(job.name, success=True)
+                spawn_outcome = "success"
             else:
                 tail = out.decode(errors="replace")[-2000:]
                 log.error("%s: hermes chat exited with status %s — output: %s",
@@ -1275,6 +1426,13 @@ async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
             record_inference_seconds(time.monotonic() - infer_t0)
             _running_procs.pop(job.name, None)
             tracked.close()
+
+    # ROADMAP M4: close the goal loop AFTER the spawn lock is released — a
+    # slow goal-outcome recorder must not hold the one lock every other
+    # spawn job queues on. Pass the ORIGINAL task text so relevance is
+    # judged against the actual task, not the injected goal block.
+    if active_goals:
+        await _record_goal_outcomes(job.name, active_goals, spawn_outcome, job.target)
 
 
 async def dispatch(job: Job, vram_limit: float, cgroup: CgroupThrottle, pressure_active: bool,

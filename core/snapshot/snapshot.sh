@@ -16,7 +16,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SNAP_ROOT="${SNAPSHOT_ROOT:-$WORKSPACE/memory/snapshots}"
 LKG_POINTER="$SNAP_ROOT/last-known-good"
 DEFAULT_FILES=(

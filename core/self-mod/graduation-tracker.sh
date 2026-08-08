@@ -22,7 +22,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_DIR="$WORKSPACE/memory/self-mod"
 STATE_FILE="$STATE_DIR/graduation-streak.json"
 CLEAN_STREAK_TARGET="${CLEAN_STREAK_TARGET:-20}"

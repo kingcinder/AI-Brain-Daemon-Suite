@@ -1,5 +1,26 @@
 # AI Brain Suite
 
+[![Verification Gate](https://github.com/kingcinder/AI-Brain-Daemon-Suite/actions/workflows/verification.yml/badge.svg)](https://github.com/kingcinder/AI-Brain-Daemon-Suite/actions/workflows/verification.yml)
+
+> **Mission & scope:** see [`VISION.md`](VISION.md) — the official statement
+> of what this suite is, what it is for, and where it is headed.
+
+## CI
+
+Every pull request — and every night on the default branch, plus on demand
+from the Actions tab — is gated by **`.github/workflows/verification.yml`**,
+the manifest-driven **Verification Gate**: it validates every
+`capability-manifest.json` (schema + registry rules), validates the daemon's
+JOBS table with `deep-brain-kernel.py --check` (minute uniqueness, script
+paths), runs the per-skill unit suite, then runs the verification region's
+declared-test sweep. A PR that breaks any test a module declared — or declares
+a test that doesn't exist — fails before merge. The same commands run locally
+as one command — `bash scripts/ci-gate.sh` replays the gate step-for-step with
+the exact CI environment (`WORKSPACE` at the checkout and
+`DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1` for `--check`, isolated scratch
+workspace for the sweep) — so a green local gate is a green CI run (see
+`skills/verification-memory/SKILL.md` → "CI Integration").
+
 ## Overview
 
 The AI Brain Suite is a unified scheduling and pressure-management engine
@@ -22,9 +43,13 @@ under `legacy-IGNORE/` for rollback only — see `legacy-IGNORE/README.md`.
 
 | Path | Purpose |
 |---|---|
+| `VISION.md` | **Official vision & scope.** Persistent skills → naturalized experience synthesis → self-directed evolution → eclipsing the external harness → crystallized self-improvement. Read this first. |
+| `ROADMAP.md` | **Roadmap to full autonomy.** Sequenced milestones (M0–M7) mapping the vision's three stages onto existing code — self-mod pipeline, executive cycle, daemon — each with acceptance criteria and CI-green verification. |
+| `AUDIT.md` | **Living vision-gap audit.** Tracks the three open gaps (scheduled self-mod, internalized inference, closed goal loop) against ROADMAP milestones, with per-gap status, code evidence, and closure criteria. |
+| `HERMES_COMPATIBILITY.md` | **Hermes Agent compatibility audit.** File-by-file inspection of the whole suite against the installed `hermes` binary — CLI invocations, skill packaging, and nomenclature — with per-file verdicts and open items. |
 | `deep-brain-kernel.py` | **The engine.** Async scheduler + pressure supervisor: epoll-driven PSI monitoring, GPU VRAM checking, cgroups v2 throttling, pidfd-based process tracking, single-instance locking. `--check` validates the job table without starting anything. |
 | `aibrain.service` | Systemd (user) unit supervising `deep-brain-kernel.py`, using systemd's own delegated cgroup controls rather than hand-rolled cgroup paths. |
-| `skills/` | All 11 skill packages. `anterior-cingulate-memory` includes a fix (see below) so every skill's LLM-backed encoding runs against your local model, none against a paid cloud API. |
+| `skills/` | All 12 skill packages (11 memory skills + `verification-memory`). `anterior-cingulate-memory` includes a fix (see below) so every skill's LLM-backed encoding runs against your local model, none against a paid cloud API. |
 | `SETUP_COMMANDS.md` | Host-level verification steps (PSI, cgroup v2 delegation, GPU tooling) to run once before or after enabling the service. |
 | `docs/V4_STATUS.md` | V4.0 phase ledger (plumbing vs live-exercised; full-cycle close-out pointer). |
 | `docs/verification/` | Verification evidence; canonical GREEN pack: `full_cycle_20260720T234945Z/`. |
@@ -32,6 +57,9 @@ under `legacy-IGNORE/` for rollback only — see `legacy-IGNORE/README.md`.
 | `install.sh` | Automates workspace setup, deployment, host prerequisite checks, pre-flight validation, and service activation. |
 | `legacy-IGNORE/` | Prior bash daemon (`brain-daemon.sh`) — **not live**; live engine is `deep-brain-kernel.py`, fully working, kept for rollback only. Not used by `install.sh`. |
 | `tests/pfc_decide_harness.sh` | Closed-loop verification that `prefrontal-cortex-memory/scripts/decide.sh` actually changes its output based on sibling state (not just documented to) — synthetic sibling state files, 7 pass/fail assertions, no LLM or real siblings required. Run: `bash tests/pfc_decide_harness.sh`. |
+| `skills/verification-memory/` | **Verification region (the suite's proprioception):** runs every test each module declares in its `capability-manifest.json` `tests` array (manifest-driven, zero per-region wiring), publishes `tests_passed`/`test_failure` signals into the brain's routing table, is scheduled daily as `verification_pass` in `deep-brain-kernel.py`, and is the self-mod pre-deploy regression gate (`core/self-mod/evaluate-proposal.sh` runs the sweep + `deep-brain-kernel.py --check` in its sandbox; phase1 fallback). Long-term health: `query-history.sh` computes per-module pass-rate history over the report ledger, with a sparkline + healthiest/unhealthiest region in the dashboard tab. It also gates CI: `.github/workflows/verification.yml` runs manifest validation + the daemon job-table check (`deep-brain-kernel.py --check`) + the unit suite + this sweep on every pull request, nightly on the default branch, and on demand from the Actions tab. Run: `bash skills/verification-memory/scripts/run-declared-tests.sh`. |
+| `tests/test_verification_region.sh` | verification-memory self-test — the gate that gates the gate (auto-included in the unit suite). Run: `bash tests/test_verification_region.sh`. |
+| `scripts/ci-gate.sh` | One-command local replay of the CI Verification Gate — runs the same four commands with the exact CI env (`WORKSPACE` at the checkout + `DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1` for `--check`, isolated scratch workspace for the sweep). Run: `bash scripts/ci-gate.sh`. |
 
 ### Why are there two ACC skills?
 
@@ -81,7 +109,7 @@ was built to address exactly that, and to genuinely test what it claims:
   wrong one.
 - **Per-job execution timeouts** (`--direct-timeout`, default 300s;
   `--spawn-timeout`, default 900s) — a hung script or a stuck
-  `openclaw sessions:spawn` call is killed via its pidfd rather than left to
+  `hermes chat` call is killed via its pidfd rather than left to
   run forever. This matters most for spawn jobs specifically: they share one
   lock (only one real agent turn runs at a time), so without a timeout a
   single hung call would silently starve every other spawn-type job
@@ -134,11 +162,11 @@ dependency — consistent with the rest of the suite. State writes go through
 
    `install.sh`:
 
-   1. **Initializes the workspace** — `~/.openclaw/workspace/skills/` and
+   1. **Initializes the workspace** — `~/.hermes/workspace/skills/` and
       `~/.config/systemd/user/`.
    2. **Deploys artifacts** — `deep-brain-kernel.py` to the workspace root,
       `aibrain.service` to the systemd user directory, all 11 skills into
-      `~/.openclaw/workspace/skills/`.
+      `~/.hermes/workspace/skills/`.
    3. **Sets permissions** on the engine and every skill script.
    4. **Checks host prerequisites** — PSI availability, cgroup v2, GPU
       tooling — printing a warning (not a hard failure) for anything
@@ -154,8 +182,8 @@ dependency — consistent with the rest of the suite. State writes go through
 ## Configuration / Gotchas
 
 * **WORKSPACE / PATH** — `systemctl --user` services don't inherit your
-  shell's environment. `aibrain.service` sets `WORKSPACE=%h/.openclaw/workspace`
-  and a minimal `PATH`; if logs show `openclaw`/`jq`/`curl`/`python3`/
+  shell's environment. `aibrain.service` sets `WORKSPACE=%h/.hermes/workspace`
+  and a minimal `PATH`; if logs show `hermes`/`jq`/`curl`/`python3`/
   `nvidia-smi`/`rocm-smi` "not found" despite working in your terminal, run
   `which <tool>` and add the real paths to the unit's `PATH=` line.
 * **cgroup delegation** — confirm it actually took effect after enabling:
@@ -175,7 +203,7 @@ dependency — consistent with the rest of the suite. State writes go through
 ```bash
 systemctl --user status aibrain.service
 journalctl --user -u aibrain.service -f
-python3 ~/.openclaw/workspace/deep-brain-kernel.py --check
+python3 ~/.hermes/workspace/deep-brain-kernel.py --check
 ```
 
 ## Checking Job Health
@@ -185,7 +213,7 @@ it says nothing about whether jobs are actually succeeding once the daemon
 is live. For that:
 
 ```bash
-python3 ~/.openclaw/workspace/deep-brain-kernel.py --status
+python3 ~/.hermes/workspace/deep-brain-kernel.py --status
 ```
 
 Read-only, safe to run anytime, doesn't need the daemon stopped or the
@@ -210,5 +238,5 @@ entries it replaces — see `BRAIN_DAEMON_SCHEDULE.md` for the full mapping.
 systemctl --user stop aibrain.service
 systemctl --user disable aibrain.service
 rm ~/.config/systemd/user/aibrain.service
-rm ~/.openclaw/workspace/deep-brain-kernel.py
+rm ~/.hermes/workspace/deep-brain-kernel.py
 ```

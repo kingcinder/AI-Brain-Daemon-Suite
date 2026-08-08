@@ -58,6 +58,14 @@
     {
       "path": "tests/run_phase2_harness.sh",
       "kind": "regression"
+    },
+    {
+      "path": "tests/run_phase5_harness.sh",
+      "kind": "regression"
+    },
+    {
+      "path": "tests/run_phase6_harness.sh",
+      "kind": "regression"
     }
   ],
   "immutable": false

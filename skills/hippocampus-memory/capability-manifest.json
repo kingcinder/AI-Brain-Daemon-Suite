@@ -46,6 +46,10 @@
       "kind": "regression"
     },
     {
+      "path": "tests/run_phase7_harness.sh",
+      "kind": "regression"
+    },
+    {
       "path": "tests/test_hippocampus_load_core.sh",
       "kind": "unit"
     }

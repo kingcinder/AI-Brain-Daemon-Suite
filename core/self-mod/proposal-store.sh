@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STORE="$WORKSPACE/memory/self-mod/proposals"
 INDEX="$STORE/index.jsonl"
 

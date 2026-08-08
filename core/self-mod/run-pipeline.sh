@@ -13,6 +13,12 @@
 #   run-pipeline.sh [--workspace PATH] [--suite-root PATH] [--top-k N]
 #                   [--proposal PATH] [--proposals-dir DIR]
 #                   [--no-deploy] [--dry-run]
+#                   [--autonomy-gate]
+#
+# --autonomy-gate (ROADMAP M2): reads graduation-tracker review-frequency and
+#   only auto-deploys in relaxed_review; in full_review the accepted proposal
+#   is queued for human approval (deploy.skipped with a reason). Without this
+#   flag, behavior is unchanged (deploy first accepted proposal).
 #
 # Does not modify Immutable Core modules. Pipeline code under core/self-mod
 # is never a legal proposal target.
@@ -22,13 +28,14 @@ set -euo pipefail
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SELF_DIR/../.." && pwd)"
 SUITE_ROOT="$ROOT"
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 TOP_K=""
 PROPOSAL=""
 PROP_DIR=""
 NO_DEPLOY=0
 DRY=0
 GENERATE_LLM=0
+AUTONOMY_GATE=0
 LLM_MODULE=""
 LLM_PROVIDER=""
 
@@ -42,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     --no-deploy) NO_DEPLOY=1; shift ;;
     --dry-run) DRY=1; NO_DEPLOY=1; shift ;;
     --generate-llm) GENERATE_LLM=1; shift ;;
+    --autonomy-gate) AUTONOMY_GATE=1; shift ;;
     --llm-module) LLM_MODULE="$2"; shift 2 ;;
     --llm-provider) LLM_PROVIDER="$2"; shift 2 ;;
     -h|--help)
@@ -120,24 +128,36 @@ done < <(echo "$RANKED" | jq -r '.ranked[].path')
 
 # ── 6. Deploy ───────────────────────────────────────────────────────────────
 DEPLOY_RESULT='null'
+REVIEW_MODE=''
+if [ "$AUTONOMY_GATE" -eq 1 ]; then
+  REVIEW_MODE=$(WORKSPACE="$WORKSPACE" bash "$SELF_DIR/graduation-tracker.sh" review-frequency \
+    2>/dev/null | jq -r '.review_mode // "full_review"' 2>/dev/null || echo "full_review")
+  REVIEW_MODE="${REVIEW_MODE:-full_review}"  # safe default; never empty
+fi
 if [ "$NO_DEPLOY" -eq 0 ] && [ -n "$DEPLOY_CANDIDATE" ]; then
-  # attach baseline metrics into deploy record path via env file
-  DEPLOY_RESULT=$(bash "$SELF_DIR/deploy-proposal.sh" \
-    --proposal "$DEPLOY_CANDIDATE" \
-    --suite-root "$SUITE_ROOT" \
-    --workspace "$WORKSPACE" \
-    --skip-eval)
-  # Store baseline metrics on deploy record
-  DPID=$(echo "$DEPLOY_RESULT" | jq -r .proposal_id)
-  if [ -f "$WORKSPACE/memory/self-mod/deploys/${DPID}.json" ]; then
-    python3 - "$WORKSPACE/memory/self-mod/deploys/${DPID}.json" \
-      "$WORKSPACE/memory/self-mod/baseline-metrics.json" <<'PY'
+  if [ "$AUTONOMY_GATE" -eq 1 ] && [ "$REVIEW_MODE" != "relaxed_review" ]; then
+    # M2: full_review queues for human approval — no auto-deploy
+    DEPLOY_RESULT=$(jq -nc --arg p "$DEPLOY_CANDIDATE" --arg m "${REVIEW_MODE:-full_review}" \
+      '{skipped:true, reason:"full_review_human_approval_required", review_mode:$m, would_deploy:$p}')
+  else
+    # attach baseline metrics into deploy record path via env file
+    DEPLOY_RESULT=$(bash "$SELF_DIR/deploy-proposal.sh" \
+      --proposal "$DEPLOY_CANDIDATE" \
+      --suite-root "$SUITE_ROOT" \
+      --workspace "$WORKSPACE" \
+      --skip-eval)
+    # Store baseline metrics on deploy record
+    DPID=$(echo "$DEPLOY_RESULT" | jq -r .proposal_id)
+    if [ -f "$WORKSPACE/memory/self-mod/deploys/${DPID}.json" ]; then
+      python3 - "$WORKSPACE/memory/self-mod/deploys/${DPID}.json" \
+        "$WORKSPACE/memory/self-mod/baseline-metrics.json" <<'PY'
 import json,sys
 from pathlib import Path
 rec=Path(sys.argv[1]); base=json.loads(Path(sys.argv[2]).read_text())
 d=json.loads(rec.read_text()); d["baseline_metrics"]=base
 rec.write_text(json.dumps(d,indent=2,sort_keys=True)+"\n")
 PY
+    fi
   fi
 elif [ "$NO_DEPLOY" -eq 1 ] && [ -n "$DEPLOY_CANDIDATE" ]; then
   DEPLOY_RESULT=$(jq -nc --arg p "$DEPLOY_CANDIDATE" '{skipped:true, would_deploy:$p}')
@@ -151,10 +171,14 @@ SUMMARY=$(jq -nc \
   --argjson ranked "$RANKED" \
   --argjson evals "$EVALS" \
   --argjson deploy "$DEPLOY_RESULT" \
+  --argjson ag "$([ "$AUTONOMY_GATE" -eq 1 ] && echo true || echo false)" \
+  --arg rm "${REVIEW_MODE:-}" \
   '{
     pipeline: "phase3-self-mod",
     timestamp: $ts,
     baseline_snapshot: $base,
+    autonomy_gate: $ag,
+    review_mode: $rm,
     ranked: $ranked,
     evaluations: $evals,
     deploy: $deploy
