@@ -45,6 +45,17 @@ GPU VRAM parsing) are built to spec but not exercised on a real target host.
    via `systemctl --user show -p DelegateControllers aibrain.service`.
 3. `--status` shows real success counts with zero unhealthy jobs after 24h.
 
+**Status: `IN PROGRESS` (2026-08-08).** Checkable checklist with recorded
+results in `SETUP_COMMANDS.md` §5 (sub-checks 2a–2c there split criterion 2
+into its machinery parts). This host so far — criterion 1 ✅ (all 29 jobs
+`ok` via `--check`); criterion 2's **machinery** verified/armed: PSI
+poll-mode fallback active (`/proc/pressure/*` readable), rootless cgroup
+delegation confirmed (`DelegateControllers=cpu cpuset io memory pids`),
+and GPU VRAM resolved via the amdgpu sysfs fallback (`vulkaninfo` on this
+Vulkan-Tools version emits no `heapBudget`, so the documented fallback
+path is the live one). Still pending: a deferral *actually firing* during
+a spawn job, and the 24h `--status` clean-run window.
+
 ---
 
 ## Stage 2 — Eclipsing the external harness

@@ -211,7 +211,16 @@ weekly cycle defers with a visible alert instead of churning). The Gap-2
 `core/agent-loop/` gives spawn jobs internal tool use + session memory via
 `SPAWN_PROVIDER=agentloop`, so the daemon no longer needs hermes even for
 its agent turns. The remaining open item is Stage-1 hardening on a real
-host (M0).
+host — **M0 is now `IN PROGRESS`** (2026-08-08): the checkable checklist
+lives in `SETUP_COMMANDS.md` §5. On this host, criterion 1 (all 29 jobs
+`ok` via `--check`) is **verified**, and criterion 2's machinery is
+verified/armed across all three sub-checks: PSI poll-mode fallback active
+(`/proc/pressure/*` readable), rootless cgroup delegation confirmed
+(`DelegateControllers=cpu cpuset io memory pids`), and GPU VRAM resolved
+via the amdgpu sysfs fallback (`vulkaninfo` on this Vulkan-Tools version
+emits no `heapBudget`). The two observation-based checks — a deferral
+*actually firing* during a spawn job, and the 24h clean `--status` window
+— remain pending.
 
 ---
 

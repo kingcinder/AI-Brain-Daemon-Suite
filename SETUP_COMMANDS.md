@@ -116,10 +116,70 @@ one.
 
 ```bash
 python3 ~/.hermes/workspace/deep-brain-kernel.py --check
-# expect: all 18 jobs listed, zero minute collisions, hermes found
+# expect: all 29 jobs listed, zero minute collisions, hermes found
 
 journalctl --user -u aibrain.service -f
 # watch for clean "completed" lines as scheduled jobs fire; let it run at
 # least one full day before removing any old cron entries, so every
 # once-daily job gets a chance to fire and be observed succeeding
 ```
+
+## 5. M0 — Host-verified pillars checklist (ROADMAP M0)
+
+M0 is the suite's "does the hardware actually do what the code claims" gate:
+PSI deferral, rootless cgroup v2 delegation, and GPU VRAM parsing all built
+to spec but never exercised on a real target host until now. Tick each box
+with the command shown; the `▶` lines record the result on **this host**
+(checked 2026-08-08). A criterion is *done* only when its box is checked.
+
+### Criterion 1 — `--check` passes on a real machine
+
+```bash
+python3 ~/.hermes/workspace/deep-brain-kernel.py --check
+# expect: exit 0, "✅ All checks passed", every job ok, zero MISSING
+```
+
+- [x] ▶ 2026-08-08: exit 0, `✅ All checks passed` — all 29 jobs (21 direct + 8 spawn) `ok`, `hermes: found`.
+
+### Criterion 2 — deferral machinery exercised during a spawn job
+
+**2a. PSI available (and the poll fallback, per this kernel):**
+
+```bash
+ls /proc/pressure/          # expect: cpu  io  memory
+cat /proc/pressure/memory   # expect real avg10/avg60/avg300 values
+journalctl --user -u aibrain.service -n 50 | grep -i "pressure"
+```
+
+- [x] ▶ 2026-08-08: `/proc/pressure/{cpu,io,memory}` present with real values. Unprivileged PSI *trigger* write returns `EINVAL` (kernel 6.8, `CONFIG_PSI=y`) — expected on this host — and the daemon logs `Falling back to avg10 poll mode`; journal shows `pressure supervisor active (memory=poll cpu=poll); threshold avg10=10.0%`. Poll-mode deferral is live.
+- [ ] ▶ PSI *deferral firing during a spawn job*: not yet observed — no pressure spike has crossed the 10% threshold since the 2026-08-08 restart. Re-check under sustained load (e.g. run a local inference while a spawn job is due).
+
+**2b. Rootless cgroup v2 delegation took effect:**
+
+```bash
+systemctl --user show -p DelegateControllers aibrain.service
+# expect: non-empty list including cpu and memory
+```
+
+- [x] ▶ 2026-08-08: `DelegateControllers=cpu cpuset io memory pids` — includes `cpu` and `memory`.
+
+**2c. GPU VRAM parsing resolves real usage:**
+
+```bash
+vulkaninfo --json 2>/dev/null | grep -c heapBudget   # parser's expected key path
+cat /sys/class/drm/card*/device/mem_info_vram_total   # amdgpu sysfs fallback
+cat /sys/class/drm/card*/device/mem_info_vram_used
+```
+
+- [x] ▶ 2026-08-08: `vulkaninfo` present, but this Vulkan-Tools version emits **no `heapBudget`** (`grep -c` = 0) — exactly the version-drift the NOTE above warns about — so the daemon logs `vulkaninfo found but neither --json nor plain-text output yielded a usable memory-budget reading — falling back to amdgpu sysfs` and reads the kernel's own files: `vram_total=8573157376` (~8 GB RX 5700 XT), `vram_used=11677696`. VRAM gating is live via the fallback. (Optional hardening: update `_parse_vulkaninfo_*()` in `deep-brain-kernel.py` for this Vulkan-Tools schema, or accept the sysfs path.)
+- [ ] ▶ GPU *deferral firing*: not yet observed — current VRAM use is tiny (~11 MB of 8 GB); no spawn job has been deferred on the VRAM gate since the restart. Re-check while a Quality GGUF is loaded.
+
+### Criterion 3 — `--status` clean after 24h
+
+```bash
+python3 ~/.hermes/workspace/deep-brain-kernel.py --status
+# expect: real success counts, zero "⚠ UNHEALTHY" rows, exit 0
+```
+
+- [x] ▶ 2026-08-08 (pre-window): zero jobs at/above the 3-failure unhealthy threshold; exit 0. Jobs show real OK counts (e.g. `heartbeat_beat` 895 OK, `acc_conflict_encoding` 143 OK).
+- [ ] ▶ **24h window**: daemon restarted 2026-08-08 08:28 PDT with the synced 29-job engine — the clean-run observation window is open; re-run this check after a full day (incl. one `verification_pass` sweep, one `brain_snapshot`, the Sunday-only weekly cycle if applicable).

@@ -1,9 +1,25 @@
 # AI Brain Suite
 
 [![Verification Gate](https://github.com/kingcinder/AI-Brain-Daemon-Suite/actions/workflows/verification.yml/badge.svg)](https://github.com/kingcinder/AI-Brain-Daemon-Suite/actions/workflows/verification.yml)
+[![CI](https://github.com/kingcinder/AI-Brain-Daemon-Suite/actions/workflows/ci.yml/badge.svg)](https://github.com/kingcinder/AI-Brain-Daemon-Suite/actions/workflows/ci.yml)
 
 > **Mission & scope:** see [`VISION.md`](VISION.md) — the official statement
 > of what this suite is, what it is for, and where it is headed.
+
+## Documentation Index
+
+Six docs carry the suite's story, and they're designed to be read in this
+order — each hands off to the next, so the repository reads as a single
+navigable document set rather than six disconnected files:
+
+| Doc | What it answers |
+|---|---|
+| [`VISION.md`](VISION.md) | What is this suite, what is it for, and where is it headed? (**read first**) |
+| [`ROADMAP.md`](ROADMAP.md) | Which milestones get us to full autonomy, and which have landed (M0–M8)? |
+| [`AUDIT.md`](AUDIT.md) | Which vision gaps are open or closed, and what code proves it? |
+| [`HERMES_COMPATIBILITY.md`](HERMES_COMPATIBILITY.md) | How does the suite interoperate with the Hermes Agent harness? |
+| [`BRAIN_DAEMON_SCHEDULE.md`](BRAIN_DAEMON_SCHEDULE.md) | What jobs does the daemon run, on what schedule, and why? |
+| [`docs/V4_STATUS.md`](docs/V4_STATUS.md) | The V4.0 implementation ledger (plumbing vs live-exercised). |
 
 ## CI
 
