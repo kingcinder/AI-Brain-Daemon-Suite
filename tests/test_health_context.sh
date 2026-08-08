@@ -16,6 +16,8 @@ HC="$ROOT/core/self-mod/health-context.sh"
 OUT=$(WORKSPACE="$WORKSPACE" bash "$HC")
 echo "$OUT" | jq -e '.daemon_streaks == [] and .verification.failures == [] and .acc_lessons == [] and .graduation.review_mode == "full_review" and .proposal_store.queued == 0' >/dev/null \
   || { echo "FAIL: empty-workspace shape: $OUT"; exit 1; }
+echo "$OUT" | jq -e '.acc_calibration.total_conflicts == 0 and .acc_calibration.hit_rate == 0.0 and .acc_calibration.by_type == {}' >/dev/null \
+  || { echo "FAIL: acc_calibration key present + zeroed on empty workspace: $OUT"; exit 1; }
 
 # Seed every source with realistic data.
 cat > "$WORKSPACE/memory/deep-brain-kernel-state.json" << 'EOF'
@@ -45,11 +47,20 @@ echo "$OUT2" | jq -e '.graduation.review_mode == "relaxed_review" and .graduatio
   || { echo "FAIL: graduation state: $OUT2"; exit 1; }
 echo "$OUT2" | jq -e '.proposal_store.queued == 1 and .proposal_store.rejected == 1 and .proposal_store.deployed == 1' >/dev/null \
   || { echo "FAIL: proposal-store counts: $OUT2"; exit 1; }
+# acc_calibration is fed through from acc-calibration.sh (the seeded
+# acc-state.json has no firstSeen, so it must be zeroed but PRESENT).
+echo "$OUT2" | jq -e '.acc_calibration.total_errors == 0 and (.acc_calibration.total_conflicts | type) == "number"' >/dev/null \
+  || { echo "FAIL: acc_calibration feed-through: $OUT2"; exit 1; }
 
 # Corrupt sources must degrade, not abort (invalid JSON in one file).
 echo 'not-json{{' > "$WORKSPACE/memory/verification-report.jsonl"
 OUT3=$(WORKSPACE="$WORKSPACE" bash "$HC")
 echo "$OUT3" | jq -e '.verification.failures == []' >/dev/null \
   || { echo "FAIL: corrupt-source degradation: $OUT3"; exit 1; }
+# acc_calibration survives a corrupt acc-state.json (degraded, never aborts).
+echo 'not-json{{' > "$WORKSPACE/memory/acc-state.json"
+OUT4=$(WORKSPACE="$WORKSPACE" bash "$HC")
+echo "$OUT4" | jq -e '.acc_calibration.total_conflicts == 0 and .acc_calibration.hit_rate == 0.0' >/dev/null \
+  || { echo "FAIL: acc_calibration survives corrupt acc-state: $OUT4"; exit 1; }
 
 echo "PASS: health-context"

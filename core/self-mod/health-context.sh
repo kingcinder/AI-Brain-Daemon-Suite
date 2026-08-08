@@ -12,6 +12,9 @@
 #   acc_lessons         resolved error patterns with mitigation/insight
 #                       (acc-state.json → resolved, via the same shape
 #                        get-lessons.sh surfaces)
+#   acc_calibration     flag→error calibration (acc-calibration.sh): how
+#                       often anterior-cingulate conflict flags predict an
+#                       actual acc-error correction within the window
 #   graduation          review_mode / clean_streak / target (deferral state)
 #   proposal_store      queued / rejected / deployed counts
 #
@@ -26,6 +29,7 @@
 
 set -euo pipefail
 
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -36,7 +40,13 @@ done
 
 MEM="$WORKSPACE/memory"
 
-python3 - "$MEM" <<'PY'
+# ── 6. ACC flag→error calibration (own script, beside this one) ─────────────
+ACC_CAL_JSON=""
+if [ -x "$SELF_DIR/acc-calibration.sh" ]; then
+  ACC_CAL_JSON=$(WORKSPACE="$WORKSPACE" bash "$SELF_DIR/acc-calibration.sh" 2>/dev/null) || ACC_CAL_JSON=""
+fi
+
+python3 - "$MEM" "$ACC_CAL_JSON" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
@@ -128,11 +138,25 @@ if props_dir.is_dir():
         elif status == "deployed":
             deployed += 1
 
+# ── 6. ACC calibration (parsed from the companion script's JSON; corrupt or
+#        absent output degrades to zeros — never fails the block) ────────────
+acc_cal = {
+    "total_conflicts": 0, "flags_followed_by_error": 0, "hit_rate": 0.0,
+    "false_positive_rate": 0.0, "total_errors": 0, "errors_unpredicted": 0,
+    "by_type": {}, "window_days": 7,
+}
+try:
+    if sys.argv[2]:
+        acc_cal.update(json.loads(sys.argv[2]))
+except (ValueError, TypeError):
+    pass
+
 out = {
     "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "daemon_streaks": streaks,
     "verification": verification,
     "acc_lessons": lessons,
+    "acc_calibration": acc_cal,
     "graduation": graduation,
     "proposal_store": {"queued": queued, "rejected": rejected, "deployed": deployed},
 }

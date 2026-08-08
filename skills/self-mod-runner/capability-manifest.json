@@ -54,6 +54,10 @@
       "kind": "unit"
     },
     {
+      "path": "tests/test_acc_calibration.sh",
+      "kind": "unit"
+    },
+    {
       "path": "tests/test_autonomy_report.sh",
       "kind": "unit"
     }
