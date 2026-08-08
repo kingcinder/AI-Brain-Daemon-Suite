@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # load-sense.sh — Human-readable state for session context injection
 set -euo pipefail
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 [ ! -f "$STATE_FILE" ] && echo "🌡️ Insula: not installed" && exit 0
 python3 - "$STATE_FILE" << 'PYTHON'

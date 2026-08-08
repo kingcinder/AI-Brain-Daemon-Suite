@@ -13,14 +13,14 @@
 # Usage:
 #   isolated-reflect.sh [--workspace PATH] [--out PATH] [--with-inference]
 # Env:
-#   WORKSPACE  default ~/.openclaw/workspace
+#   WORKSPACE  default ~/.hermes/workspace
 #
 # Exit 0 on success; prints path to reflection JSON on stdout last line.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 OUT_DIR=""
 WITH_INFERENCE=0
 

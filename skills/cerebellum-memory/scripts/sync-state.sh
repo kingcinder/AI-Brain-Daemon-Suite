@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
 OUTPUT_FILE="$WORKSPACE/CEREBELLUM_STATE.md"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No cerebellum state found"; exit 1; }

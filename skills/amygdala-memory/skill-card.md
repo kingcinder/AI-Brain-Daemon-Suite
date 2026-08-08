@@ -18,7 +18,7 @@ Global <br>
 
 ## Known Risks and Mitigations: <br>
 Risk: Recent conversations can be analyzed into persistent emotional memory. <br>
-Mitigation: Install only when persistent emotional memory is desired, and review or delete AMYGDALA_STATE.md and files under ~/.openclaw/workspace/memory when that state should not carry forward. <br>
+Mitigation: Install only when persistent emotional memory is desired, and review or delete AMYGDALA_STATE.md and files under ~/.hermes/workspace/memory when that state should not carry forward. <br>
 Risk: Background cron jobs can continue emotional decay and encoding without manual prompts. <br>
 Mitigation: Avoid --with-cron unless recurring background processing is intended, and remove the amygdala cron jobs when automatic processing is no longer wanted. <br>
 Risk: Persisted emotional state can influence future agent responses. <br>

@@ -3,7 +3,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
 STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 INJECT_FILE="$WORKSPACE/ACC_CONFLICT_STATE.md"
 QUIET=false

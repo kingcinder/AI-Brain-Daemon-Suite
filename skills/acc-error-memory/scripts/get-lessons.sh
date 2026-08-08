@@ -9,7 +9,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
 
 if [ ! -f "$STATE_FILE" ]; then
@@ -35,7 +35,7 @@ import json
 import os
 import sys
 
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
 state_file = os.path.join(workspace, 'memory', 'acc-state.json')
 pattern_filter = os.environ.get('PATTERN', '')
 json_mode = os.environ.get('JSON_MODE', 'false') == 'true'

@@ -9,7 +9,7 @@ You've been given `memory/pending-habits.json` containing signals extracted from
 ## Step 1: Read the pending signals
 
 ```bash
-cat ~/.openclaw/workspace/memory/pending-habits.json
+cat ~/.hermes/workspace/memory/pending-habits.json
 ```
 
 Each entry in `pending` has:
@@ -31,7 +31,7 @@ Each entry in `pending` has:
 ## Step 2: Read the current habit state
 
 ```bash
-cat ~/.openclaw/workspace/memory/habit-state.json
+cat ~/.hermes/workspace/memory/habit-state.json
 ```
 
 Use this to:
@@ -52,7 +52,7 @@ For each signal, decide which of these applies, then call the matching command:
 **When:** The signal describes a cue → routine → reward pattern the agent should adopt (explicit instruction, strong preference, or a recurring behavioral observation).
 
 ```bash
-~/.openclaw/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
+~/.hermes/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
   --new \
   --cue   "<trigger condition>" \
   --routine "<the action the agent should take>" \
@@ -77,7 +77,7 @@ For each signal, decide which of these applies, then call the matching command:
 **When:** `suggested_type = reinforcement` and the cue/routine in the signal clearly matches the existing habit at `similar_id`.
 
 ```bash
-~/.openclaw/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
+~/.hermes/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
   --id <similar_id> \
   --type habit \
   --note "Optional note about this recurrence"
@@ -90,7 +90,7 @@ For each signal, decide which of these applies, then call the matching command:
 **When:** The signal describes a multi-step workflow that has become a reliable sequence (numbered steps, explicit order, consistent task pattern).
 
 ```bash
-~/.openclaw/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
+~/.hermes/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
   --new --type procedure \
   --name "<Short descriptive name>" \
   --steps "Step one,Step two,Step three" \
@@ -103,7 +103,7 @@ For each signal, decide which of these applies, then call the matching command:
 ### 3D — Reinforce existing procedure
 
 ```bash
-~/.openclaw/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
+~/.hermes/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
   --id <similar_id> \
   --type procedure
 ```
@@ -115,7 +115,7 @@ For each signal, decide which of these applies, then call the matching command:
 **When:** The signal is a correction, a "never do that again," a "stop doing X," or negative feedback about a recurring mistake.
 
 ```bash
-~/.openclaw/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
+~/.hermes/workspace/skills/basal-ganglia-memory/reinforce-habit.sh \
   --suppress "<the pattern to avoid>" \
   --reason   "<why it should be suppressed>" \
   --strength <0.60–0.85>
@@ -144,14 +144,14 @@ After processing all signals:
 
 ```bash
 # Remove the pending file
-rm ~/.openclaw/workspace/memory/pending-habits.json
+rm ~/.hermes/workspace/memory/pending-habits.json
 
 # Resync the state file + dashboard
-WORKSPACE=~/.openclaw/workspace \
-  ~/.openclaw/workspace/skills/basal-ganglia-memory/scripts/sync-state.sh
+WORKSPACE=~/.hermes/workspace \
+  ~/.hermes/workspace/skills/basal-ganglia-memory/scripts/sync-state.sh
 
 # Brief report
-~/.openclaw/workspace/skills/basal-ganglia-memory/get-habits.sh --status chunked
+~/.hermes/workspace/skills/basal-ganglia-memory/get-habits.sh --status chunked
 ```
 
 ---
@@ -162,8 +162,8 @@ After syncing state, signal adjacent modules based on what was encoded. Check fo
 
 **If any habit was newly promoted to "chunked" status** (strength ≥ 0.70 after this run):
 ```bash
-if [ -f "$HOME/.openclaw/workspace/memory/reward-state.json" ]; then
-  "$HOME/.openclaw/workspace/skills/vta-memory/scripts/log-reward.sh" \
+if [ -f "$HOME/.hermes/workspace/memory/reward-state.json" ]; then
+  "$HOME/.hermes/workspace/skills/vta-memory/scripts/log-reward.sh" \
     --type competence --intensity 0.5 \
     --source "habit chunked: <cue>"
 fi
@@ -171,8 +171,8 @@ fi
 
 **If a suppression was newly created** (from a correction signal):
 ```bash
-if [ -f "$HOME/.openclaw/workspace/memory/emotional-state.json" ]; then
-  "$HOME/.openclaw/workspace/skills/amygdala-memory/scripts/update-state.sh" \
+if [ -f "$HOME/.hermes/workspace/memory/emotional-state.json" ]; then
+  "$HOME/.hermes/workspace/skills/amygdala-memory/scripts/update-state.sh" \
     --emotion satisfaction --intensity 0.3 \
     --trigger "correction encoded as suppression: <pattern>"
 fi
@@ -180,8 +180,8 @@ fi
 
 **If 3+ habits were reinforced in this run** (a behaviorally rich session):
 ```bash
-if [ -f "$HOME/.openclaw/workspace/memory/interoceptive-state.json" ]; then
-  "$HOME/.openclaw/workspace/skills/insula-memory/scripts/update-state.sh" \
+if [ -f "$HOME/.hermes/workspace/memory/interoceptive-state.json" ]; then
+  "$HOME/.hermes/workspace/skills/insula-memory/scripts/update-state.sh" \
     --signal congruence --intensity 0.4 \
     --source "rich habit reinforcement session"
 fi

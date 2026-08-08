@@ -4,7 +4,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
 
 if [ ! -f "$STATE_FILE" ]; then
@@ -18,7 +18,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import os
 
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
 state_file = Path(workspace) / 'memory' / 'acc-state.json'
 
 with open(state_file) as f:

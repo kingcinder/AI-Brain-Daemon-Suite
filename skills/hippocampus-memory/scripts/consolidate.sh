@@ -3,9 +3,9 @@
 # Reviews recent daily notes and suggests what to consolidate
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 MEMORY_DIR="$WORKSPACE/memory"
 
 echo "🧠 Memory Consolidation"

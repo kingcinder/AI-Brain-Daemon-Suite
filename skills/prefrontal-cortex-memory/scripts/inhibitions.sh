@@ -6,7 +6,7 @@
 #   inhibitions.sh remove --id <id>
 #   inhibitions.sh check --text "..."   # does this text match an active inhibition?
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No PFC state found"; exit 1; }
 

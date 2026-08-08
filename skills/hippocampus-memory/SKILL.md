@@ -3,6 +3,9 @@ name: hippocampus-memory
 title: "Hippocampus - Memory System"
 description: "Persistent memory system for AI agents. Automatic encoding, decay, and semantic reinforcement — just like the hippocampus in your brain. Based on Stanford Generative Agents (Park et al., 2023)."
 metadata:
+  hermes:
+    emoji: "🧠"
+    tags: ["memory", "encoding", "decay", "ai-brain"]
   openclaw:
     emoji: "🧠"
     version: "3.8.6"
@@ -22,6 +25,16 @@ metadata:
 > "Memory is identity. This skill is how I stay alive."
 
 The hippocampus is the brain region responsible for memory formation. This skill makes memory capture automatic, structured, and persistent — with importance scoring, decay, and semantic reinforcement.
+
+## When to Use
+
+Use this skill when:
+- You want to remember facts, events, or experiences across sessions instead of starting blank
+- You want automatic encoding of conversation into scored memories, with decay and semantic reinforcement
+- You want core memories loaded at session start (`load-core.sh`)
+- You're integrating with the AI Brain Suite and want the memory layer the other modules read from
+
+Not for: transient working context, or task state that lives in the project rather than long-term memory.
 
 ## Quick Start
 
@@ -75,7 +88,7 @@ $WORKSPACE/
 │   ├── self/                # Facts about the agent
 │   ├── relationship/        # Shared context
 │   └── world/               # External knowledge
-└── HIPPOCAMPUS_CORE.md      # Auto-generated for OpenClaw RAG
+└── HIPPOCAMPUS_CORE.md      # Auto-generated for Hermes Agent RAG
 ```
 
 ## Scripts
@@ -98,7 +111,7 @@ Visual dashboard showing all installed brain skills:
 
 ```bash
 ./scripts/generate-dashboard.sh
-open ~/.openclaw/workspace/brain-dashboard.html
+open ~/.hermes/workspace/brain-dashboard.html
 ```
 
 - **Auto-detects** all other brain skills by their state files
@@ -113,9 +126,9 @@ When you install this skill, **notify the user** about the dashboard:
 > 🧠 **Hippocampus installed!**
 >
 > View your agent's memories in the Brain Dashboard:
-> `~/.openclaw/workspace/brain-dashboard.html`
+> `~/.hermes/workspace/brain-dashboard.html`
 
-All scripts use `$WORKSPACE` environment variable (default: `~/.openclaw/workspace`).
+All scripts use `$WORKSPACE` environment variable (default: `~/.hermes/workspace`).
 
 ## Importance Scoring
 
@@ -191,21 +204,15 @@ The encoding cron is the heart of the system. Staggered from other suite crons t
 
 ```bash
 # Encoding every 3 hours (on the hour — first in the suite)
-openclaw cron add --name hippocampus-encoding \
-  --cron "0 0,3,6,9,12,15,18,21 * * *" \
-  --session isolated \
-  --agent-turn "Run hippocampus encoding with semantic reinforcement..."
+hermes cron create "0 0,3,6,9,12,15,18,21 * * *" "Run hippocampus encoding with semantic reinforcement..." --name hippocampus-encoding
 
 # Daily decay at 3 AM
-openclaw cron add --name hippocampus-decay \
-  --cron "0 3 * * *" \
-  --session isolated \
-  --agent-turn "Run decay.sh and report any memories below 0.2"
+hermes cron create "0 3 * * *" "Run decay.sh and report any memories below 0.2" --name hippocampus-decay
 ```
 
 ## OpenClaw Integration
 
-Add to `memorySearch.extraPaths` in openclaw.json:
+Add to the legacy `memorySearch.extraPaths` config (OpenClaw openclaw.json; Hermes reads AGENTS.md instead):
 
 ```json
 {
@@ -227,13 +234,13 @@ Full Brain Suite startup — run all installed modules in sequence:
 
 ```markdown
 ## Every Session
-1. 🧠 Load memories: `~/.openclaw/workspace/skills/hippocampus-memory/scripts/load-core.sh`
-2. 🎭 Load emotional state: `~/.openclaw/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
-3. ⭐ Load motivation: `~/.openclaw/workspace/skills/vta-memory/scripts/load-motivation.sh`
-4. 🎯 Load habits: `~/.openclaw/workspace/skills/basal-ganglia-memory/load-habits.sh`
-5. 🌡️ Load felt sense: `~/.openclaw/workspace/skills/insula-memory/scripts/load-sense.sh`
-6. ⚡ Load conflict state: `~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
-7. 🔴 Load error patterns: `~/.openclaw/workspace/skills/acc-error-memory/scripts/load-state.sh`
+1. 🧠 Load memories: `~/.hermes/workspace/skills/hippocampus-memory/scripts/load-core.sh`
+2. 🎭 Load emotional state: `~/.hermes/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
+3. ⭐ Load motivation: `~/.hermes/workspace/skills/vta-memory/scripts/load-motivation.sh`
+4. 🎯 Load habits: `~/.hermes/workspace/skills/basal-ganglia-memory/load-habits.sh`
+5. 🌡️ Load felt sense: `~/.hermes/workspace/skills/insula-memory/scripts/load-sense.sh`
+6. ⚡ Load conflict state: `~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
+7. 🔴 Load error patterns: `~/.hermes/workspace/skills/acc-error-memory/scripts/load-state.sh`
 
 ## When answering context questions
 Use hippocampus recall:

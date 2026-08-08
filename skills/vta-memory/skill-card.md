@@ -18,7 +18,7 @@ Global <br>
 
 ## Known Risks and Mitigations: <br>
 Risk: Persistent motivation and memory files may contain sensitive or unwanted conversation-derived content. <br>
-Mitigation: Install only when persistent agent-wide motivation state is desired, and review or delete ~/.openclaw/workspace/memory/*, ~/.openclaw/workspace/VTA_STATE.md, and ~/.openclaw/workspace/brain-dashboard.html when needed. <br>
+Mitigation: Install only when persistent agent-wide motivation state is desired, and review or delete ~/.hermes/workspace/memory/*, ~/.hermes/workspace/VTA_STATE.md, and ~/.hermes/workspace/brain-dashboard.html when needed. <br>
 Risk: Auto-injected motivation state can shape future agent behavior. <br>
 Mitigation: Inspect the generated VTA_STATE.md before relying on it in sessions, and remove or edit it if the behavior influence is unwanted. <br>
 Risk: The optional --with-cron install path can run recurring transcript and reward processing. <br>
@@ -40,7 +40,7 @@ Mitigation: Avoid --with-cron unless recurring processing is acceptable, and rev
 **Output Type(s):** [Text, Markdown, Shell commands, Configuration, Files] <br>
 **Output Format:** [Markdown guidance, shell command output, JSON/JSONL state files, and an HTML dashboard] <br>
 **Output Parameters:** [1D] <br>
-**Other Properties Related to Output:** [Writes persistent motivation state under ~/.openclaw/workspace and can optionally register recurring OpenClaw cron jobs.] <br>
+**Other Properties Related to Output:** [Writes persistent motivation state under ~/.hermes/workspace and can optionally register recurring OpenClaw cron jobs.] <br>
 
 ## Skill Version(s): <br>
 1.2.0 (source: server release and OpenClaw metadata) <br>

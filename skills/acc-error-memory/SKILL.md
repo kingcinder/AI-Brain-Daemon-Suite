@@ -2,6 +2,9 @@
 name: acc-error-memory
 description: "Error pattern tracking for AI agents. Detects corrections, escalates recurring mistakes, learns mitigations. Reactive complement to anterior-cingulate-memory. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "🔴"
+    tags: ["memory", "monitoring", "ai-brain", "error-detection"]
   openclaw:
     emoji: "🔴"
     version: "1.0.0"
@@ -18,6 +21,16 @@ metadata:
 **Reactive error pattern tracking for AI agents.** Part of the AI Brain series.
 
 The ACC Error module watches the *past* — scanning corrections the user made, detecting recurring mistake patterns, and surfacing mitigations at session start so history doesn't repeat. Its proactive partner, `anterior-cingulate-memory` ⚡, watches the *present* for emerging conflicts and uncertainty.
+
+## When to Use
+
+Use this skill when:
+- The user corrects you ("no", "wrong", "actually…") and you want to learn from it instead of repeating it
+- A mistake has happened more than once and should be escalated into a tracked pattern
+- You want session-start awareness of your known failure modes (load `ACC_STATE.md` via `load-state.sh`)
+- You're integrating with the AI Brain Suite and want a reactive feedback loop paired with `anterior-cingulate-memory`
+
+Not for: live conflict detection (that's `anterior-cingulate-memory`), or one-off mistakes you don't expect to recur.
 
 ## The Problem
 
@@ -68,7 +81,7 @@ export ACC_MODELS="claude --model haiku -p"
 ### 1. Install
 
 ```bash
-cd ~/.openclaw/workspace/skills/acc-error-memory
+cd ~/.hermes/workspace/skills/acc-error-memory
 ./install.sh --with-cron
 ```
 
@@ -180,10 +193,7 @@ Default: 3× daily for a faster feedback loop. Offset from other suite crons to 
 
 ```bash
 # Add to cron (or use ./install.sh --with-cron)
-openclaw cron add --name acc-error-analysis \
-  --cron "0 4,12,20 * * *" \
-  --session isolated \
-  --agent-turn "Run ACC error analysis pipeline and report any new or resolved patterns"
+hermes cron create "0 4,12,20 * * *" "Run ACC error analysis pipeline and report any new or resolved patterns" --name acc-error-analysis
 ```
 
 ## Brain Dashboard
@@ -192,7 +202,7 @@ The ACC Error and ACC Conflict modules share the **⚡ Oversight** tab in the un
 
 ```bash
 ./scripts/generate-dashboard.sh
-open ~/.openclaw/workspace/brain-dashboard.html
+open ~/.hermes/workspace/brain-dashboard.html
 ```
 
 The Oversight tab shows:
@@ -210,7 +220,7 @@ When you install this skill, **notify the user** about the dashboard:
 > 🔴 **ACC Error Memory installed!**
 >
 > Error patterns and corrections are now tracked. View them in the Brain Dashboard:
-> `~/.openclaw/workspace/brain-dashboard.html`
+> `~/.hermes/workspace/brain-dashboard.html`
 
 ## Auto-Injection (Zero Manual Steps!)
 
@@ -269,7 +279,7 @@ Track ACC error activity over time. All events use `"type": "acc-error"` to dist
 ./scripts/log-event.sh pattern_resolved pattern=tone_mismatch days_clear=32
 ```
 
-Events append to `~/.openclaw/workspace/memory/brain-events.jsonl`:
+Events append to `~/.hermes/workspace/memory/brain-events.jsonl`:
 ```json
 {"ts":"2026-02-11T12:00:00Z","type":"acc-error","event":"analysis","errors_found":2,"patterns_active":3}
 ```
@@ -282,13 +292,13 @@ Full Brain Suite startup order — run all installed modules in sequence:
 
 ```markdown
 ## Every Session
-1. 🧠 Load memories: `~/.openclaw/workspace/skills/hippocampus/scripts/load-core.sh`
-2. 🎭 Load emotional state: `~/.openclaw/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
-3. ⭐ Load motivation: `~/.openclaw/workspace/skills/vta-memory/scripts/load-motivation.sh`
-4. 🎯 Load habits: `~/.openclaw/workspace/skills/basal-ganglia-memory/load-habits.sh`
-5. 🌡️ Load felt sense: `~/.openclaw/workspace/skills/insula-memory/scripts/load-sense.sh`
-6. ⚡ Load conflict state: `~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
-7. 🔴 Load error patterns: `~/.openclaw/workspace/skills/acc-error-memory/scripts/load-state.sh`
+1. 🧠 Load memories: `~/.hermes/workspace/skills/hippocampus/scripts/load-core.sh`
+2. 🎭 Load emotional state: `~/.hermes/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
+3. ⭐ Load motivation: `~/.hermes/workspace/skills/vta-memory/scripts/load-motivation.sh`
+4. 🎯 Load habits: `~/.hermes/workspace/skills/basal-ganglia-memory/load-habits.sh`
+5. 🌡️ Load felt sense: `~/.hermes/workspace/skills/insula-memory/scripts/load-sense.sh`
+6. ⚡ Load conflict state: `~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
+7. 🔴 Load error patterns: `~/.hermes/workspace/skills/acc-error-memory/scripts/load-state.sh`
 ```
 
 ## AI Brain Suite Integration
@@ -315,7 +325,7 @@ Install both for complete cognitive oversight:
 ```bash
 ./install.sh --with-cron  # This skill: reactive error tracking
 # Plus:
-cd ~/.openclaw/workspace/skills/anterior-cingulate-memory && ./install.sh --with-cron
+cd ~/.hermes/workspace/skills/anterior-cingulate-memory && ./install.sh --with-cron
 ```
 
 ## AI Brain Series

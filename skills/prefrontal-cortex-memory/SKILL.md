@@ -2,6 +2,9 @@
 name: prefrontal-cortex-memory
 description: "Executive function for AI agents: goal tracking, impulse control, and arbitration across the brain suite. Reads sibling skills' state to weigh candidate actions in context — the one skill in the suite designed to do that. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "🧭"
+    tags: ["memory", "executive-function", "ai-brain", "decision-making"]
   openclaw:
     emoji: "🧭"
     version: "1.0.0"
@@ -18,6 +21,16 @@ metadata:
 **Executive function: goals, impulse control, and cross-region arbitration.** Part of the AI Brain series.
 
 Every other skill in the suite deliberately avoids reading its siblings' state — that decoupling is what makes the dashboard architecture and the rest of the suite maintainable (see the brain-suite review history for why cross-reads caused real bugs). Prefrontal cortex is the deliberate exception: synthesizing across brain regions to make one decision **is** executive function. Its `decide.sh` reads insula, VTA, amygdala, basal ganglia, and ACC's state — but every read is best-effort and optional, so it still works standalone with zero siblings installed.
+
+## When to Use
+
+Use this skill when:
+- You have multiple candidate actions and want them scored against current brain state and active goals
+- You want impulse control — inhibitions that suppress patterns you've decided not to act on
+- You want active goals tracked with priority so decisions favor them
+- You're integrating with the AI Brain Suite and want `heartbeat-memory` to arbitrate choices instead of weighted-random
+
+Not for: simple either/or decisions with no brain-state context, or planning (that stays with the agent's own deliberation).
 
 ## Status: ✅ Live
 

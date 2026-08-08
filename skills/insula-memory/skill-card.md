@@ -21,7 +21,7 @@ Mitigation: Review INSULA_STATE.md regularly and reset or edit interoceptive-sta
 Risk: Background cron jobs can continue interoceptive decay and encoding without manual prompts. <br>
 Mitigation: Avoid --with-cron unless recurring background processing is desired, and remove insula cron jobs when automatic processing is no longer wanted. <br>
 Risk: Recent conversations can be analyzed into persistent interoceptive memory. <br>
-Mitigation: Install only when persistent interoceptive awareness is desired, and review or delete INSULA_STATE.md and files under ~/.openclaw/workspace/memory when that state should not carry forward. <br>
+Mitigation: Install only when persistent interoceptive awareness is desired, and review or delete INSULA_STATE.md and files under ~/.hermes/workspace/memory when that state should not carry forward. <br>
 
 ## Reference(s): <br>
 - [Hippocampus skill](https://www.clawhub.ai/skills/hippocampus) <br>

@@ -2,6 +2,9 @@
 name: anterior-cingulate-memory
 description: "Conflict detection and uncertainty monitoring for AI agents. Tracks information conflicts, ambiguous intent, and cognitive load. The real-time 'something feels off' detector. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "⚡"
+    tags: ["memory", "monitoring", "conflict", "uncertainty", "ai-brain"]
   openclaw:
     emoji: "⚡"
     version: "1.0.0"
@@ -18,6 +21,16 @@ metadata:
 **Proactive conflict detection and uncertainty monitoring for AI agents.** Part of the AI Brain series.
 
 Give your AI agent a persistent sense of *something's off* — detecting information conflicts, flagging ambiguous intent, and tracking cognitive load across sessions. Its reactive complement, `acc-error-memory` 🔴, watches for corrections and patterns *after the fact*.
+
+## When to Use
+
+Use this skill when:
+- Instructions or facts contradict each other and you need to flag the conflict rather than guess
+- User intent is ambiguous and you should ask before proceeding
+- You want an internal uncertainty meter that gates how confidently you respond
+- You're integrating with the AI Brain Suite and want proactive oversight paired with `acc-error-memory`
+
+Not for: post-hoc error learning (that's `acc-error-memory`), or clear-cut tasks with no ambiguity.
 
 ## The Problem
 
@@ -47,7 +60,7 @@ Track **conflict load** through persistent state:
 ### 1. Install
 
 ```bash
-cd ~/.openclaw/workspace/skills/anterior-cingulate-memory
+cd ~/.hermes/workspace/skills/anterior-cingulate-memory
 ./install.sh --with-cron
 ```
 
@@ -153,8 +166,8 @@ The ACC can detect conflicts from conversation history using an LLM-based pipeli
 Set up cron for automatic encoding (staggered 50 minutes after the hour to avoid collisions with other suite crons):
 
 ```bash
-50 0,3,6,9,12,15,18,21 * * * ~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/encode-pipeline.sh
-0 */4 * * *                   ~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/decay-load.sh
+50 0,3,6,9,12,15,18,21 * * * ~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/encode-pipeline.sh
+0 */4 * * *                   ~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/decay-load.sh
 ```
 
 ## Auto-Injection (Zero Manual Steps!)
@@ -244,7 +257,7 @@ Track conflict patterns over time. All events use `"type": "acc-conflict"` to di
 ./scripts/log-event.sh resolved conflict_id=instruction_1749852000
 ```
 
-Events append to `~/.openclaw/workspace/memory/brain-events.jsonl`:
+Events append to `~/.hermes/workspace/memory/brain-events.jsonl`:
 ```json
 {"ts":"2026-06-14T12:00:00Z","type":"acc-conflict","event":"encoding","conflicts_found":2,"load":0.45}
 ```
@@ -257,13 +270,13 @@ Full Brain Suite startup order — run all installed modules in sequence:
 
 ```markdown
 ## Every Session
-1. 🧠 Load memories: `~/.openclaw/workspace/skills/hippocampus/scripts/load-core.sh`
-2. 🎭 Load emotional state: `~/.openclaw/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
-3. ⭐ Load motivation: `~/.openclaw/workspace/skills/vta-memory/scripts/load-motivation.sh`
-4. 🎯 Load habits: `~/.openclaw/workspace/skills/basal-ganglia-memory/load-habits.sh`
-5. 🌡️ Load felt sense: `~/.openclaw/workspace/skills/insula-memory/scripts/load-sense.sh`
-6. ⚡ Load conflict state: `~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
-7. 🔴 Load error patterns: `~/.openclaw/workspace/skills/acc-error-memory/scripts/load-state.sh`
+1. 🧠 Load memories: `~/.hermes/workspace/skills/hippocampus/scripts/load-core.sh`
+2. 🎭 Load emotional state: `~/.hermes/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
+3. ⭐ Load motivation: `~/.hermes/workspace/skills/vta-memory/scripts/load-motivation.sh`
+4. 🎯 Load habits: `~/.hermes/workspace/skills/basal-ganglia-memory/load-habits.sh`
+5. 🌡️ Load felt sense: `~/.hermes/workspace/skills/insula-memory/scripts/load-sense.sh`
+6. ⚡ Load conflict state: `~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
+7. 🔴 Load error patterns: `~/.hermes/workspace/skills/acc-error-memory/scripts/load-state.sh`
 ```
 
 ### Behavior Guidelines

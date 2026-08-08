@@ -11,9 +11,9 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 AGENT_ID="${AGENT_ID:-main}"
-TRANSCRIPT_DIR="$HOME/.openclaw/agents/$AGENT_ID/sessions"
+TRANSCRIPT_DIR="${TRANSCRIPT_DIR:-$HOME/.hermes/sessions}"
 OUTPUT="$WORKSPACE/memory/pending-errors.json"
 WATERMARK_FILE="$WORKSPACE/memory/acc-watcher-watermark.json"
 
@@ -32,6 +32,7 @@ done
 SESSION_COUNT=$(find "$TRANSCRIPT_DIR" -maxdepth 1 -name '*.jsonl' 2>/dev/null | wc -l | tr -d ' ')
 if [ "$SESSION_COUNT" -eq 0 ]; then
     echo "No session transcripts found in $TRANSCRIPT_DIR"
+    echo "Hint: populate it with: hermes sessions export --format jsonl \"$TRANSCRIPT_DIR\""
     exit 1
 fi
 

@@ -25,8 +25,10 @@ Only peripheral modules with a valid `capability-manifest.json` are modifiable.
 | `core/executive/` | Phase 2 isolated reflection + goal proposal cycle |
 | `core/self-mod/` | Phase 3 self-mod pipeline (immutable as proposal target) |
 | `core/self-mod/generate-proposals-llm.sh` | LLM → proposal store (manifest allowlist only) |
-| `tests/run_skill_unit_tests.sh` | Per-skill unit suite (11 skills) |
-| `skills/` | Peripheral modules (memory skills + executive-function + self-mod-runner) |
+| `tests/run_skill_unit_tests.sh` | Per-skill unit suite (12 skills incl. verification-memory self-test) |
+| `skills/` | Peripheral modules (memory skills + executive-function + self-mod-runner + verification-memory) |
+| `skills/verification-memory/` | **Verification region (proprioception):** manifest-driven runner of every module's declared tests; publishes `tests_passed`/`test_failure` signals; self-mod's `evaluate-proposal.sh` runs it as the pre-deploy regression gate |
+| `tests/test_verification_region.sh` | verification-memory self-test (gates the gate) |
 | `tests/run_phase1_harness.sh` | Phase 1a/1b regression suite |
 | `tests/run_phase2_harness.sh` | Phase 2 executive / isolation regression suite |
 | `tests/run_phase3_harness.sh` | Phase 3 self-mod pipeline regression suite |
@@ -53,7 +55,17 @@ bash tests/run_phase1_harness.sh
 bash tests/run_phase2_harness.sh
 bash tests/run_phase3_harness.sh
 bash core/schema/validate-manifest.sh --all
+bash skills/verification-memory/scripts/run-declared-tests.sh   # full manifest-driven sweep
 ```
+
+## Verification region fixture rule
+
+Since `run-declared-tests.sh` parses `capability-manifest.json` `tests` entries
+(path + kind), a change to that manifest shape means auditing
+`skills/verification-memory/scripts/run-declared-tests.sh` and
+`tests/test_verification_region.sh` **before** the manifest change lands. A
+passing verification self-test only proves the runner agrees with its own
+fixture — the standing fixture rule applies to the verification region itself.
 
 ## Live scheduler (naming)
 

@@ -1,8 +1,8 @@
 #!/bin/bash
-# install.sh — Set up cerebellum-memory for OpenClaw
+# install.sh — Set up cerebellum-memory for Hermes Agent
 # Usage: ./install.sh [--with-cron]
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 WITH_CRON=false
 [ "$1" = "--with-cron" ] && WITH_CRON=true
@@ -32,14 +32,12 @@ echo "✅ Scripts are executable"
 
 if [ "$WITH_CRON" = true ]; then
   echo ""
-  echo "Setting up OpenClaw cron job..."
-  if ! command -v openclaw &> /dev/null; then
-    echo "⚠️  'openclaw' not in PATH. Add this cron job manually:"
-    echo "openclaw cron add --name cerebellum-refine --cron '0 */8 * * *' --session isolated --agent-turn '🎚️ Run $SKILL_DIR/scripts/refine.sh'"
+  echo "Setting up Hermes cron job..."
+  if ! command -v hermes &> /dev/null; then
+    echo "⚠️  'hermes' not in PATH. Add this cron job manually:"
+    echo "hermes cron create '0 */8 * * *' '🎚️ Run $SKILL_DIR/scripts/refine.sh' --name cerebellum-refine"
   else
-    openclaw cron add --name cerebellum-refine --cron '0 */8 * * *' --session isolated \
-      --agent-turn "🎚️ Run $SKILL_DIR/scripts/refine.sh and report results" \
-      2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    hermes cron create '0 */8 * * *' "🎚️ Run $SKILL_DIR/scripts/refine.sh and report results" --name cerebellum-refine 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
   fi
 fi
 

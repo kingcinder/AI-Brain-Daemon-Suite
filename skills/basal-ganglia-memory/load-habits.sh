@@ -8,12 +8,12 @@
 #   load-habits.sh --format json   # Raw JSON of chunked+active items
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 #   THRESHOLD - Minimum strength for "active" inclusion (default: 0.4)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 THRESHOLD="${THRESHOLD:-0.4}"
 

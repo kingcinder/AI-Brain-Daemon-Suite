@@ -34,7 +34,7 @@ Track **conflict load** — a persistent uncertainty metric that rises when conf
 ```bash
 # Install
 clawdhub install anterior-cingulate-memory
-cd ~/.openclaw/workspace/skills/anterior-cingulate-memory
+cd ~/.hermes/workspace/skills/anterior-cingulate-memory
 ./install.sh --with-cron
 
 # Check conflict state

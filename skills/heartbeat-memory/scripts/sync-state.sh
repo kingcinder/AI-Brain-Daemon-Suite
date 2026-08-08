@@ -1,7 +1,7 @@
 #!/bin/bash
 # sync-state.sh — Generate HEARTBEAT_STATE.md for session injection
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/heartbeat-state.json"
 OUTPUT_FILE="$WORKSPACE/HEARTBEAT_STATE.md"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No heartbeat state found"; exit 1; }

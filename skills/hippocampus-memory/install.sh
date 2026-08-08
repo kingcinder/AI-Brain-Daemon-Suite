@@ -18,7 +18,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 WITH_CRON=false
@@ -105,26 +105,20 @@ if [ "$WITH_CRON" = true ]; then
     echo "⏰ Setting up cron jobs..."
     
     # Check if openclaw is available
-    if ! command -v openclaw &> /dev/null; then
-        echo "   ⚠️  'openclaw' not in PATH. Printing commands instead:"
+    if ! command -v hermes &> /dev/null; then
+        echo "   ⚠️  'hermes' not in PATH. Printing commands instead:"
         echo ""
         echo "# Daily decay at 3 AM"
-        echo "openclaw cron add --name hippocampus-decay --cron '0 3 * * *' --session isolated --agent-turn '🧠 Run decay: ~/.openclaw/workspace/skills/hippocampus-memory/scripts/decay.sh'"
+        echo "hermes cron create '0 3 * * *' '🧠 Run decay: ~/.hermes/workspace/skills/hippocampus-memory/scripts/decay.sh' --name hippocampus-decay"
         echo ""
         echo "# Encoding every 3 hours with LLM summarization"
-        echo "openclaw cron add --name hippocampus-encoding --cron '0 0,3,6,9,12,15,18,21 * * *' --session isolated --agent-turn 'Run hippocampus encoding with summarization...'"
+        echo "hermes cron create '0 0,3,6,9,12,15,18,21 * * *' 'Run hippocampus encoding with summarization...' --name hippocampus-encoding"
     else
         echo "   Creating hippocampus-decay..."
-        openclaw cron add --name hippocampus-decay \
-            --cron '0 3 * * *' \
-            --session isolated \
-            --agent-turn "🧠 Run memory decay:\n\n1. Run: ~/.openclaw/workspace/skills/hippocampus-memory/scripts/decay.sh\n2. Report any memories below 0.2 threshold\n3. Confirm decay complete" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+        hermes cron create '0 3 * * *' "🧠 Run memory decay:\n\n1. Run: ~/.hermes/workspace/skills/hippocampus-memory/scripts/decay.sh\n2. Report any memories below 0.2 threshold\n3. Confirm decay complete" --name hippocampus-decay 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
         
         echo "   Creating hippocampus-encoding..."
-        openclaw cron add --name hippocampus-encoding \
-            --cron '0 0,3,6,9,12,15,18,21 * * *' \
-            --session isolated \
-            --agent-turn "Run hippocampus encoding with LLM summarization:\n\n1. Run the encoding pipeline:\n\`\`\`bash\nWORKSPACE=\"\$HOME/.openclaw/workspace\" ~/.openclaw/workspace/skills/hippocampus-memory/scripts/encode-pipeline.sh --no-spawn\n\`\`\`\n\n2. Check pending memories:\n\`\`\`bash\ncat ~/.openclaw/workspace/memory/pending-memories.json 2>/dev/null | head -20\n\`\`\`\n\n3. If pending exist, summarize each to ~100 chars\n4. Update index.json with summaries\n5. Delete pending-memories.json\n6. Sync core: ~/.openclaw/workspace/skills/hippocampus-memory/scripts/sync-core.sh\n7. Report results" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+        hermes cron create '0 0,3,6,9,12,15,18,21 * * *' "Run hippocampus encoding with LLM summarization:\n\n1. Run the encoding pipeline:\n\`\`\`bash\nWORKSPACE=\"\$HOME/.hermes/workspace\" ~/.hermes/workspace/skills/hippocampus-memory/scripts/encode-pipeline.sh --no-spawn\n\`\`\`\n\n2. Check pending memories:\n\`\`\`bash\ncat ~/.hermes/workspace/memory/pending-memories.json 2>/dev/null | head -20\n\`\`\`\n\n3. If pending exist, summarize each to ~100 chars\n4. Update index.json with summaries\n5. Delete pending-memories.json\n6. Sync core: ~/.hermes/workspace/skills/hippocampus-memory/scripts/sync-core.sh\n7. Report results" --name hippocampus-encoding 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
     fi
     echo ""
 fi
@@ -134,7 +128,9 @@ if [ "$WITH_AGENT" = true ]; then
     echo ""
     echo "🤖 Agent configuration..."
     echo ""
-    echo "Add this to your openclaw.json agents.list:"
+    echo "Legacy sub-agent config (OpenClaw openclaw.json agents.list)."
+    echo "Hermes Agent instead reads AGENTS.md project rules — point the main"
+    echo "agent at this skill's agentdir via AGENTS.md if you want this role."
     echo ""
     cat << EOF
 {
@@ -148,15 +144,14 @@ if [ "$WITH_AGENT" = true ]; then
 }
 EOF
     echo ""
-    echo "And add 'hippocampus' to main agent's subagents.allowAgents"
+    echo "And add 'hippocampus' to main agent's subagents.allowAgents (OpenClaw only)"
     echo ""
 fi
 
 # 7. Add extraPaths for HIPPOCAMPUS_CORE.md
 echo ""
-echo "📚 OpenClaw config recommendation:"
+echo "📚 Config recommendation (legacy OpenClaw openclaw.json memorySearch.extraPaths):"
 echo ""
-echo "Add to memorySearch.extraPaths in openclaw.json:"
 echo '  "extraPaths": ["HIPPOCAMPUS_CORE.md"]'
 echo ""
 
@@ -173,7 +168,7 @@ echo ""
 echo "┌─────────────────────────────────────────────────────────┐"
 echo "│  🧠 View your agent's MEMORIES in the Brain Dashboard  │"
 echo "│                                                         │"
-echo "│  open ~/.openclaw/workspace/brain-dashboard.html        │"
+echo "│  open ~/.hermes/workspace/brain-dashboard.html        │"
 echo "└─────────────────────────────────────────────────────────┘"
 echo ""
 echo "Next steps:"

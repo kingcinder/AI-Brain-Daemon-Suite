@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
 OUTPUT_FILE="$WORKSPACE/PFC_STATE.md"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No PFC state found"; exit 1; }

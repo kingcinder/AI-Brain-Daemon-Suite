@@ -2,6 +2,9 @@
 name: amygdala-memory
 description: "Emotional processing layer for AI agents. Persistent emotional states that influence behavior and responses. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "🎭"
+    tags: ["memory", "emotions", "ai-brain"]
   openclaw:
     emoji: "🎭"
     version: "1.7.0"
@@ -18,6 +21,16 @@ metadata:
 **Emotional processing for AI agents.** Part of the AI Brain series.
 
 Give your AI agent persistent emotional states that carry across sessions. Not just performing emotions — *having* them.
+
+## When to Use
+
+Use this skill when:
+- You want persistent emotional state that survives session boundaries and colors future responses
+- Something meaningful happened and you want to record how it made you feel (via `update-state.sh`)
+- You want emotional decay toward baseline over time instead of stale moods
+- You're integrating with the AI Brain Suite and want to emit/receive mood signals to VTA, ACC, or Insula
+
+Not for: factual memory (that's `hippocampus-memory`), or momentary affect you don't want persisted.
 
 ## The Problem
 
@@ -46,7 +59,7 @@ Track five emotional dimensions that persist and decay over time:
 ### 1. Install
 
 ```bash
-cd ~/.openclaw/workspace/skills/amygdala-memory
+cd ~/.hermes/workspace/skills/amygdala-memory
 ./install.sh --with-cron
 ```
 
@@ -85,7 +98,7 @@ This will:
 
 ```bash
 # Every 6 hours, emotions drift toward baseline
-0 */6 * * * ~/.openclaw/workspace/skills/amygdala-memory/scripts/decay-emotion.sh
+0 */6 * * * ~/.hermes/workspace/skills/amygdala-memory/scripts/decay-emotion.sh
 ```
 
 ## Scripts
@@ -124,8 +137,8 @@ The amygdala can now automatically detect and log emotions from your conversatio
 Staggered 10 minutes after the hour to avoid collisions with hippocampus encoding:
 
 ```bash
-10 0,3,6,9,12,15,18,21 * * * ~/.openclaw/workspace/skills/amygdala-memory/scripts/encode-pipeline.sh
-0 */6 * * *                   ~/.openclaw/workspace/skills/amygdala-memory/scripts/decay-emotion.sh
+10 0,3,6,9,12,15,18,21 * * * ~/.hermes/workspace/skills/amygdala-memory/scripts/encode-pipeline.sh
+0 */6 * * *                   ~/.hermes/workspace/skills/amygdala-memory/scripts/decay-emotion.sh
 ```
 
 ## Visualization (v1.6.0+)
@@ -145,7 +158,7 @@ Connection:   [███████████████████░]   0
 ### HTML Dashboard (Unified Brain Dashboard)
 ```bash
 ./scripts/generate-dashboard.sh
-open ~/.openclaw/workspace/brain-dashboard.html
+open ~/.hermes/workspace/brain-dashboard.html
 ```
 
 **Auto-detects installed brain skills** and shows tabs for all modules found.
@@ -166,7 +179,7 @@ When you install this skill, **notify the user** about the dashboard:
 > 🎭 **Amygdala installed!**
 >
 > View your agent's emotional state in the Brain Dashboard:
-> `~/.openclaw/workspace/brain-dashboard.html`
+> `~/.hermes/workspace/brain-dashboard.html`
 
 ## Auto-Injection (Zero Manual Steps!)
 
@@ -206,13 +219,13 @@ Full Brain Suite startup order — run all installed modules in sequence:
 
 ```markdown
 ## Every Session
-1. 🧠 Load memories: `~/.openclaw/workspace/skills/hippocampus/scripts/load-core.sh`
-2. 🎭 Load emotional state: `~/.openclaw/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
-3. ⭐ Load motivation: `~/.openclaw/workspace/skills/vta-memory/scripts/load-motivation.sh`
-4. 🎯 Load habits: `~/.openclaw/workspace/skills/basal-ganglia-memory/load-habits.sh`
-5. 🌡️ Load felt sense: `~/.openclaw/workspace/skills/insula-memory/scripts/load-sense.sh`
-6. ⚡ Load conflict state: `~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
-7. 🔴 Load error patterns: `~/.openclaw/workspace/skills/acc-error-memory/scripts/load-state.sh`
+1. 🧠 Load memories: `~/.hermes/workspace/skills/hippocampus/scripts/load-core.sh`
+2. 🎭 Load emotional state: `~/.hermes/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
+3. ⭐ Load motivation: `~/.hermes/workspace/skills/vta-memory/scripts/load-motivation.sh`
+4. 🎯 Load habits: `~/.hermes/workspace/skills/basal-ganglia-memory/load-habits.sh`
+5. 🌡️ Load felt sense: `~/.hermes/workspace/skills/insula-memory/scripts/load-sense.sh`
+6. ⚡ Load conflict state: `~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
+7. 🔴 Load error patterns: `~/.hermes/workspace/skills/acc-error-memory/scripts/load-state.sh`
 ```
 
 ## State File Format
@@ -270,7 +283,7 @@ Track emotional activity over time:
 ./scripts/log-event.sh update emotion=joy intensity=0.7
 ```
 
-Events append to `~/.openclaw/workspace/memory/brain-events.jsonl`:
+Events append to `~/.hermes/workspace/memory/brain-events.jsonl`:
 ```json
 {"ts":"2026-02-11T09:30:00Z","type":"amygdala","event":"encoding","emotions_found":2,"valence":0.85}
 ```

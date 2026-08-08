@@ -7,7 +7,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 WATERMARK_FILE="$WORKSPACE/memory/acc-watcher-watermark.json"
 PENDING_FILE="$WORKSPACE/memory/pending-errors.json"
 

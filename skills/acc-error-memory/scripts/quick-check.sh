@@ -14,7 +14,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 
 # Parse arguments
 USER_TEXT=""
@@ -117,7 +117,7 @@ for pattern, label in low_patterns:
 
 # --- Context boost: check against active patterns ---
 # If user text matches context of an existing active pattern, boost the signal
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
 state_file = os.path.join(workspace, 'memory', 'acc-state.json')
 matched_patterns = []
 try:

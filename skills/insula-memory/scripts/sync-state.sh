@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # sync-state.sh — Generate INSULA_STATE.md from interoceptive-state.json
 set -euo pipefail
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 STATE_MD="$WORKSPACE/INSULA_STATE.md"
 [ ! -f "$STATE_FILE" ] && echo "No state file" && exit 0

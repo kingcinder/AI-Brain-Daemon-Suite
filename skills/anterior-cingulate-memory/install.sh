@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # anterior-cingulate-memory/install.sh
-# Installs the anterior-cingulate-memory skill into the OpenClaw workspace.
+# Installs the anterior-cingulate-memory skill into the Hermes workspace.
 # Usage: ./install.sh [--with-cron]
 
 set -e
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 MEMORY_DIR="$WORKSPACE/memory"
 STATE_FILE="$MEMORY_DIR/conflict-state.json"
 INJECT_FILE="$WORKSPACE/ACC_CONFLICT_STATE.md"
@@ -64,25 +64,19 @@ echo "   ✅ Generated ACC_CONFLICT_STATE.md"
 # ── 5. Optional cron setup ────────────────────────────────────────────────────
 if [[ "$WITH_CRON" == true ]]; then
   echo ""
-  echo "Setting up OpenClaw cron jobs..."
+  echo "Setting up Hermes cron jobs..."
 
-  if ! command -v openclaw &> /dev/null; then
-    echo "⚠️  'openclaw' not in PATH. Add these cron jobs manually:"
+  if ! command -v hermes &> /dev/null; then
+    echo "⚠️  'hermes' not in PATH. Add these cron jobs manually:"
     echo ""
-    echo "openclaw cron add --name acc-conflict-decay --cron '0 */4 * * *' --session isolated --agent-turn '⚡ Run conflict load decay: Run $SKILL_DIR/scripts/decay-load.sh and sync state'"
-    echo "openclaw cron add --name acc-conflict-encoding --cron '50 0,3,6,9,12,15,18,21 * * *' --session isolated --agent-turn 'Run ACC conflict encoding: Run encode-pipeline.sh, detect conflicts, update state.'"
+    echo "hermes cron create '0 */4 * * *' '⚡ Run conflict load decay: Run $SKILL_DIR/scripts/decay-load.sh and sync state' --name acc-conflict-decay"
+    echo "hermes cron create '50 0,3,6,9,12,15,18,21 * * *' 'Run ACC conflict encoding: Run encode-pipeline.sh, detect conflicts, update state.' --name acc-conflict-encoding"
   else
     echo "   Creating acc-conflict-decay..."
-    openclaw cron add --name acc-conflict-decay \
-      --cron '0 */4 * * *' \
-      --session isolated \
-      --agent-turn "⚡ Run conflict load decay: Run $SKILL_DIR/scripts/decay-load.sh and report results" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    hermes cron create '0 */4 * * *' "⚡ Run conflict load decay: Run $SKILL_DIR/scripts/decay-load.sh and report results" --name acc-conflict-decay 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
 
     echo "   Creating acc-conflict-encoding..."
-    openclaw cron add --name acc-conflict-encoding \
-      --cron '50 0,3,6,9,12,15,18,21 * * *' \
-      --session isolated \
-      --agent-turn "Run ACC conflict encoding: 1) Run encode-pipeline.sh 2) Detect conflicts and uncertainty 3) Update state 4) Update watermark 5) Sync state" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    hermes cron create '50 0,3,6,9,12,15,18,21 * * *' "Run ACC conflict encoding: 1) Run encode-pipeline.sh 2) Detect conflicts and uncertainty 3) Update state 4) Update watermark 5) Sync state" --name acc-conflict-encoding 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
   fi
 fi
 

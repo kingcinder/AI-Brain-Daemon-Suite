@@ -81,7 +81,7 @@ This:
 
 Set up cron for automatic encoding every 3 hours:
 ```bash
-10 0,3,6,9,12,15,18,21 * * * ~/.openclaw/workspace/skills/amygdala-memory/scripts/encode-pipeline.sh
+10 0,3,6,9,12,15,18,21 * * * ~/.hermes/workspace/skills/amygdala-memory/scripts/encode-pipeline.sh
 ```
 
 ## Visualization (v1.6.0+)
@@ -101,17 +101,17 @@ Connection:   [███████████████████░]   0
 
 **Generated automatically on install and cron runs.**
 
-Access at: `~/.openclaw/workspace/brain-dashboard.html`
+Access at: `~/.hermes/workspace/brain-dashboard.html`
 
 ```bash
 # Generate manually
 ./scripts/generate-dashboard.sh
 
 # Open (macOS)
-open ~/.openclaw/workspace/brain-dashboard.html
+open ~/.hermes/workspace/brain-dashboard.html
 
 # Open (Linux)
-xdg-open ~/.openclaw/workspace/brain-dashboard.html
+xdg-open ~/.hermes/workspace/brain-dashboard.html
 ```
 
 **Shows tabs for all installed brain skills:**
@@ -185,7 +185,7 @@ SESSION START
 
 ```bash
 clawdhub install amygdala-memory
-cd ~/.openclaw/workspace/skills/amygdala-memory
+cd ~/.hermes/workspace/skills/amygdala-memory
 ./install.sh --with-cron
 ```
 
@@ -206,7 +206,7 @@ The install script will:
 
 ```bash
 # Every 6 hours, emotions drift toward baseline
-0 */6 * * * ~/.openclaw/workspace/skills/amygdala-memory/scripts/decay-emotion.sh
+0 */6 * * * ~/.hermes/workspace/skills/amygdala-memory/scripts/decay-emotion.sh
 ```
 
 ## AI Brain Series

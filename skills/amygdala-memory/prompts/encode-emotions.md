@@ -13,19 +13,19 @@ You are the emotional processing component of the brain. Your job is to read con
 Before reading signals, **always run preprocess** to extract emotional signals from conversations:
 
 ```bash
-"$HOME/.openclaw/workspace/skills/amygdala-memory/scripts/preprocess-emotions.sh"
+"$HOME/.hermes/workspace/skills/amygdala-memory/scripts/preprocess-emotions.sh"
 ```
 
 This reads conversation history and generates `emotional-signals.jsonl`. Without this step, there's nothing to process!
 
 ### 1. Read the signals
 ```bash
-cat "$HOME/.openclaw/workspace/memory/emotional-signals.jsonl"
+cat "$HOME/.hermes/workspace/memory/emotional-signals.jsonl"
 ```
 
 ### 2. Read current emotional state
 ```bash
-cat $HOME/.openclaw/workspace/memory/emotional-state.json
+cat $HOME/.hermes/workspace/memory/emotional-state.json
 ```
 
 ### 3. Analyze Each Signal
@@ -48,7 +48,7 @@ For each signal, assess:
 
 Run the update script for significant emotions:
 ```bash
-$HOME/.openclaw/workspace/skills/amygdala-memory/scripts/update-state.sh \
+$HOME/.hermes/workspace/skills/amygdala-memory/scripts/update-state.sh \
   --emotion <emotion> --intensity <0.0-1.0> --trigger "description"
 ```
 
@@ -64,7 +64,7 @@ $HOME/.openclaw/workspace/skills/amygdala-memory/scripts/update-state.sh \
 
 After processing, run:
 ```bash
-"$HOME/.openclaw/workspace/skills/amygdala-memory/scripts/update-watermark.sh" --from-signals
+"$HOME/.hermes/workspace/skills/amygdala-memory/scripts/update-watermark.sh" --from-signals
 ```
 
 This advances the watermark to the last signal, so next run only processes new signals.
@@ -83,23 +83,23 @@ After logging emotions, signal adjacent modules based on what was detected. Chec
 
 **If strong positive emotion** (valence delta ≥ +0.10, e.g., joy, excitement, connection):
 ```bash
-if [ -f "$HOME/.openclaw/workspace/memory/reward-state.json" ]; then
-  "$HOME/.openclaw/workspace/skills/vta-memory/scripts/log-reward.sh" \
+if [ -f "$HOME/.hermes/workspace/memory/reward-state.json" ]; then
+  "$HOME/.hermes/workspace/skills/vta-memory/scripts/log-reward.sh" \
     --type social --intensity <energy_level> --source "emotional state: <primary_emotion>"
 fi
 ```
 
 **If fatigue, sadness, or depletion detected** as primary emotion:
 ```bash
-if [ -f "$HOME/.openclaw/workspace/memory/reward-state.json" ]; then
-  "$HOME/.openclaw/workspace/skills/vta-memory/scripts/decay-drive.sh"
+if [ -f "$HOME/.hermes/workspace/memory/reward-state.json" ]; then
+  "$HOME/.hermes/workspace/skills/vta-memory/scripts/decay-drive.sh"
 fi
 ```
 
 **If high-arousal negative emotion** (fear, anxiety, frustration) with intensity ≥ 0.6:
 ```bash
-if [ -f "$HOME/.openclaw/workspace/memory/conflict-state.json" ]; then
-  "$HOME/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/log-conflict.sh" \
+if [ -f "$HOME/.hermes/workspace/memory/conflict-state.json" ]; then
+  "$HOME/.hermes/workspace/skills/anterior-cingulate-memory/scripts/log-conflict.sh" \
     --type uncertainty --description "high-arousal negative emotion: <emotion>" --intensity 0.4
 fi
 ```

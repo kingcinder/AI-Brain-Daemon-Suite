@@ -30,7 +30,7 @@ Track motivation through:
 ```bash
 # Install
 clawdhub install vta-memory
-cd ~/.openclaw/workspace/skills/vta-memory
+cd ~/.hermes/workspace/skills/vta-memory
 ./install.sh --with-cron
 
 # Check motivation
@@ -95,17 +95,17 @@ Visual dashboard showing all installed brain skills.
 
 **Generated automatically on install and cron runs.**
 
-Access at: `~/.openclaw/workspace/brain-dashboard.html`
+Access at: `~/.hermes/workspace/brain-dashboard.html`
 
 ```bash
 # Generate manually
 ./scripts/generate-dashboard.sh
 
 # Open (macOS)
-open ~/.openclaw/workspace/brain-dashboard.html
+open ~/.hermes/workspace/brain-dashboard.html
 
 # Open (Linux)  
-xdg-open ~/.openclaw/workspace/brain-dashboard.html
+xdg-open ~/.hermes/workspace/brain-dashboard.html
 ```
 
 Shows tabs for all installed brain skills: 🧠 Memory, 🎭 Emotions, ⭐ Drive, 🎯 Habits, 🌡️ Sense, ⚡ Oversight — with install prompts for missing modules.

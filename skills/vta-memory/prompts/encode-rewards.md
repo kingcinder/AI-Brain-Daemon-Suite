@@ -13,19 +13,19 @@ You are the reward/motivation processing component of the brain. Your job is to 
 Before reading signals, **always run preprocess** to extract reward signals from conversations:
 
 ```bash
-"$HOME/.openclaw/workspace/skills/vta-memory/scripts/preprocess-rewards.sh"
+"$HOME/.hermes/workspace/skills/vta-memory/scripts/preprocess-rewards.sh"
 ```
 
 This reads conversation history and generates `reward-signals.jsonl`. Without this step, there's nothing to process!
 
 ### 1. Read the signals
 ```bash
-cat "$HOME/.openclaw/workspace/memory/reward-signals.jsonl"
+cat "$HOME/.hermes/workspace/memory/reward-signals.jsonl"
 ```
 
 ### 2. Read current state
 ```bash
-cat $HOME/.openclaw/workspace/memory/reward-state.json
+cat $HOME/.hermes/workspace/memory/reward-state.json
 ```
 
 ### 3. Identify Rewards
@@ -60,7 +60,7 @@ For each signal, look for:
 
 For each reward found:
 ```bash
-$HOME/.openclaw/workspace/skills/vta-memory/scripts/log-reward.sh \
+$HOME/.hermes/workspace/skills/vta-memory/scripts/log-reward.sh \
   --type <type> --source "what happened" --intensity <0.5-1.0>
 ```
 
@@ -73,23 +73,23 @@ Intensity guide:
 
 If something to look forward to was mentioned:
 ```bash
-$HOME/.openclaw/workspace/skills/vta-memory/scripts/anticipate.sh --add "thing to look forward to"
+$HOME/.hermes/workspace/skills/vta-memory/scripts/anticipate.sh --add "thing to look forward to"
 ```
 
 If an anticipated thing happened, resolve it:
 ```bash
-$HOME/.openclaw/workspace/skills/vta-memory/scripts/resolve-anticipation.sh --item "thing that happened" --reward
+$HOME/.hermes/workspace/skills/vta-memory/scripts/resolve-anticipation.sh --item "thing that happened" --reward
 ```
 
 ### 6. Sync State File
 ```bash
-$HOME/.openclaw/workspace/skills/vta-memory/scripts/sync-motivation.sh
+$HOME/.hermes/workspace/skills/vta-memory/scripts/sync-motivation.sh
 ```
 
 ### 7. Update Watermark
 
 ```bash
-$HOME/.openclaw/workspace/skills/vta-memory/scripts/update-watermark.sh --from-signals
+$HOME/.hermes/workspace/skills/vta-memory/scripts/update-watermark.sh --from-signals
 ```
 
 ### 8. Report
@@ -106,15 +106,15 @@ After logging rewards, signal adjacent modules. Check for presence before callin
 
 **For accomplishment / creative / competence rewards** (intensity ≥ 0.6):
 ```bash
-if [ -f "$HOME/.openclaw/workspace/memory/emotional-state.json" ]; then
-  "$HOME/.openclaw/workspace/skills/amygdala-memory/scripts/update-state.sh" \
+if [ -f "$HOME/.hermes/workspace/memory/emotional-state.json" ]; then
+  "$HOME/.hermes/workspace/skills/amygdala-memory/scripts/update-state.sh" \
     --emotion joy --intensity <intensity> --trigger "reward: <type> — <source>"
 fi
 ```
 
 **If multiple rewards logged in this run** (3+, indicating a productive session):
 ```bash
-if [ -f "$HOME/.openclaw/workspace/memory/habit-state.json" ]; then
+if [ -f "$HOME/.hermes/workspace/memory/habit-state.json" ]; then
   # Check if there's an active chunked habit that contributed — reinforce it
   # (Skip if no specific habit can be attributed)
   echo "High-reward session: consider manually reinforcing contributing habits"
@@ -123,8 +123,8 @@ fi
 
 **If drive increased by ≥ 0.15 from this encoding run**:
 ```bash
-if [ -f "$HOME/.openclaw/workspace/memory/interoceptive-state.json" ]; then
-  "$HOME/.openclaw/workspace/skills/insula-memory/scripts/update-state.sh" \
+if [ -f "$HOME/.hermes/workspace/memory/interoceptive-state.json" ]; then
+  "$HOME/.hermes/workspace/skills/insula-memory/scripts/update-state.sh" \
     --signal expansion --intensity 0.5 --source "drive boost from reward encoding"
 fi
 ```

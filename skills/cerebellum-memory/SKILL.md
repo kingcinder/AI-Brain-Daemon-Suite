@@ -2,6 +2,9 @@
 name: cerebellum-memory
 description: "Procedural precision and smoothness — HOW something is executed, not WHAT to do. Tracks per-skill calibration via exponential moving average across repetitions. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "🎚️"
+    tags: ["memory", "procedural", "ai-brain", "calibration"]
   openclaw:
     emoji: "🎚️"
     version: "1.0.0"
@@ -18,6 +21,15 @@ metadata:
 **Procedural refinement: how well something gets executed, not what to do.** Part of the AI Brain series.
 
 `basal-ganglia-memory` tracks *which* habit or procedure to run for a given cue. Cerebellum tracks *how well* the execution itself has been going — precision (closeness to the target outcome) and smoothness (consistency, not just average quality) for any named skill or task, refined over repetitions.
+
+## When to Use
+
+Use this skill when:
+- You want to track how well you execute a named skill or task over repetitions (`log-execution.sh`)
+- You want per-skill calibration and a global "how dialed-in is execution" number
+- You want to notice drift or regression in execution quality before it becomes a habit
+
+Not for: deciding *which* routine to run (that's `basal-ganglia-memory`), or one-shot quality judgments with no history.
 
 ## Status: ✅ Live
 

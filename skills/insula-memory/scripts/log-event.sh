@@ -2,7 +2,7 @@
 # log-event.sh — Append structured event to brain-events.jsonl
 # Usage: ./scripts/log-event.sh <event_name> [key=value ...]
 set -euo pipefail
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
 EVENTS_FILE="$WORKSPACE/memory/brain-events.jsonl"
 EVENT="${1:-unknown}"; shift || true
 TS="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

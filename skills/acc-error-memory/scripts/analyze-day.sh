@@ -4,9 +4,9 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
-TRANSCRIPTS_DIR="$HOME/.openclaw/sessions"
+TRANSCRIPTS_DIR="${TRANSCRIPTS_DIR:-$HOME/.hermes/sessions}"
 
 echo "⚡ ACC Daily Analysis"
 echo "===================="

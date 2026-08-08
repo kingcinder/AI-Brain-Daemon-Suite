@@ -7,13 +7,13 @@
 # the basal-ganglia analog of hippocampus's HIPPOCAMPUS_CORE.md.
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 #   CHUNK_THRESHOLD - Minimum strength for "chunked" habits (default: 0.7)
 #   ACTIVE_THRESHOLD - Minimum strength for procedures/suppressions (default: 0.4)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 OUTPUT="$WORKSPACE/BASAL_GANGLIA_STATE.md"

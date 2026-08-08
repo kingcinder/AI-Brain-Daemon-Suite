@@ -7,7 +7,7 @@
 # 5. Log event
 set -euo pipefail
 
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 PENDING="$WORKSPACE/memory/pending-sense.json"

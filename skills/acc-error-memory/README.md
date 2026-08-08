@@ -17,7 +17,7 @@ Track errors and learn from mistakes:
 
 ```bash
 clawhub install acc-error-memory
-cd ~/.openclaw/workspace/skills/acc-error-memory
+cd ~/.hermes/workspace/skills/acc-error-memory
 ./install.sh --with-cron
 ```
 

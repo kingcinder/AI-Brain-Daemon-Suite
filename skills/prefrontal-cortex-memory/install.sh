@@ -1,10 +1,10 @@
 #!/bin/bash
-# install.sh — Set up prefrontal-cortex-memory for OpenClaw
+# install.sh — Set up prefrontal-cortex-memory for Hermes Agent
 # Usage: ./install.sh [--with-cron]
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 WITH_CRON=false
 [ "$1" = "--with-cron" ] && WITH_CRON=true
@@ -39,18 +39,14 @@ echo "✅ Scripts are executable"
 
 if [ "$WITH_CRON" = true ]; then
   echo ""
-  echo "Setting up OpenClaw cron job..."
-  if ! command -v openclaw &> /dev/null; then
-    echo "⚠️  'openclaw' not in PATH. Add this cron job manually:"
+  echo "Setting up Hermes cron job..."
+  if ! command -v hermes &> /dev/null; then
+    echo "⚠️  'hermes' not in PATH. Add this cron job manually:"
     echo ""
-    echo "openclaw cron add --name pfc-decay --cron '0 */6 * * *' --session isolated --agent-turn '🧭 Run $SKILL_DIR/scripts/decay-load.sh'"
+    echo "hermes cron create '0 */6 * * *' '🧭 Run $SKILL_DIR/scripts/decay-load.sh' --name pfc-decay"
   else
     echo "   Creating pfc-decay..."
-    openclaw cron add --name pfc-decay \
-      --cron '0 */6 * * *' \
-      --session isolated \
-      --agent-turn "🧭 Run $SKILL_DIR/scripts/decay-load.sh and report results" \
-      2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    hermes cron create '0 */6 * * *' "🧭 Run $SKILL_DIR/scripts/decay-load.sh and report results" --name pfc-decay 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
   fi
 fi
 

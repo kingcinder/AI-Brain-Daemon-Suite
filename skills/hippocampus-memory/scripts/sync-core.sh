@@ -3,12 +3,12 @@
 # This file gets loaded by OpenClaw as workspace context
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 #   THRESHOLD - Minimum importance score (default: 0.75)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 INDEX="$WORKSPACE/memory/index.json"
 OUTPUT="$WORKSPACE/HIPPOCAMPUS_CORE.md"
 THRESHOLD="${THRESHOLD:-0.75}"

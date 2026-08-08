@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/load-state.sh — Human-readable conflict state for session context
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
 STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 
 if [[ ! -f "$STATE_FILE" ]]; then

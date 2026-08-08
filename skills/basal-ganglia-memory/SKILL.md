@@ -2,6 +2,9 @@
 name: basal-ganglia-memory
 description: "Habit formation and procedural learning for AI agents. Develops preferences and shortcuts through repetition. Tracks cue-routine-reward loops, chunked procedures, and active suppressions. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "🎯"
+    tags: ["memory", "habits", "procedural", "ai-brain"]
   openclaw:
     emoji: "🎯"
     version: "0.2.2"
@@ -17,6 +20,16 @@ metadata:
 **Habit formation and procedural learning for AI agents.** Part of the AI Brain series.
 
 The basal ganglia is the brain region responsible for chunking repeated behaviors into automatic routines — turning deliberate actions into effortless habits. This skill brings the same mechanism to AI agents: patterns that appear repeatedly crystallize into habits, multi-step workflows compact into procedures, and corrections that stick become suppressions.
+
+## When to Use
+
+Use this skill when:
+- A behavior or workflow has repeated successfully and should become an automatic routine
+- You've been corrected on a pattern and want a suppression so it stops recurring
+- You want session-start injection of established habits (`load-habits.sh`)
+- You're integrating with the AI Brain Suite and want `acc-error-memory` corrections to close into suppressions
+
+Not for: one-off tasks, or execution quality tracking (that's `cerebellum-memory`).
 
 ---
 
@@ -146,8 +159,8 @@ The encoding pipeline runs on a schedule (or manually) and follows these steps:
 Staggered 30 minutes after the hour to avoid collisions with other suite crons:
 
 ```bash
-30 0,3,6,9,12,15,18,21 * * *  ~/.openclaw/workspace/skills/basal-ganglia-memory/scripts/encode-pipeline.sh
-0 4 * * *                       ~/.openclaw/workspace/skills/basal-ganglia-memory/scripts/decay-habits.sh
+30 0,3,6,9,12,15,18,21 * * *  ~/.hermes/workspace/skills/basal-ganglia-memory/scripts/encode-pipeline.sh
+0 4 * * *                       ~/.hermes/workspace/skills/basal-ganglia-memory/scripts/decay-habits.sh
 ```
 
 Install with `./install.sh --with-cron` to register both.
@@ -235,7 +248,7 @@ Suppressions (actively avoid these patterns):
 
 ## Data Files
 
-All data lives under `$WORKSPACE/memory/` (default: `~/.openclaw/workspace/memory/`):
+All data lives under `$WORKSPACE/memory/` (default: `~/.hermes/workspace/memory/`):
 
 | File | Description |
 |------|-------------|
@@ -309,13 +322,13 @@ Full Brain Suite startup order — run all installed modules in sequence:
 
 ```markdown
 ## Every Session
-1. 🧠 Load memories: `~/.openclaw/workspace/skills/hippocampus/scripts/load-core.sh`
-2. 🎭 Load emotional state: `~/.openclaw/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
-3. ⭐ Load motivation: `~/.openclaw/workspace/skills/vta-memory/scripts/load-motivation.sh`
-4. 🎯 Load habits: `~/.openclaw/workspace/skills/basal-ganglia-memory/load-habits.sh`
-5. 🌡️ Load felt sense: `~/.openclaw/workspace/skills/insula-memory/scripts/load-sense.sh`
-6. ⚡ Load conflict state: `~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
-7. 🔴 Load error patterns: `~/.openclaw/workspace/skills/acc-error-memory/scripts/load-state.sh`
+1. 🧠 Load memories: `~/.hermes/workspace/skills/hippocampus/scripts/load-core.sh`
+2. 🎭 Load emotional state: `~/.hermes/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
+3. ⭐ Load motivation: `~/.hermes/workspace/skills/vta-memory/scripts/load-motivation.sh`
+4. 🎯 Load habits: `~/.hermes/workspace/skills/basal-ganglia-memory/load-habits.sh`
+5. 🌡️ Load felt sense: `~/.hermes/workspace/skills/insula-memory/scripts/load-sense.sh`
+6. ⚡ Load conflict state: `~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
+7. 🔴 Load error patterns: `~/.hermes/workspace/skills/acc-error-memory/scripts/load-state.sh`
 ```
 
 ---

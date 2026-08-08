@@ -11,11 +11,11 @@
 # Runs at most once per day (checks decayLastRun).
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
+#   WORKSPACE - Hermes workspace directory (default: ~/.hermes/workspace)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 BACKUP="$WORKSPACE/memory/habit-state.backup.json"

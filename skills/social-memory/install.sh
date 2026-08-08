@@ -1,10 +1,10 @@
 #!/bin/bash
-# install.sh — Set up social-memory for OpenClaw
+# install.sh — Set up social-memory for Hermes Agent
 # Usage: ./install.sh [--with-cron]
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 WITH_CRON=false
 [ "$1" = "--with-cron" ] && WITH_CRON=true
@@ -43,20 +43,17 @@ echo "✅ Scripts are executable"
 
 if [ "$WITH_CRON" = true ]; then
   echo ""
-  echo "Setting up OpenClaw cron jobs..."
-  if ! command -v openclaw &> /dev/null; then
-    echo "⚠️  'openclaw' not in PATH. Add these cron jobs manually:"
+  echo "Setting up Hermes cron jobs..."
+  if ! command -v hermes &> /dev/null; then
+    echo "⚠️  'hermes' not in PATH. Add these cron jobs manually:"
     echo ""
-    echo "openclaw cron add --name social-decay --cron '0 0 * * *' --session isolated --agent-turn '🫂 Run $SKILL_DIR/scripts/decay.sh'"
-    echo "openclaw cron add --name social-encoding --cron '50 0,3,6,9,12,15,18,21 * * *' --session isolated --agent-turn 'Run social-memory encoding pipeline'"
+    echo "hermes cron create '0 0 * * *' '🫂 Run $SKILL_DIR/scripts/decay.sh' --name social-decay"
+    echo "hermes cron create '50 0,3,6,9,12,15,18,21 * * *' 'Run social-memory encoding pipeline' --name social-encoding"
   else
     echo "   Creating social-decay..."
-    openclaw cron add --name social-decay --cron '0 0 * * *' --session isolated \
-      --agent-turn "🫂 Run $SKILL_DIR/scripts/decay.sh and report results" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    hermes cron create '0 0 * * *' "🫂 Run $SKILL_DIR/scripts/decay.sh and report results" --name social-decay 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
     echo "   Creating social-encoding..."
-    openclaw cron add --name social-encoding --cron '50 0,3,6,9,12,15,18,21 * * *' --session isolated \
-      --agent-turn "Run social-memory encoding: 1) Run encode-pipeline.sh 2) Detect relationship signals 3) Update relationships 4) Update watermark 5) Sync state" \
-      2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    hermes cron create '50 0,3,6,9,12,15,18,21 * * *' "Run social-memory encoding: 1) Run encode-pipeline.sh 2) Detect relationship signals 3) Update relationships 4) Update watermark 5) Sync state" --name social-encoding 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
   fi
   echo ""
   echo "   (Encoding offset :50 — the only free minute slot left in the suite.)"

@@ -7,7 +7,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
 WATERMARK_FILE="$WORKSPACE/memory/acc-watcher-watermark.json"
@@ -79,10 +79,7 @@ if [ "$WITH_CRON" = true ]; then
     echo ""
     echo "Add this cron job (runs 3x daily at 4 AM, 12 PM, 8 PM):"
     echo ""
-    echo "  openclaw cron add --name acc-analysis \\"
-    echo "    --cron '0 4,12,20 * * *' \\"
-    echo "    --session isolated \\"
-    echo "    --agent-turn 'Run ACC Error Memory analysis: encode-pipeline.sh, analyze exchanges, log errors, update watermark'"
+    echo "  hermes cron create '0 4,12,20 * * *' 'Run ACC Error Memory analysis: encode-pipeline.sh, analyze exchanges, log errors, update watermark' --name acc-analysis"
     echo ""
 fi
 

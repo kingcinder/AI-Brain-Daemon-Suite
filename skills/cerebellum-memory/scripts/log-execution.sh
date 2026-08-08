@@ -4,7 +4,7 @@
 # consistent that has been over time, not just the running average).
 # Usage: log-execution.sh --skill "<name>" --quality <0.0-1.0> [--note "..."]
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

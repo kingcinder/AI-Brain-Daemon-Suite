@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "module": "thalamus-memory",
+  "version": "1.0.0",
+  "capabilities": [
+    "attentional_gating",
+    "signal_routing",
+    "cross_module_dispatch",
+    "relevance_scoring",
+    "circadian_gain_modulation"
+  ],
+  "inputs": [
+    {
+      "name": "brain_signals",
+      "type": "event",
+      "source": "memory/brain-signals.jsonl"
+    },
+    {
+      "name": "pfc_state",
+      "type": "state_file",
+      "source": "memory/pfc-state.json",
+      "required": false
+    },
+    {
+      "name": "executive_load",
+      "type": "state_file",
+      "source": "memory/executive-load.json",
+      "required": false
+    },
+    {
+      "name": "thalamus_state",
+      "type": "state_file",
+      "source": "memory/thalamus-state.json",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "thalamus_state",
+      "type": "state_write",
+      "target": "memory/thalamus-state.json"
+    },
+    {
+      "name": "dispatched_signals",
+      "type": "event",
+      "target": "target skill scripts (via route-signals.sh)"
+    }
+  ],
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "dependencies": [
+    {
+      "module": "prefrontal-cortex-memory",
+      "version_constraint": ">=1.0.0"
+    }
+  ],
+  "tests": [
+    {
+      "path": "tests/test_thalamus_gate.sh",
+      "kind": "unit"
+    },
+    {
+      "path": "tests/run_phase1_harness.sh",
+      "kind": "regression"
+    }
+  ],
+  "immutable": false
+}

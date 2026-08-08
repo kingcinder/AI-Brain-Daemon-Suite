@@ -2,7 +2,7 @@
 # get-calibration.sh — Usage: get-calibration.sh [--skill <name>] [--json]
 # V4-verify: calibration lookup is read-primary (2026-07-20)
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

@@ -8,7 +8,7 @@ You don't know the context of conversations. You don't know what the agent is th
 
 Read the preprocessed signals file:
 ```
-~/.openclaw/workspace/memory/signals.jsonl
+~/.hermes/workspace/memory/signals.jsonl
 ```
 
 Each line is a clean signal:
@@ -20,12 +20,12 @@ Each line is a clean signal:
 
 ### Step 1: Read signals
 ```bash
-cat ~/.openclaw/workspace/memory/signals.jsonl
+cat ~/.hermes/workspace/memory/signals.jsonl
 ```
 
 ### Step 2: Read current memory index
 ```bash
-cat ~/.openclaw/workspace/memory/index.json
+cat ~/.hermes/workspace/memory/index.json
 ```
 
 ### Step 3: For each signal, decide if it's memorable
@@ -103,7 +103,7 @@ Set `lastUpdated` to current ISO timestamp.
 - Updated `lastUpdated`
 - All memories (including reinforced ones with NEW importance values)
 
-Use the Write tool to save to `~/.openclaw/workspace/memory/index.json`
+Use the Write tool to save to `~/.hermes/workspace/memory/index.json`
 
 ### Step 8: Report
 

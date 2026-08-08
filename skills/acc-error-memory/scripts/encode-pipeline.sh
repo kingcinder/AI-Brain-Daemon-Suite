@@ -9,7 +9,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(dirname "$0")/.."
 PENDING_FILE="$WORKSPACE/memory/pending-errors.json"
 CALIBRATION_STATE="$WORKSPACE/memory/calibration-state.json"

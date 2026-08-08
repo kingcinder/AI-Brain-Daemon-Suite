@@ -7,7 +7,7 @@
 #   ./update-watermark.sh --set <value> # set watermark to value
 #   ./update-watermark.sh --reset       # reset to 0
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
 WM_FILE="$WORKSPACE/memory/acc-encode-watermark.txt"
 
 mkdir -p "$WORKSPACE/memory"

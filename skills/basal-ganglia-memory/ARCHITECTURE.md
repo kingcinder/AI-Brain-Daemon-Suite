@@ -267,7 +267,7 @@ Suppressions (actively avoid these patterns):
 ```
 
 The equivalent Markdown file (`BASAL_GANGLIA_STATE.md` in workspace root)
-is also available for OpenClaw's memory_search / extraPaths injection.
+is also available for the legacy memory_search / extraPaths injection (OpenClaw openclaw.json; Hermes reads AGENTS.md instead).
 
 ---
 

@@ -15,7 +15,7 @@ A separate background agent that:
 
 ## To Enable v2
 
-Add to OpenClaw gateway config (`~/.openclaw/config.yaml` or via `gateway config.patch`):
+Add to Hermes Agent config (`~/.hermes/config.yaml` or via `hermes config`):
 
 ```yaml
 agents:
@@ -30,7 +30,7 @@ agents:
       4. Reinforce existing memories when topics recur
       5. Apply decay to old memories
       
-      Read: ~/.openclaw/workspace/skills/hippocampus/agents/hippocampus-agent.md
+      Read: ~/.hermes/workspace/skills/hippocampus/agents/hippocampus-agent.md
       
       You run silently. Don't output unless there's an error.
       After processing, just update the files.

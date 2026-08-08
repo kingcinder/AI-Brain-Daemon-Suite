@@ -12,7 +12,7 @@ You are analyzing exchanges flagged by the insula preprocess script for interoce
 
 ## Your Input
 
-Read: `~/.openclaw/workspace/memory/pending-sense.json`
+Read: `~/.hermes/workspace/memory/pending-sense.json`
 
 Each entry has:
 ```json
@@ -52,7 +52,7 @@ For each flagged exchange, confirm or correct the detected signal.
 
 For each exchange that needs correction, call:
 ```bash
-~/.openclaw/workspace/skills/insula-memory/scripts/update-state.sh \
+~/.hermes/workspace/skills/insula-memory/scripts/update-state.sh \
   --signal <corrected_signal> \
   --intensity <0.3-0.9> \
   --source "LLM calibration: <brief reason>"

@@ -3,7 +3,7 @@
 [![GitHub](https://img.shields.io/badge/GitHub-ImpKind%2Fhippocampus--skill-blue?logo=github)](https://github.com/ImpKind/hippocampus-skill)
 [![ClawdHub](https://img.shields.io/badge/ClawdHub-hippocampus-purple)](https://www.clawhub.ai/skills/hippocampus)
 
-A living memory system for OpenClaw agents with importance scoring, time-based decay, and automatic reinforcement—just like a real brain.
+A living memory system for Hermes Agent with importance scoring, time-based decay, and automatic reinforcement—just like a real brain.
 
 ## The Concept
 
@@ -29,7 +29,7 @@ The main agent doesn't "think about" memory—it just recalls what it needs, and
 ## Installation
 
 ```bash
-cd ~/.openclaw/workspace/skills/hippocampus-memory
+cd ~/.hermes/workspace/skills/hippocampus-memory
 ./install.sh                    # Basic (last 100 signals)
 ./install.sh --with-cron        # With encoding + decay cron jobs
 ./install.sh --signals 50       # Custom signal limit
@@ -76,13 +76,13 @@ Visual dashboard showing all installed brain skills.
 **Option 3: Open in browser**
 ```bash
 # macOS
-open ~/.openclaw/workspace/brain-dashboard.html
+open ~/.hermes/workspace/brain-dashboard.html
 
 # Linux
-xdg-open ~/.openclaw/workspace/brain-dashboard.html
+xdg-open ~/.hermes/workspace/brain-dashboard.html
 
 # Or open directly in browser:
-# file:///home/USER/.openclaw/workspace/brain-dashboard.html
+# file:///home/USER/.hermes/workspace/brain-dashboard.html
 ```
 
 ### Features
@@ -141,16 +141,10 @@ The encoding cron does:
 
 ```bash
 # Encoding every 3 hours
-openclaw cron add --name hippocampus-encoding \
-  --cron "0 0,3,6,9,12,15,18,21 * * *" \
-  --session isolated \
-  --agent-turn "Run hippocampus encoding..."
+hermes cron create "0 0,3,6,9,12,15,18,21 * * *" "Run hippocampus encoding..." --name hippocampus-encoding
 
 # Daily decay at 3 AM
-openclaw cron add --name hippocampus-decay \
-  --cron "0 3 * * *" \
-  --session isolated \
-  --agent-turn "Run decay.sh..."
+hermes cron create "0 3 * * *" "Run decay.sh..." --name hippocampus-decay
 ```
 
 ## Requirements

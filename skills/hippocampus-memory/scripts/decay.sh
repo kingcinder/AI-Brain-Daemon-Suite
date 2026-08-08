@@ -4,11 +4,11 @@
 # Based on Stanford Generative Agents paper (Park et al., 2023)
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="${SKILL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 INDEX="$WORKSPACE/memory/index.json"
 BACKUP="$WORKSPACE/memory/index.backup.json"
@@ -107,7 +107,7 @@ PYTHON
 echo ""
 echo "Done. Backup saved to: $BACKUP"
 
-# Sync core memories to markdown for OpenClaw indexing
+# Sync core memories to markdown for Hermes Agent indexing
 SYNC_SCRIPT="$SKILL_DIR/scripts/sync-core.sh"
 if [ -x "$SYNC_SCRIPT" ]; then
     echo ""

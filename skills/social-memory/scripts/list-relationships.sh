@@ -1,7 +1,7 @@
 #!/bin/bash
 # list-relationships.sh — Usage: list-relationships.sh [--type human|ai_agent]
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No social state found"; exit 1; }
 

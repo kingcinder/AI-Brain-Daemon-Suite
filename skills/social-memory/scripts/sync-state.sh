@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 OUTPUT_FILE="$WORKSPACE/SOCIAL_STATE.md"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No social state found"; exit 1; }

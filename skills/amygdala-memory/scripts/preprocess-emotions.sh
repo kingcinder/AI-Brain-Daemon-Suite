@@ -8,9 +8,9 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 AGENT_ID="${AGENT_ID:-main}"
-TRANSCRIPT_DIR="$HOME/.openclaw/agents/$AGENT_ID/sessions"
+TRANSCRIPT_DIR="${TRANSCRIPT_DIR:-$HOME/.hermes/sessions}"
 OUTPUT="$WORKSPACE/memory/emotional-signals.jsonl"
 STATE="$WORKSPACE/memory/emotional-state.json"
 

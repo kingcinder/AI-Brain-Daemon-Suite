@@ -7,7 +7,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"
 SIGNALS_FILE="$WORKSPACE/memory/emotional-signals.jsonl"
 

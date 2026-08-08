@@ -3,12 +3,12 @@
 # Outputs formatted memory list for context injection
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 #   THRESHOLD - Minimum importance score (default: 0.7)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 INDEX="$WORKSPACE/memory/index.json"
 THRESHOLD="${THRESHOLD:-0.7}"
 

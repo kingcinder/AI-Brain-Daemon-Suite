@@ -2,7 +2,7 @@
 # generate-dashboard.sh — Write amygdala's own dashboard fragment, then call
 # the shared dashboard-builder.sh. Reads ONLY amygdala's own state file.
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"

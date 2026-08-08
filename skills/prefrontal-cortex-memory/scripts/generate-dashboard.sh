@@ -3,7 +3,7 @@
 # shared dashboard-builder.sh. Reads ONLY PFC's own state file (its decide.sh
 # cross-reads siblings for arbitration, but the dashboard tab does not).
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"

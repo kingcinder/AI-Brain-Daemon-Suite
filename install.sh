@@ -17,8 +17,8 @@ if [ "${AIBRAIN_NONINTERACTIVE:-0}" = "1" ]; then
 fi
 
 echo "--- Step 1: Initializing Workspace ---"
-mkdir -p ~/.openclaw/workspace/skills
-mkdir -p ~/.openclaw/workspace/core
+mkdir -p ~/.hermes/workspace/skills
+mkdir -p ~/.hermes/workspace/core
 mkdir -p ~/.config/systemd/user/
 
 echo "--- Step 2: Deploying Artifacts ---"
@@ -28,18 +28,24 @@ if [ ! -f "deep-brain-kernel.py" ] || [ ! -f "aibrain.service" ] || [ ! -d "skil
     exit 1
 fi
 
-cp deep-brain-kernel.py ~/.openclaw/workspace/deep-brain-kernel.py
+cp deep-brain-kernel.py ~/.hermes/workspace/deep-brain-kernel.py
 cp aibrain.service ~/.config/systemd/user/aibrain.service
-cp -r skills/. ~/.openclaw/workspace/skills/
+cp -r skills/. ~/.hermes/workspace/skills/
 # V4.0: foundation + executive function live under core/ (Phase 1–2)
 if [ -d "core" ]; then
-    cp -r core/. ~/.openclaw/workspace/core/
+    cp -r core/. ~/.hermes/workspace/core/
+fi
+# Verification region: the declared-test harnesses ship with the suite so
+# verification-memory can run them in a deployed workspace, not just the repo.
+if [ -d "tests" ]; then
+    cp -r tests/. ~/.hermes/workspace/tests/
 fi
 
 echo "--- Step 3: Configuring Permissions ---"
-chmod +x ~/.openclaw/workspace/deep-brain-kernel.py
-find ~/.openclaw/workspace/skills -name "*.sh" -exec chmod +x {} \;
-find ~/.openclaw/workspace/core -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+chmod +x ~/.hermes/workspace/deep-brain-kernel.py
+find ~/.hermes/workspace/skills -name "*.sh" -exec chmod +x {} \;
+find ~/.hermes/workspace/core -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+find ~/.hermes/workspace/tests -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
 
 echo "--- Step 4: Host Prerequisites (see SETUP_COMMANDS.md for detail) ---"
 echo "Checking PSI (pressure-based deferral)..."
@@ -77,7 +83,7 @@ else
 fi
 
 echo "--- Step 5: Pre-flight Check ---"
-if ! WORKSPACE="$HOME/.openclaw/workspace" python3 ~/.openclaw/workspace/deep-brain-kernel.py --check; then
+if ! WORKSPACE="$HOME/.hermes/workspace" python3 ~/.hermes/workspace/deep-brain-kernel.py --check; then
     echo ""
     echo "Pre-flight check reported problems (see above)."
     echo "Fix them before enabling the service, then re-run this script."
@@ -87,9 +93,9 @@ fi
 echo ""
 echo "!!! ACTION REQUIRED BEFORE ENABLING !!!"
 echo "Edit ~/.config/systemd/user/aibrain.service now if any of these apply:"
-echo "  (a) Your workspace isn't at \$HOME/.openclaw/workspace, or openclaw/jq/curl/"
+echo "  (a) Your workspace isn't at \$HOME/.hermes/workspace, or hermes/jq/curl/"
 echo "      python3/nvidia-smi/rocm-smi live somewhere the PATH= line won't find"
-echo "      -> run: which openclaw jq curl python3, and edit Environment=PATH="
+echo "      -> run: which hermes jq curl python3, and edit Environment=PATH="
 echo "  (b) You want to confirm cgroup delegation actually took effect after enabling:"
 echo "      -> systemctl --user show -p DelegateControllers aibrain.service"
 echo "  (c) Nice=-5 gives this daemon elevated CPU priority over your interactive work"

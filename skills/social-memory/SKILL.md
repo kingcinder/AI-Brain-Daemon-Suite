@@ -2,6 +2,9 @@
 name: social-memory
 description: "Relationships and theory of mind for AI agents. Tracks specific people and other AI agents across conversations: who they are, trust and affinity, what we believe they want/feel, and what's owed or pending. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "🫂"
+    tags: ["memory", "social", "theory-of-mind", "ai-brain", "relationships"]
   openclaw:
     emoji: "🫂"
     version: "1.0.0"
@@ -18,6 +21,16 @@ metadata:
 **Relationships and theory of mind: who they are, what's between you, what's pending.** Part of the AI Brain series.
 
 Every relationship — human or AI agent — gets a `trust` and `affinity` score, a `beliefs` map (theory of mind: what we think they want/feel/believe right now), and a list of `openLoops` (things owed or pending, in either direction). This is what gives `heartbeat-memory`'s "reach out to a known AI agent" option real content instead of being generic.
+
+## When to Use
+
+Use this skill when:
+- You interact with specific people or AI agents repeatedly and want persistent relationship state
+- You need trust/affinity scoring, a theory-of-mind beliefs map, or pending open loops
+- You want `heartbeat-memory`'s "reach out to a known agent" to have real context
+- You're integrating with the AI Brain Suite and want social signals feeding Amygdala and VTA
+
+Not for: generic contact lists, or relationship tracking you don't want persisting across sessions.
 
 ## Status: ✅ Live
 

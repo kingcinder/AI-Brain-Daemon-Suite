@@ -18,7 +18,7 @@ if [ ! -f "$INPUT_FILE" ]; then
     exit 0
 fi
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 LEARNED_FILE="$WORKSPACE/memory/learned-patterns.json"
 
 export INPUT_FILE LEARNED_FILE

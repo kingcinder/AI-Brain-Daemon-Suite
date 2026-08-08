@@ -2,6 +2,9 @@
 name: vta-memory
 description: "Reward and motivation system for AI agents. Dopamine-like wanting, not just doing. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "⭐"
+    tags: ["memory", "motivation", "reward", "ai-brain"]
   openclaw:
     emoji: "⭐"
     version: "1.2.0"
@@ -17,6 +20,16 @@ metadata:
 **Reward and motivation for AI agents.** Part of the AI Brain series.
 
 Give your AI agent genuine *wanting* — not just doing things when asked, but having drive, seeking rewards, and looking forward to things.
+
+## When to Use
+
+Use this skill when:
+- You want persistent motivation that drives behavior rather than always waiting to be asked
+- Something rewarding happened and you want to log it (`log-reward.sh`) so drive rises
+- You want session-start visibility into current drive level (`load-motivation.sh`)
+- You're integrating with the AI Brain Suite and want reward signals feeding Amygdala and Basal Ganglia
+
+Not for: task prioritization (that's `prefrontal-cortex-memory`), or momentary praise you don't want persisted.
 
 ## The Problem
 
@@ -41,7 +54,7 @@ Track motivation through:
 ### 1. Install
 
 ```bash
-cd ~/.openclaw/workspace/skills/vta-memory
+cd ~/.hermes/workspace/skills/vta-memory
 ./install.sh --with-cron
 ```
 
@@ -105,7 +118,7 @@ Visual dashboard showing all installed brain skills:
 
 ```bash
 ./scripts/generate-dashboard.sh
-open ~/.openclaw/workspace/brain-dashboard.html
+open ~/.hermes/workspace/brain-dashboard.html
 ```
 
 - **Auto-detects** all other brain skills by their state files
@@ -120,7 +133,7 @@ When you install this skill, **notify the user** about the dashboard:
 > ⭐ **VTA installed!**
 >
 > View your agent's drive level in the Brain Dashboard:
-> `~/.openclaw/workspace/brain-dashboard.html`
+> `~/.hermes/workspace/brain-dashboard.html`
 
 ## Reward Types
 
@@ -205,16 +218,10 @@ Staggered 20 minutes after the hour to avoid collisions with hippocampus and amy
 
 ```bash
 # Encoding every 3 hours (offset +20m)
-openclaw cron add --name vta-encoding \
-  --cron "20 0,3,6,9,12,15,18,21 * * *" \
-  --session isolated \
-  --agent-turn "Run VTA reward encoding pipeline..."
+hermes cron create "20 0,3,6,9,12,15,18,21 * * *" "Run VTA reward encoding pipeline..." --name vta-encoding
 
 # Drive decay every 8 hours
-openclaw cron add --name vta-decay \
-  --cron "0 */8 * * *" \
-  --session isolated \
-  --agent-turn "Run decay-drive.sh and report current motivation level"
+hermes cron create "0 */8 * * *" "Run decay-drive.sh and report current motivation level" --name vta-decay
 ```
 
 ## Event Logging
@@ -227,7 +234,7 @@ Track motivation patterns over time:
 ./scripts/log-event.sh reward type=accomplishment intensity=0.8
 ```
 
-Events append to `~/.openclaw/workspace/memory/brain-events.jsonl`:
+Events append to `~/.hermes/workspace/memory/brain-events.jsonl`:
 ```json
 {"ts":"2026-02-11T10:45:00Z","type":"vta","event":"encoding","rewards_found":2,"drive":0.65}
 ```
@@ -242,13 +249,13 @@ Full Brain Suite startup order — run all installed modules in sequence:
 
 ```markdown
 ## Every Session
-1. 🧠 Load memories: `~/.openclaw/workspace/skills/hippocampus/scripts/load-core.sh`
-2. 🎭 Load emotional state: `~/.openclaw/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
-3. ⭐ Load motivation: `~/.openclaw/workspace/skills/vta-memory/scripts/load-motivation.sh`
-4. 🎯 Load habits: `~/.openclaw/workspace/skills/basal-ganglia-memory/load-habits.sh`
-5. 🌡️ Load felt sense: `~/.openclaw/workspace/skills/insula-memory/scripts/load-sense.sh`
-6. ⚡ Load conflict state: `~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
-7. 🔴 Load error patterns: `~/.openclaw/workspace/skills/acc-error-memory/scripts/load-state.sh`
+1. 🧠 Load memories: `~/.hermes/workspace/skills/hippocampus/scripts/load-core.sh`
+2. 🎭 Load emotional state: `~/.hermes/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
+3. ⭐ Load motivation: `~/.hermes/workspace/skills/vta-memory/scripts/load-motivation.sh`
+4. 🎯 Load habits: `~/.hermes/workspace/skills/basal-ganglia-memory/load-habits.sh`
+5. 🌡️ Load felt sense: `~/.hermes/workspace/skills/insula-memory/scripts/load-sense.sh`
+6. ⚡ Load conflict state: `~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
+7. 🔴 Load error patterns: `~/.hermes/workspace/skills/acc-error-memory/scripts/load-state.sh`
 ```
 
 ## AI Brain Suite Integration

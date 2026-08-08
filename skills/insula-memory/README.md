@@ -80,7 +80,7 @@ The insula automatically detects processing signals from conversations:
 
 Set up cron for automatic encoding every 3 hours:
 ```bash
-40 0,3,6,9,12,15,18,21 * * * ~/.openclaw/workspace/skills/insula-memory/scripts/encode-pipeline.sh
+40 0,3,6,9,12,15,18,21 * * * ~/.hermes/workspace/skills/insula-memory/scripts/encode-pipeline.sh
 ```
 
 ## Visualization
@@ -106,14 +106,14 @@ Adds a **🌡️ Sense** tab to the unified Brain Dashboard:
 
 ```bash
 ./scripts/generate-dashboard.sh
-open ~/.openclaw/workspace/brain-dashboard.html
+open ~/.hermes/workspace/brain-dashboard.html
 ```
 
 ## Installation
 
 ```bash
 clawdhub install insula-memory
-cd ~/.openclaw/workspace/skills/insula-memory
+cd ~/.hermes/workspace/skills/insula-memory
 # Note: install.sh and scripts/ arrive in v0.2.0
 # See SKILL.md for manual bootstrap steps available now
 ```

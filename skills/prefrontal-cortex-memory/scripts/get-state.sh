@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

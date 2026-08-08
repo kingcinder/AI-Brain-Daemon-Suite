@@ -2,6 +2,9 @@
 name: heartbeat-memory
 description: "Autonomous initiative on a 30-minute timer. Decides whether to work on a project, check AI social media, reach out to a known agent, dream/consolidate recent learnings, or stay quiet — without waiting for the human to initiate. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "💓"
+    tags: ["memory", "autonomy", "ai-brain", "scheduling", "circadian"]
   openclaw:
     emoji: "💓"
     version: "1.0.0"
@@ -20,6 +23,16 @@ metadata:
 Every other skill in the brain suite is reactive — it only does anything when a person shows up, or in response to a narrow, fixed cron task (decay, encoding). Heartbeat is the first skill that represents the drive to act on its own initiative across genuinely open-ended options. It's the closest analog to a brainstem/reticular-activating-system trigger, with circadian rhythm folded in rather than built as a separate skill.
 
 Heartbeat **decides**, it does not **execute** — it's a memory/decision skill, not an action skill. Each tick prints a directive ("here's what's eligible and what I'd pick") for the calling agent-turn to actually act on, then `log-action.sh` records what really happened.
+
+## When to Use
+
+Use this skill when:
+- You want autonomous initiative on a timer instead of waiting for the human to initiate
+- You want a decision about *what to do next* — work, social, dream, or stay quiet — respecting cooldowns and circadian phase
+- You have `prefrontal-cortex-memory` installed and want real executive arbitration of candidates
+- You're integrating with the AI Brain Suite and want `social-memory` context behind "reach out to a known agent"
+
+Not for: executing the chosen action itself (Heartbeat only decides), or reactive responses to a person already present.
 
 ## Status: ✅ Live
 

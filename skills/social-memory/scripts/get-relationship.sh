@@ -1,7 +1,7 @@
 #!/bin/bash
 # get-relationship.sh — Usage: get-relationship.sh --id <id> [--json]
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

@@ -2,7 +2,7 @@
 # encode-pipeline.sh — Social signal encoding
 # Usage: ./encode-pipeline.sh [--no-spawn]
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SIGNALS_FILE="$WORKSPACE/memory/social-signals.jsonl"
 NO_SPAWN="${1:-}"

@@ -2,8 +2,8 @@
 #
 # INSTALLATION:
 #   1. Copy deep-brain-kernel.py to your workspace root:
-#        cp deep-brain-kernel.py ~/.openclaw/workspace/deep-brain-kernel.py
-#        chmod +x ~/.openclaw/workspace/deep-brain-kernel.py
+#        cp deep-brain-kernel.py ~/.hermes/workspace/deep-brain-kernel.py
+#        chmod +x ~/.hermes/workspace/deep-brain-kernel.py
 #
 #   2. Copy this file into place:
 #        mkdir -p ~/.config/systemd/user
@@ -16,16 +16,16 @@
 #   4. Verify:
 #        systemctl --user status aibrain.service
 #        journalctl --user -u aibrain.service -f
-#        python3 ~/.openclaw/workspace/deep-brain-kernel.py --check
+#        python3 ~/.hermes/workspace/deep-brain-kernel.py --check
 #
 # GOTCHAS (real, not hypothetical — same two as the prior bash iteration):
 #
 #   (a) WORKSPACE / PATH: `systemctl --user` services do NOT inherit your
 #       interactive shell's environment. Environment= below sets WORKSPACE
 #       explicitly via systemd's %h specifier (your home directory). If
-#       `journalctl --user -u aibrain.service` shows "openclaw not found in
+#       `journalctl --user -u aibrain.service` shows "hermes not found in
 #       PATH" even though it works fine in your terminal, add the real
-#       paths to the PATH= line — run `which openclaw jq curl python3` in
+#       paths to the PATH= line — run `which hermes jq curl python3` in
 #       your normal terminal to find them.
 #
 #   (b) CGROUP DELEGATION (this replaced the earlier hand-rolled
@@ -61,15 +61,15 @@ After=network-online.target
 Type=simple
 
 # See gotcha (a). Adjust if your workspace isn't the default, or if
-# openclaw/jq/curl/python3/vulkaninfo (primary VRAM check — see
+# hermes/jq/curl/python3/vulkaninfo (primary VRAM check — see
 # gpu_vram_percent() in deep-brain-kernel.py) live somewhere PATH here
 # wouldn't otherwise find. nvidia-smi/rocm-smi are also checked as
 # portability fallbacks but are not expected to exist on this hardware
 # (RX 5700 XT / RDNA1 has no ROCm support and there's no NVIDIA GPU).
-Environment=WORKSPACE=%h/.openclaw/workspace
+Environment=WORKSPACE=%h/.hermes/workspace
 Environment=PATH=/usr/bin:/bin:/usr/local/bin:%h/.local/bin
 
-ExecStart=/usr/bin/python3 %h/.openclaw/workspace/deep-brain-kernel.py
+ExecStart=/usr/bin/python3 %h/.hermes/workspace/deep-brain-kernel.py
 
 # Crash recovery.
 Restart=always

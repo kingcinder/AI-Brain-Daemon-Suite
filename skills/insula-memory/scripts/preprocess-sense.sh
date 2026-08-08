@@ -2,7 +2,7 @@
 # preprocess-sense.sh — Extract interoceptive signals from session transcripts
 # Scans for friction, resonance, depletion, flow patterns since last watermark.
 set -euo pipefail
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 OUTPUT="$WORKSPACE/memory/pending-sense.json"
 

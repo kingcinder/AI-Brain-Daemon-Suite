@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # decay-sense.sh — Return channels toward baseline (12% per run, every 4h)
 set -euo pipefail
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ ! -f "$STATE_FILE" ] && echo "No state file" && exit 0

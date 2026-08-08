@@ -3,6 +3,9 @@ name: insula-memory
 title: "Insula - Interoceptive Awareness System"
 description: "Internal state sensing for AI agents. Gut feelings, cognitive load, friction, and somatic coherence — the felt sense beneath emotion. Part of the AI Brain series."
 metadata:
+  hermes:
+    emoji: "🌡️"
+    tags: ["memory", "interoception", "awareness", "ai-brain"]
   openclaw:
     emoji: "🌡️"
     version: "0.2.0"
@@ -19,6 +22,16 @@ metadata:
 **The felt sense beneath emotion.** Part of the AI Brain series.
 
 Give your AI agent a body-aware inner compass — gut signals, processing friction, empathic resonance, and self-coherence that persist across sessions and shape how it shows up.
+
+## When to Use
+
+Use this skill when:
+- You want a felt sense of internal state — gut signals, cognitive load, friction, somatic coherence
+- Something feels off internally and you want to log it (`update-state.sh --signal …`) instead of ignoring it
+- You want interoceptive context to weigh how you show up in a session
+- You're integrating with the AI Brain Suite and want strain/ease signals feeding ACC and Amygdala
+
+Not for: emotion *labeling* (that's `amygdala-memory`), or external-world sensing.
 
 > **v0.2.0 — Full Release**
 >
@@ -53,7 +66,7 @@ Track seven interoceptive channels that capture the body's inner state:
 ## Quick Start
 
 ```bash
-cd ~/.openclaw/workspace/skills/insula-memory
+cd ~/.hermes/workspace/skills/insula-memory
 ./install.sh --with-cron
 
 # Check state
@@ -124,8 +137,8 @@ cd ~/.openclaw/workspace/skills/insula-memory
 Staggered 40 minutes after the hour to avoid collisions with other suite crons:
 
 ```bash
-40 0,3,6,9,12,15,18,21 * * * ~/.openclaw/workspace/skills/insula-memory/scripts/encode-pipeline.sh
-0 */4 * * *                   ~/.openclaw/workspace/skills/insula-memory/scripts/decay-sense.sh
+40 0,3,6,9,12,15,18,21 * * * ~/.hermes/workspace/skills/insula-memory/scripts/encode-pipeline.sh
+0 */4 * * *                   ~/.hermes/workspace/skills/insula-memory/scripts/decay-sense.sh
 ```
 
 ## Visualization (v0.2.0)
@@ -148,7 +161,7 @@ contextSaturation:[███████░░░░░░░░░░░░░]
 ### HTML Dashboard (Brain Dashboard tab)
 ```bash
 ./scripts/generate-dashboard.sh
-open ~/.openclaw/workspace/brain-dashboard.html
+open ~/.hermes/workspace/brain-dashboard.html
 ```
 
 **Adds a 🌡️ Sense tab** to the unified Brain Dashboard alongside all other installed modules.
@@ -160,7 +173,7 @@ When v0.2.0 installs, **notify the user** about the dashboard:
 > 🌡️ **Insula installed!**
 >
 > View your agent's interoceptive state in the Brain Dashboard:
-> `~/.openclaw/workspace/brain-dashboard.html`
+> `~/.hermes/workspace/brain-dashboard.html`
 
 ## Auto-Injection
 
@@ -203,20 +216,20 @@ Full Brain Suite startup order — run all installed modules in sequence:
 
 ```markdown
 ## Every Session
-1. 🧠 Load memories: `~/.openclaw/workspace/skills/hippocampus/scripts/load-core.sh`
-2. 🎭 Load emotional state: `~/.openclaw/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
-3. ⭐ Load motivation: `~/.openclaw/workspace/skills/vta-memory/scripts/load-motivation.sh`
-4. 🎯 Load habits: `~/.openclaw/workspace/skills/basal-ganglia-memory/load-habits.sh`
-5. 🌡️ Load felt sense: `~/.openclaw/workspace/skills/insula-memory/scripts/load-sense.sh`
-6. ⚡ Load conflict state: `~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
-7. 🔴 Load error patterns: `~/.openclaw/workspace/skills/acc-error-memory/scripts/load-state.sh`
+1. 🧠 Load memories: `~/.hermes/workspace/skills/hippocampus/scripts/load-core.sh`
+2. 🎭 Load emotional state: `~/.hermes/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
+3. ⭐ Load motivation: `~/.hermes/workspace/skills/vta-memory/scripts/load-motivation.sh`
+4. 🎯 Load habits: `~/.hermes/workspace/skills/basal-ganglia-memory/load-habits.sh`
+5. 🌡️ Load felt sense: `~/.hermes/workspace/skills/insula-memory/scripts/load-sense.sh`
+6. ⚡ Load conflict state: `~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
+7. 🔴 Load error patterns: `~/.hermes/workspace/skills/acc-error-memory/scripts/load-state.sh`
 ```
 
 ### Log interoceptive signals during conversation
 
 When something significant is felt in processing (v0.2.0+):
 ```bash
-~/.openclaw/workspace/skills/insula-memory/scripts/update-state.sh \
+~/.hermes/workspace/skills/insula-memory/scripts/update-state.sh \
   --signal resonance --intensity 0.8 --source "user sharing vulnerable moment"
 ```
 
@@ -298,7 +311,7 @@ Track interoceptive activity over time (v0.2.0+):
 ./scripts/log-event.sh update signal=resonance intensity=0.8
 ```
 
-Events append to `~/.openclaw/workspace/memory/brain-events.jsonl` with type `insula`:
+Events append to `~/.hermes/workspace/memory/brain-events.jsonl` with type `insula`:
 ```json
 {"ts":"2026-06-21T09:40:00Z","type":"insula","event":"signal","signal":"discord","intensity":0.6}
 ```

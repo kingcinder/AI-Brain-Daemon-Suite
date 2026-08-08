@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # get-state.sh — Print current interoceptive state
 set -euo pipefail
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 [ ! -f "$STATE_FILE" ] && echo "No state file. Run: ./install.sh" && exit 1
 python3 - "$STATE_FILE" << 'PYTHON'

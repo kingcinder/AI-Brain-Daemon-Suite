@@ -4,7 +4,7 @@
 #   ./scripts/update-state.sh --signal <name> [--intensity <0.0-1.0>] [--source <text>]
 #   ./scripts/update-state.sh --channel <name> --set <value>
 set -euo pipefail
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

@@ -2,9 +2,9 @@
 # Self-reflection helper - outputs prompts for introspection
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="${SKILL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 MEMORY_DIR="$WORKSPACE/memory"
 PROMPTS_FILE="$SKILL_DIR/prompts/self-reflect.md"

@@ -115,8 +115,8 @@ one.
 ## 4. Verify everything end to end
 
 ```bash
-python3 ~/.openclaw/workspace/deep-brain-kernel.py --check
-# expect: all 18 jobs listed, zero minute collisions, openclaw found
+python3 ~/.hermes/workspace/deep-brain-kernel.py --check
+# expect: all 18 jobs listed, zero minute collisions, hermes found
 
 journalctl --user -u aibrain.service -f
 # watch for clean "completed" lines as scheduled jobs fire; let it run at

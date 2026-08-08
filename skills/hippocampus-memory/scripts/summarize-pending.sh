@@ -11,7 +11,7 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 PENDING_FILE="$WORKSPACE/memory/pending-memories.json"
 INDEX_FILE="$WORKSPACE/memory/index.json"
 BATCH_SIZE="${BATCH_SIZE:-30}"

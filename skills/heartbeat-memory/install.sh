@@ -1,10 +1,10 @@
 #!/bin/bash
-# install.sh — Set up heartbeat-memory for OpenClaw
+# install.sh — Set up heartbeat-memory for Hermes Agent
 # Usage: ./install.sh [--with-cron] [--wake-hour H] [--sleep-hour H]
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 WAKE_HOUR=7
 SLEEP_HOUR=23
@@ -66,18 +66,14 @@ echo "✅ Scripts are executable"
 
 if [ "$WITH_CRON" = true ]; then
   echo ""
-  echo "Setting up OpenClaw cron job..."
-  if ! command -v openclaw &> /dev/null; then
-    echo "⚠️  'openclaw' not in PATH. Add this cron job manually:"
+  echo "Setting up Hermes cron job..."
+  if ! command -v hermes &> /dev/null; then
+    echo "⚠️  'hermes' not in PATH. Add this cron job manually:"
     echo ""
-    echo "openclaw cron add --name heartbeat --cron '7,37 * * * *' --session isolated --agent-turn '💓 Run heartbeat: $SKILL_DIR/scripts/beat.sh, then act on whatever it tells you to, then run $SKILL_DIR/scripts/log-action.sh when done.'"
+    echo "hermes cron create '7,37 * * * *' '💓 Run heartbeat: $SKILL_DIR/scripts/beat.sh, then act on whatever it tells you to, then run $SKILL_DIR/scripts/log-action.sh when done.' --name heartbeat"
   else
     echo "   Creating heartbeat..."
-    openclaw cron add --name heartbeat \
-      --cron '7,37 * * * *' \
-      --session isolated \
-      --agent-turn "💓 Run heartbeat: $SKILL_DIR/scripts/beat.sh. Read what it tells you to consider doing, decide whether to act (skip if mid-task or it doesn't make sense right now), then run $SKILL_DIR/scripts/log-action.sh --action <id> --note \"...\" once you've actually done something or decided to skip." \
-      2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    hermes cron create '7,37 * * * *' "💓 Run heartbeat: $SKILL_DIR/scripts/beat.sh. Read what it tells you to consider doing, decide whether to act (skip if mid-task or it doesn't make sense right now), then run $SKILL_DIR/scripts/log-action.sh --action <id> --note \"...\" once you've actually done something or decided to skip." --name heartbeat 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
   fi
   echo ""
   echo "   (Offset :07/:37 to avoid colliding with the other brain-suite skills'"

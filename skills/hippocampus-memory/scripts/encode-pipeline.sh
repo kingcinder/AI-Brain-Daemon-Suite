@@ -10,11 +10,11 @@
 # Usage: ./encode-pipeline.sh [--no-spawn]
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace (default: ~/.openclaw/workspace)
+#   WORKSPACE - OpenClaw workspace (default: ~/.hermes/workspace)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SIGNALS_FILE="$WORKSPACE/memory/signals.jsonl"
 PENDING_FILE="$WORKSPACE/memory/pending-memories.json"
@@ -60,7 +60,7 @@ import os
 import re
 from datetime import datetime
 
-WORKSPACE = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
+WORKSPACE = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
 SIGNALS_FILE = f"{WORKSPACE}/memory/signals.jsonl"
 INDEX_FILE = f"{WORKSPACE}/memory/index.json"
 PENDING_FILE = f"{WORKSPACE}/memory/pending-memories.json"
@@ -273,7 +273,7 @@ echo ""
 echo "✅ Pipeline phase 1 complete. Sub-agent will handle summarization."
 echo ""
 echo "To complete manually, run:"
-echo "  openclaw sessions:spawn --task 'Run ~/.openclaw/workspace/skills/hippocampus-memory/scripts/summarize-pending.sh'"
+echo "  hermes chat -q 'Run ~/.hermes/workspace/skills/hippocampus-memory/scripts/summarize-pending.sh' --source daemon"
 
 # Regenerate brain dashboard
 [ -x "$SCRIPT_DIR/generate-dashboard.sh" ] && "$SCRIPT_DIR/generate-dashboard.sh" 2>/dev/null || true

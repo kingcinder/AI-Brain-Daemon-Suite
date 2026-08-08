@@ -14,7 +14,7 @@ set -e
 INPUT_FILE="${1:?Usage: calibrate-patterns.sh <pending-errors.json> [sample_rate]}"
 SAMPLE_RATE="${2:-0.15}"
 
-WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 LEARNED_FILE="$WORKSPACE/memory/learned-patterns.json"
 CALIBRATION_STATE="$WORKSPACE/memory/calibration-state.json"
 
@@ -303,7 +303,7 @@ with open(calibration_state_file, 'w') as f:
 
 # --- Save confirmed errors for pipeline to use ---
 # This allows calibration runs to skip Haiku screening
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
 calib_errors_file = os.path.join(workspace, 'memory', 'calibration-errors.json')
 with open(calib_errors_file, 'w') as f:
     json.dump(llm_errors, f, indent=2)

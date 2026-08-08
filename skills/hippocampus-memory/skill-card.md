@@ -18,7 +18,7 @@ Global <br>
 
 ## Known Risks and Mitigations: <br>
 Risk: The skill can persistently scan conversation history and store sensitive personal memories. <br>
-Mitigation: Install only when long-lived agent memory is intended, review the generated memory files, and periodically delete unneeded data under ~/.openclaw/workspace/memory/ and HIPPOCAMPUS_CORE.md. <br>
+Mitigation: Install only when long-lived agent memory is intended, review the generated memory files, and periodically delete unneeded data under ~/.hermes/workspace/memory/ and HIPPOCAMPUS_CORE.md. <br>
 Risk: The --whole option can ingest historical conversation data beyond recent context. <br>
 Mitigation: Start with the default recent-signal setup or a small --signals value, and use --whole only after confirming historical ingestion is desired. <br>
 Risk: Cron or background-agent setup can run recurring memory updates without an active manual prompt. <br>

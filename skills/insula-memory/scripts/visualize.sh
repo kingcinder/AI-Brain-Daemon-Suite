@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # visualize.sh — Terminal ASCII visualization of interoceptive state
 set -euo pipefail
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 [ ! -f "$STATE_FILE" ] && echo "No state file" && exit 0
 
