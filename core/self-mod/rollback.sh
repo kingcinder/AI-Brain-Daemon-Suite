@@ -73,7 +73,7 @@ if [ -d "$BACKUP" ]; then
     mkdir -p "$(dirname "$dest")"
     cp -a "$f" "$dest"
     restored_files=$((restored_files + 1))
-  done < <(find "$BACKUP" -type f ! -name '*.missing' -print0 2>/dev/null)
+  done < <(find "$BACKUP" -type f -print0 2>/dev/null)
 fi
 
 # Best-effort git restore if repo

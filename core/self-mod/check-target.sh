@@ -47,6 +47,9 @@ for line in list_path.read_text().splitlines():
 
 targets = []
 module = module_arg
+prop = None
+files_map = {}
+new_module = False
 if proposal_path:
     prop = json.loads(Path(proposal_path).read_text())
     module = module or prop.get("module") or ""
@@ -57,8 +60,53 @@ if proposal_path:
     single = prop.get("target") or prop.get("target_path")
     if single:
         targets.append(single)
+    fm = prop.get("files")
+    files_map = fm if isinstance(fm, dict) else {}
+    new_module = bool(prop.get("new_module")) and module != ""
 elif target_arg:
     targets = [target_arg]
+
+# ── M6: new-module creation — validate the PROPOSED manifest up front. ─────
+# A proposal with new_module:true creates a brand-new skill directory under the
+# same gates as patching an existing one. The proposed manifest (from the
+# files map, never the live tree) must be schema-valid, name the same module,
+# and ship every declared test in the files map — the new module's regression
+# harness is REQUIRED before deploy (a declared test that isn't part of the
+# proposal would fail the sandbox sweep at evaluate time anyway, so we reject
+# it earlier, at the gate).
+NEW_MOD_MANIFEST = None  # validated manifest dict once accepted
+NEW_MOD_REJECT = None    # (target, reason) if the proposed manifest is invalid
+if new_module:
+    man_rel = f"skills/{module}/capability-manifest.json"
+    if man_rel not in files_map:
+        NEW_MOD_REJECT = (man_rel, "new_module_missing_manifest")
+    else:
+        try:
+            cand = json.loads(files_map[man_rel])
+        except Exception as e:
+            NEW_MOD_REJECT = (man_rel, f"new_module_invalid_manifest_json: {e}")
+        else:
+            errs = []
+            if cand.get("schema") != 1:
+                errs.append("schema_not_1")
+            if cand.get("immutable") is not False:
+                errs.append("manifest_immutable_not_false")
+            if cand.get("module") != module:
+                errs.append(f"module_mismatch:{cand.get('module')}!= {module}")
+            tests = cand.get("tests") or []
+            if not isinstance(tests, list) or len(tests) < 1:
+                errs.append("tests_min_items_1")
+            else:
+                for t in tests:
+                    tp = (t or {}).get("path", "")
+                    # A declared test must be shippable: either it comes in the
+                    # proposal's files map, or it already exists in the suite.
+                    if tp and tp not in files_map and not (suite / tp).is_file():
+                        errs.append(f"declared_test_not_shipped:{tp}")
+            if errs:
+                NEW_MOD_REJECT = (man_rel, "new_module_invalid_manifest:" + ",".join(errs))
+            else:
+                NEW_MOD_MANIFEST = cand
 
 def norm(p: str) -> str:
     p = p.replace("\\", "/").lstrip("./")
@@ -115,9 +163,21 @@ for t in targets:
     if rel.startswith("core/self-mod/") or rel == "core/self-mod":
         rejected.append({"target": rel, "reason": "immutable_core"})
         continue
+    # M6: a brand-new module has no manifest in the live tree yet — its files
+    # (manifest, scripts, tests) all live under skills/<module>/ and are accepted
+    # iff the proposed manifest validated above. Every target must be inside the
+    # new module's directory; immutable guards still apply (checked above).
+    if new_module and NEW_MOD_MANIFEST is not None and rel.startswith(f"skills/{module}/"):
+        accepted.append({"target": rel, "module": module,
+                         "manifest": f"skills/{module}/capability-manifest.json",
+                         "new_module": True})
+        continue
     man = find_manifest(module, rel)
     if man is None:
-        rejected.append({"target": rel, "reason": "missing_capability_manifest"})
+        if NEW_MOD_REJECT is not None:
+            rejected.append({"target": rel, "reason": NEW_MOD_REJECT[1]})
+        else:
+            rejected.append({"target": rel, "reason": "missing_capability_manifest"})
         continue
     try:
         m = json.loads(man.read_text())
@@ -133,6 +193,11 @@ for t in targets:
     accepted.append({"target": rel, "module": m.get("module"), "manifest": str(man.relative_to(suite))})
 
 ok = len(rejected) == 0 and len(accepted) > 0
+if new_module and NEW_MOD_REJECT is not None and ok:
+    # Belt-and-braces: a rejected proposed manifest must fail the gate even if
+    # some other target slipped through an accept path above.
+    ok = False
+    rejected.append({"target": NEW_MOD_REJECT[0], "reason": NEW_MOD_REJECT[1]})
 if len(targets) == 0:
     ok = False
     rejected.append({"target": None, "reason": "no_targets"})

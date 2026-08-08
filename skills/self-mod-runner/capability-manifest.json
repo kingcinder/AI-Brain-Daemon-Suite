@@ -42,7 +42,15 @@
       "kind": "regression"
     },
     {
+      "path": "tests/run_phase8_harness.sh",
+      "kind": "regression"
+    },
+    {
       "path": "tests/test_health_context.sh",
+      "kind": "unit"
+    },
+    {
+      "path": "tests/test_autonomy_report.sh",
       "kind": "unit"
     }
   ],

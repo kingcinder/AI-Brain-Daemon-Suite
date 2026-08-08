@@ -1695,6 +1695,124 @@ def print_status() -> int:
     return unhealthy
 
 
+def compute_autonomy_mode(daemon_state: "DaemonState",
+                          window_days: int = 30,
+                          max_auto_rollbacks: int = 3,
+                          unhealthy_max: int = 0,
+                          require_graduated: bool = True) -> dict:
+    """ROADMAP M7: steward-only autonomy contract. Determines the current
+    operational mode from evidence, not vibes:
+
+      auto_mode   — granted only when, over the rolling window, ALL hold:
+                      * graduation streak is at/above target (require_graduated)
+                      * zero unhealthy jobs (consecutive-failure streak >= 3)
+                      * auto-rollbacks in the window stay under the cap
+      steward_mode — otherwise: the human stays the operator; the suite may
+                      still propose/evaluate/monitor, but the human is
+                      consulted for direction, exemptions, and incidents.
+
+    Evidence sources (all persisted in WORKSPACE/memory):
+      * memory/self-mod/graduation-streak.json   (graduation-tracker.sh)
+      * daemon state jobStats consecutive_failures (this file)
+      * memory/self-mod/deploys/*.json rolled_back=true within window_days
+
+    Returns a dict {mode, auto, evidence:{...}, computed_at} for display and
+    persistence. Read-only — never mutates daemon state."""
+    import json as _json
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+
+    evidence = {"graduated": False, "clean_streak": None, "clean_streak_target": None,
+                "unhealthy_jobs": 0, "auto_rollbacks_in_window": 0,
+                "window_days": window_days, "max_auto_rollbacks": max_auto_rollbacks}
+    # ── graduation streak ─────────────────────────────────────────────────
+    grad_file = WORKSPACE / "memory" / "self-mod" / "graduation-streak.json"
+    try:
+        g = _json.loads(grad_file.read_text())
+        streak = int(g.get("clean_streak") or 0)
+        target = int(g.get("clean_streak_target") or 20)
+        evidence["clean_streak"] = streak
+        evidence["clean_streak_target"] = target
+        evidence["graduated"] = streak >= target
+    except (OSError, ValueError, TypeError):
+        pass
+    # ── unhealthy jobs from daemon state ──────────────────────────────────
+    unhealthy = 0
+    for job in JOBS:
+        stats = daemon_state.job_stats.get(job.name, {})
+        if int(stats.get("consecutive_failures", 0) or 0) >= DaemonState.UNHEALTHY_STREAK:
+            unhealthy += 1
+    evidence["unhealthy_jobs"] = unhealthy
+    # ── auto-rollbacks in the rolling window ──────────────────────────────
+    cutoff = _dt.now(_tz.utc) - _td(days=max(1, window_days))
+    deploys_dir = WORKSPACE / "memory" / "self-mod" / "deploys"
+    rollbacks = 0
+    if deploys_dir.is_dir():
+        for f in deploys_dir.glob("*.json"):
+            if f.name == "LATEST":
+                continue
+            try:
+                rec = _json.loads(f.read_text())
+                if rec.get("rolled_back") is not True:
+                    continue
+                at = rec.get("rollback_at") or rec.get("deployed_at") or ""
+                if at:
+                    ts = _dt.fromisoformat(at.replace("Z", "+00:00"))
+                    if ts >= cutoff:
+                        rollbacks += 1
+                else:
+                    rollbacks += 1
+            except (OSError, ValueError, TypeError):
+                continue
+    evidence["auto_rollbacks_in_window"] = rollbacks
+
+    auto = True
+    if require_graduated and not evidence["graduated"]:
+        auto = False
+    if unhealthy > unhealthy_max:
+        auto = False
+    if rollbacks > max_auto_rollbacks:
+        auto = False
+    return {
+        "mode": "auto_mode" if auto else "steward_mode",
+        "auto": auto,
+        "evidence": evidence,
+        "computed_at": _dt.now(_tz.utc).isoformat().replace("+00:00", "Z"),
+    }
+
+
+def print_autonomy() -> int:
+    """ROADMAP M7: report + persist the autonomy contract mode.
+    Read-only wrt daemon state; persists the computed mode to
+    memory/self-mod/autonomy-state.json so the human (or a status check) can
+    see the mode with its evidence later. Returns 0 when auto_mode, 1 when
+    steward_mode (so a steward-monitoring cron can alert on mode regressions)."""
+    import json as _json
+    daemon_state = DaemonState(DAEMON_STATE_FILE)
+    thresh = {}
+    try:
+        thresh = _json.loads(
+            (Path(__file__).resolve().parent / "core" / "self-mod" / "thresholds.json").read_text()
+        ).get("autonomy", {})
+    except (OSError, ValueError, TypeError):
+        pass
+    mode = compute_autonomy_mode(
+        daemon_state,
+        window_days=int(thresh.get("window_days", 30) or 30),
+        max_auto_rollbacks=int(thresh.get("max_auto_rollbacks", 3) or 3),
+        unhealthy_max=int(thresh.get("unhealthy_jobs_max", 0) or 0),
+        require_graduated=bool(thresh.get("require_graduated", True)),
+    )
+    # Persist for later inspection / stewardship dashboards.
+    try:
+        state_file = WORKSPACE / "memory" / "self-mod" / "autonomy-state.json"
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(_json.dumps(mode, indent=2, sort_keys=True) + "\n")
+    except OSError:
+        pass
+    print(_json.dumps(mode, indent=2))
+    return 0 if mode["auto"] else 1
+
+
 def main() -> None:
     import argparse
     parser = argparse.ArgumentParser(description="AI Brain Suite unified async scheduler")
@@ -1705,6 +1823,11 @@ def main() -> None:
                               "daemon is active. Exit code is the number of jobs currently at or "
                               "above the unhealthy consecutive-failure threshold, so this can "
                               "double as a monitoring check.")
+    parser.add_argument("--autonomy", action="store_true",
+                         help="ROADMAP M7: report the operational autonomy contract mode "
+                              "(auto_mode vs steward_mode) with its evidence, persist it to "
+                              "memory/self-mod/autonomy-state.json, and exit. Exit code 0 = "
+                              "auto_mode, 1 = steward_mode (alert-worthy). Read-only.")
     parser.add_argument("--vram-limit", type=float, default=80.0,
                          help="Defer spawn jobs when GPU VRAM usage is at or above this percent (default 80)")
     parser.add_argument("--tick-seconds", type=int, default=30,
@@ -1746,6 +1869,9 @@ def main() -> None:
 
     if args.status:
         sys.exit(print_status())
+
+    if args.autonomy:
+        sys.exit(print_autonomy())
 
     lock = SingleInstanceLock(PID_LOCK_FILE)
     lock.acquire()

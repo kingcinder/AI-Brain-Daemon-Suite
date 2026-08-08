@@ -5,6 +5,9 @@
 #   target_paths: [rel path, ...]  (first is primary)
 #   content: full new file body (UTF-8 text)
 #   OR content_b64: base64 body
+#   OR files: { "rel/path": "file body", ... }  (M6: per-file content — needed
+#      when a proposal creates a brand-new module: manifest + scripts + tests
+#      each carry distinct bodies)
 #   OR patch_unified: unified diff (applied with patch -p1)
 #
 # Usage:
@@ -66,15 +69,17 @@ if prop.get("patch_unified"):
     print(json.dumps({"ok": True, "mode": "unified_diff", "targets": targets}))
     sys.exit(0)
 
+files_map = prop.get("files")
 content = prop.get("content")
 if content is None and prop.get("content_b64"):
     content = base64.b64decode(prop["content_b64"]).decode("utf-8")
-if content is None:
-    print(json.dumps({"ok": False, "error": "no content or patch_unified"}))
+if content is None and not isinstance(files_map, dict):
+    print(json.dumps({"ok": False, "error": "no content, files, or patch_unified"}))
     sys.exit(1)
 
-# Write full content to each target (typically one primary file)
-for rel in targets:
+
+def _write(rel, body):
+    """Write one file body to `rel` inside the suite, suite-escape guarded."""
     rel = rel.replace("\\", "/").lstrip("./")
     dest = (suite / rel).resolve()
     try:
@@ -84,10 +89,23 @@ for rel in targets:
         sys.exit(1)
     if dry:
         applied.append(rel)
-        continue
+        return
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(content if content.endswith("\n") else content + "\n")
+    dest.write_text(body if body.endswith("\n") else body + "\n")
     applied.append(rel)
+
+
+if isinstance(files_map, dict) and files_map:
+    # M6: per-file map — write each declared path with its own body. The
+    # `targets` list still names the primary/checked paths (manifest first).
+    for rel, body in files_map.items():
+        _write(str(rel), str(body))
+    print(json.dumps({"ok": True, "mode": "file_write_files", "applied": applied, "dry_run": dry}))
+    sys.exit(0)
+
+# Single-content write to each target (typically one primary file)
+for rel in targets:
+    _write(rel, content)
 
 print(json.dumps({"ok": True, "mode": "file_write", "applied": applied, "dry_run": dry}))
 PY

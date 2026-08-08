@@ -27,5 +27,12 @@
   "monitoring": {
     "post_deploy_window_ticks": 50,
     "auto_rollback_on_breach": true
+  },
+  "autonomy": {
+    "window_days": 30,
+    "max_auto_rollbacks": 3,
+    "unhealthy_jobs_max": 0,
+    "require_graduated": true,
+    "note": "M7 steward-only contract: auto_mode is granted only when, over the rolling window, graduation streak is at/above target (require_graduated), zero unhealthy jobs, and auto-rollbacks stay under the cap. Otherwise steward_mode (human consulted for direction, exemptions, incidents)."
   }
 }
