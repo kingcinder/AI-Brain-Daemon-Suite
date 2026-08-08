@@ -184,16 +184,23 @@ follow-on lands.
 | Suite proposes its own changes on its own schedule | ✅ Weekly `self_mod_proposal_cycle` job; `review_mode` gates deploys | M1 + M2 (landed) |
 | Suite reasons without the external harness | ✅ Spawn jobs route via `spawn-provider.sh` (hermes or local `llm-call.sh`) | M3 (landed) |
 | Goals close the loop: set → act → learn → reset | ✅ Goal injection → outcome recorder → ACC calibration | M4 (landed) |
-| Full crystallization (M7) | Far off — M5–M7 remain | M5–M7 after M1–M4 |
+| Suite learns what to improve from its own measured weaknesses | ✅ `health-context.sh` feeds failure streaks/lessons/sweep failures into proposal prompts | M5 (landed) |
+| Suite grows brand-new modules under the registry gate | ✅ `new_module` proposals (manifest + scripts + tests) evaluate/deploy/rollback | M6 (landed) |
+| Steward-only operation: mode computed, persisted, reported | ✅ `deep-brain-kernel.py --autonomy` → `autonomy-state.json`, exit 0/1 | M7 (landed) |
+| Autonomy mode is a real control (crystallization point) | ✅ `--autonomy-gate` consumes the mode; auto_mode self-deploys, steward_mode keeps review gating | M8 (landed) |
 
 **Overall:** the Suite is solidly at **Stage 1** of the vision (experience
 synthesis under an external harness), with the machinery for Stage 2 present
-and now powered. The three Stage-2 wiring milestones have landed:
+and now powered. The Stage-2 wiring milestones have all landed:
 M1+M2 (the Suite proposes and gates its own changes on a schedule), M3 (the
 Suite's own reasoning path is a first-class provider, not a hermes
-hardwire), and M4 (goals close the loop: set → act → learn → reset). Next
-highest-leverage step: **M5** — outcome-driven proposal generation, so the
-Suite decides its improvement backlog from its own measured weaknesses.
+hardwire), M4 (goals close the loop: set → act → learn → reset), M5
+(outcome-driven proposals), M6 (self-directed new-module expansion), M7
+(steward-only autonomy mode), and M8 (the autonomy mode is consumed as a
+real control — auto_mode self-deploys on schedule). The remaining open items
+are the Stage-2 **agentic-loop follow-on** (internal tool use + session
+memory to fully replace hermes, not just route to local) and Stage-1
+hardening on a real host (M0).
 
 ---
 

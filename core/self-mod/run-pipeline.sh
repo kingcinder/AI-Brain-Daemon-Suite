@@ -15,10 +15,16 @@
 #                   [--no-deploy] [--dry-run]
 #                   [--autonomy-gate]
 #
-# --autonomy-gate (ROADMAP M2): reads graduation-tracker review-frequency and
-#   only auto-deploys in relaxed_review; in full_review the accepted proposal
-#   is queued for human approval (deploy.skipped with a reason). Without this
-#   flag, behavior is unchanged (deploy first accepted proposal).
+# --autonomy-gate (ROADMAP M2 + M8): reads graduation-tracker
+#   review-frequency and, under the M8 autonomy contract, the persisted
+#   autonomy mode (memory/self-mod/autonomy-state.json, written by
+#   deep-brain-kernel.py --autonomy). In auto_mode the pipeline may auto-deploy
+#   accepted proposals on its own schedule (human consulted only for direction,
+#   immutable exemptions, and incidents); in steward_mode only relaxed_review
+#   may auto-deploy — full_review queues for human approval (deploy.skipped
+#   with a reason). A missing/unreadable autonomy-state.json is treated as
+#   steward_mode (fail-safe: never over-grant autonomy on absent evidence).
+#   Without this flag, behavior is unchanged (deploy first accepted proposal).
 #
 # Does not modify Immutable Core modules. Pipeline code under core/self-mod
 # is never a legal proposal target.
@@ -129,16 +135,24 @@ done < <(echo "$RANKED" | jq -r '.ranked[].path')
 # ── 6. Deploy ───────────────────────────────────────────────────────────────
 DEPLOY_RESULT='null'
 REVIEW_MODE=''
+AUTONOMY_MODE=''
 if [ "$AUTONOMY_GATE" -eq 1 ]; then
   REVIEW_MODE=$(WORKSPACE="$WORKSPACE" bash "$SELF_DIR/graduation-tracker.sh" review-frequency \
     2>/dev/null | jq -r '.review_mode // "full_review"' 2>/dev/null || echo "full_review")
   REVIEW_MODE="${REVIEW_MODE:-full_review}"  # safe default; never empty
+  # M8: consume the M7 autonomy contract. auto_mode = the suite may auto-deploy
+  # accepted proposals on its own schedule (human consulted only for direction,
+  # immutable exemptions, incidents); steward_mode = M2 review gating stands.
+  # Fail-safe: missing/unreadable autonomy-state.json ⇒ steward_mode (never
+  # over-grant autonomy on absent evidence).
+  AUTONOMY_MODE=$(jq -r '.mode // "steward_mode"' "$WORKSPACE/memory/self-mod/autonomy-state.json" 2>/dev/null || echo "steward_mode")
+  AUTONOMY_MODE="${AUTONOMY_MODE:-steward_mode}"
 fi
 if [ "$NO_DEPLOY" -eq 0 ] && [ -n "$DEPLOY_CANDIDATE" ]; then
-  if [ "$AUTONOMY_GATE" -eq 1 ] && [ "$REVIEW_MODE" != "relaxed_review" ]; then
-    # M2: full_review queues for human approval — no auto-deploy
-    DEPLOY_RESULT=$(jq -nc --arg p "$DEPLOY_CANDIDATE" --arg m "${REVIEW_MODE:-full_review}" \
-      '{skipped:true, reason:"full_review_human_approval_required", review_mode:$m, would_deploy:$p}')
+  if [ "$AUTONOMY_GATE" -eq 1 ] && [ "$AUTONOMY_MODE" != "auto_mode" ] && [ "$REVIEW_MODE" != "relaxed_review" ]; then
+    # M2/M8: steward_mode + full_review queues for human approval — no auto-deploy
+    DEPLOY_RESULT=$(jq -nc --arg p "$DEPLOY_CANDIDATE" --arg m "${REVIEW_MODE:-full_review}" --arg a "${AUTONOMY_MODE:-steward_mode}" \
+      '{skipped:true, reason:"full_review_human_approval_required", review_mode:$m, autonomy_mode:$a, would_deploy:$p}')
   else
     # attach baseline metrics into deploy record path via env file
     DEPLOY_RESULT=$(bash "$SELF_DIR/deploy-proposal.sh" \
@@ -173,12 +187,14 @@ SUMMARY=$(jq -nc \
   --argjson deploy "$DEPLOY_RESULT" \
   --argjson ag "$([ "$AUTONOMY_GATE" -eq 1 ] && echo true || echo false)" \
   --arg rm "${REVIEW_MODE:-}" \
+  --arg am "${AUTONOMY_MODE:-}" \
   '{
     pipeline: "phase3-self-mod",
     timestamp: $ts,
     baseline_snapshot: $base,
     autonomy_gate: $ag,
     review_mode: $rm,
+    autonomy_mode: $am,
     ranked: $ranked,
     evaluations: $evals,
     deploy: $deploy

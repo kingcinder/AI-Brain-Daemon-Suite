@@ -26,6 +26,14 @@ fi
 # (run-pipeline.sh creates its own dirs, but the redirect happens first).
 mkdir -p "$WORKSPACE/memory/self-mod"
 
+# M8: refresh the M7 autonomy contract from fresh evidence before the cycle
+# decides — a stale autonomy-state.json must not auto-deploy (or wrongly
+# block) this run. --autonomy is read-only; best-effort (never fails the tick).
+KERNEL="$SUITE_ROOT/deep-brain-kernel.py"
+if [ -f "$KERNEL" ]; then
+  WORKSPACE="$WORKSPACE" python3 "$KERNEL" --autonomy >/dev/null 2>&1 || true
+fi
+
 # Forward the daemon's TERM/INT (it signals only this tracked PID — Pillar 3)
 # to the pipeline so a timeout-kill can't orphan a running proposal cycle.
 rc=0

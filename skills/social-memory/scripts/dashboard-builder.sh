@@ -231,6 +231,11 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
         .statusbar { display: flex; align-items: center; gap: 14px; padding: 10px 14px; margin-bottom: 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; font-size: 0.72rem; color: var(--text-muted); flex-wrap: wrap; backdrop-filter: blur(8px); }
         .statusbar-item { display: flex; align-items: center; gap: 6px; }
         .statusbar-item.warn { color: #f59e0b; }
+        .statusbar-item.auto { color: var(--emerald); }
+        .statusbar-item.steward { color: var(--text-muted); }
+        .autonomy-pill { padding: 2px 10px; border-radius: 20px; border: 1px solid var(--border); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.04em; }
+        .autonomy-pill.auto { border-color: rgba(16,185,129,0.5); color: var(--emerald); background: rgba(16,185,129,0.08); box-shadow: 0 0 10px rgba(16,185,129,0.25); }
+        .autonomy-pill.steward { border-color: var(--border); color: var(--text-secondary); background: var(--bg-elevated); }
         .beat-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); transition: background 0.3s, box-shadow 0.3s; }
         .beat-dot.alive { background: var(--emerald); box-shadow: 0 0 8px rgba(16,185,129,0.7); }
         .beat-dot.stale { background: var(--amber); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
@@ -272,6 +277,7 @@ cat >> "$OUTPUT_FILE" << HEADER
         <div class="statusbar-item"><span id="statusFrags">🧩 fragments —</span></div>
         <div class="statusbar-item" id="statusSparkWrap" title="per-job success rate, most recent runs"><span id="statusSparkLabel">📈 —</span><span class="sparkline" id="statusSpark"></span></div>
         <div class="statusbar-item"><span id="statusHealth">✅ —</span></div>
+        <div class="statusbar-item" id="statusAutoWrap" title="autonomy contract mode (deep-brain-kernel.py --autonomy)"><span id="statusAuto"><span class="autonomy-pill steward">🛡 steward</span></span></div>
         <button class="regen-btn" id="regenBtn" title="Run every skill's sync-state.sh, then rebuild the dashboard">🔄 Regenerate</button>
     </div>
 
@@ -435,6 +441,18 @@ function pollStatus() {
         setStatus('statusHealth', '⚠️ ' + d.summary.unhealthyJobs.length + ' unhealthy', 'warn');
       } else {
         setStatus('statusHealth', '✅ all healthy');
+      }
+      const autoEl = document.getElementById('statusAuto');
+      if (autoEl) {
+        const a = d.autonomy || {};
+        const mode = a.mode === 'auto_mode' ? 'auto' : 'steward';
+        const ev = a.evidence || {};
+        const evTxt = 'streak ' + (ev.clean_streak ?? '—') + '/' + (ev.clean_streak_target ?? '—')
+          + ' · unhealthy ' + (ev.unhealthy_jobs ?? '—')
+          + ' · rollbacks ' + (ev.auto_rollbacks_in_window ?? '—') + '/' + (ev.max_auto_rollbacks ?? '—');
+        autoEl.innerHTML = '<span class="autonomy-pill ' + mode + '">' + (mode === 'auto' ? '🤖 auto' : '🛡 steward') + '</span>';
+        const wrap = document.getElementById('statusAutoWrap');
+        if (wrap) wrap.title = (mode === 'auto' ? 'auto_mode: pipeline may self-deploy on schedule' : 'steward_mode: human consulted for deploys') + ' — ' + evTxt;
       }
       renderJobSparkline(d);
     })

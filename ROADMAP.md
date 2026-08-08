@@ -160,6 +160,31 @@ direction and safety, not operators.
 - **Done when:** a `status --autonomy` (or equivalent) reports the current
   mode with its evidence, the mode is persisted and logged, and the full
   local suite + CI remain green across every milestone.
+- **Status: LANDED.** `deep-brain-kernel.py --autonomy` computes the mode
+  from graduation streak + unhealthy-job count + rolling-window auto-rollbacks,
+  persists `memory/self-mod/autonomy-state.json`, exits 0 in auto_mode / 1 in
+  steward_mode. Covered by `tests/test_autonomy_report.sh` (unit) and
+  `tests/run_phase8_harness.sh` (deploy/rollback of new modules under the
+  gate).
+
+### M8 — Autonomy mode as a real control (the M7 contract wired into the pipeline)
+
+- **Change:** `run-pipeline.sh --autonomy-gate` reads the persisted autonomy
+  mode (`memory/self-mod/autonomy-state.json`) alongside M2's `review_mode`:
+  **auto_mode** ⇒ the pipeline may auto-deploy accepted proposals on its own
+  schedule under the existing RWLock + divergence + regression + monitor
+  gates (human consulted only for direction, immutable exemptions,
+  incidents); **steward_mode** ⇒ M2 review gating stands (full_review queues
+  for human approval). A missing/unreadable autonomy-state.json is treated as
+  steward_mode (fail-safe: never over-grant autonomy on absent evidence).
+  The scheduled cycle tick (`proposal-cycle-tick.sh`) refreshes the mode from
+  fresh evidence (`deep-brain-kernel.py --autonomy`) before each run.
+- **Done when:** a harness test proves auto_mode auto-deploys an accepted
+  proposal even in full_review, steward_mode + full_review still queues, and
+  the summary records `autonomy_mode`.
+- **Status: LANDED.** `tests/run_phase9_harness.sh` covers all four paths
+  (auto deploys, steward/full blocks, steward/relaxed deploys, missing-state
+  fail-safe) plus no-gate back-compat.
 
 ---
 
@@ -177,6 +202,9 @@ M0 (hardening, Stage 1)                    ← do first; everything depends on t
         │
         ▼
  M5 (outcome-driven proposals) → M6 (new-module expansion) → M7 (steward-only)
+        │
+        ▼
+ M8 (autonomy mode consumed as a control; scheduled cycle self-deploys in auto_mode)
 ```
 
 **Acceptance for every milestone:** all phase harnesses plus the skill unit

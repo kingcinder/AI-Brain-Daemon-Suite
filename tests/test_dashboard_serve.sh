@@ -195,6 +195,24 @@ else
     fail "token not injected into served page"
 fi
 
+# M7/M8: seed an autonomy contract, then /__daemon must surface mode + evidence
+# (the status-bar autonomy pill source).
+mkdir -p "$TEST_WORKSPACE/memory/self-mod"
+cat > "$TEST_WORKSPACE/memory/self-mod/autonomy-state.json" << 'EOF'
+{
+  "mode": "auto_mode",
+  "auto": true,
+  "computed_at": "2026-08-08T10:00:00Z",
+  "evidence": {"graduated": true, "clean_streak": 22, "clean_streak_target": 20, "unhealthy_jobs": 0, "auto_rollbacks_in_window": 1, "max_auto_rollbacks": 3, "window_days": 30}
+}
+EOF
+DAEMON3=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/__daemon")
+if echo "$DAEMON3" | jq -e '.autonomy.mode == "auto_mode" and .autonomy.auto == true and (.autonomy.evidence.clean_streak == 22)' >/dev/null 2>&1; then
+    pass "/__daemon exposes the autonomy contract mode + evidence"
+else
+    fail "/__daemon autonomy malformed: $DAEMON3"
+fi
+
 # The status bar + regenerate button must be part of the REBUILT dashboard
 # (regenerate rebuilds via the shared builder — the minimal fixture page had
 # no status bar, so this must be checked after the rebuild, not on the first
@@ -210,6 +228,12 @@ if [[ "$BODY2" == *'id="statusSpark"'* ]] && [[ "$BODY2" == *'renderJobSparkline
 else
     fail "rebuilt dashboard missing the daemon-health sparkline"
 fi
+if [[ "$BODY2" == *'id="statusAuto"'* ]] && [[ "$BODY2" == *'autonomy-pill'* ]]; then
+    pass "rebuilt dashboard carries the autonomy pill"
+else
+    fail "rebuilt dashboard missing the autonomy pill"
+fi
+rm -f "$TEST_WORKSPACE/memory/self-mod/autonomy-state.json"
 
 # ── Test 7: status / stop lifecycle ─────────────────────────────────────
 echo "Test 7: status and stop lifecycle"

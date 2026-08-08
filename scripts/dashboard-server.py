@@ -16,7 +16,8 @@ Serves $WORKSPACE over HTTP and keeps the dashboard live:
     the page's status bar can detect fragment changes without reloading.
   * `/__daemon` — sanitized daemon status: heartbeat (lastBeat/beatCount/
     lastChosenAction from heartbeat-state.json) + per-job stats and the most
-    recent successful job run (from deep-brain-kernel-state.json).
+    recent successful job run (from deep-brain-kernel-state.json) + the M7
+    autonomy contract mode (memory/self-mod/autonomy-state.json).
   * `POST /__regenerate` — **token-gated** (X-Dashboard-Token must match the
     token injected into the served page). Runs every skill's sync-state.sh
     (falling back to generate-dashboard.sh) across `$SUITE_ROOT/skills/*`
@@ -141,7 +142,18 @@ class Handler(SimpleHTTPRequestHandler):
         return {"count": len(frags), "fragments": frags, "lastChanged_ns": last}
 
     def _daemon_payload(self):
-        payload = {"heartbeat": None, "jobs": {"stats": {}, "lastFired": {}, "history": {}}, "summary": {"lastJobRun": None, "unhealthyJobs": []}}
+        payload = {"heartbeat": None, "jobs": {"stats": {}, "lastFired": {}, "history": {}}, "summary": {"lastJobRun": None, "unhealthyJobs": []}, "autonomy": None}
+        # M7/M8: the operational autonomy contract (auto_mode vs steward_mode)
+        # persisted by deep-brain-kernel.py --autonomy, so the status bar can
+        # show the mode + evidence the suite is (or isn't) self-deploying under.
+        au = self._load_json(os.path.join(WORKSPACE, "memory", "self-mod", "autonomy-state.json"))
+        if isinstance(au, dict) and au.get("mode"):
+            payload["autonomy"] = {
+                "mode": au.get("mode"),
+                "auto": bool(au.get("auto")),
+                "computed_at": au.get("computed_at"),
+                "evidence": au.get("evidence") or {},
+            }
         # M5: per-job success-rate trend from the daemon's per-run outcome
         # ledger (memory/daemon-job-history.jsonl, appended by the kernel on
         # every real job run). Mirrors the verification tab's sparkline.

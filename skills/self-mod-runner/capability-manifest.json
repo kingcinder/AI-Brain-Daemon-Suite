@@ -46,6 +46,10 @@
       "kind": "regression"
     },
     {
+      "path": "tests/run_phase9_harness.sh",
+      "kind": "regression"
+    },
+    {
       "path": "tests/test_health_context.sh",
       "kind": "unit"
     },
