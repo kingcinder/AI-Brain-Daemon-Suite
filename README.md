@@ -208,19 +208,35 @@ dependency — consistent with the rest of the suite. State writes go through
       missing, since the engine degrades gracefully either way.
    5. **Runs `--check`** — validates all 29 jobs (21 direct + 8 spawn): the 21 direct jobs' script paths, and minute + day-of-week
       uniqueness across all. Stops here if anything's actually broken.
-   6. **Pauses** so you can review/edit `aibrain.service` for the gotchas
-      below.
-   7. **Integrates with systemd** (`daemon-reload`) and **activates** the
+   6. **Auto-patches `aibrain.service`** — resolves the dirs of
+      `hermes`/`jq`/`curl`/`python3`/`vulkaninfo` (plus `nvidia-smi`/`rocm-smi`
+      if present) from your PATH and rewrites the deployed unit's
+      `Environment=PATH=` line, so nothing needs a manual service-file edit.
+   7. **Registers the suite with Hermes Agent** — Option B (zero-copy):
+      merges `skills.external_dirs → ~/.hermes/workspace/skills` into
+      `~/.hermes/config.yaml` (idempotent, with a `.bak-aibrain-install`
+      backup on first change), so all 11 brain skills load as `source=local`
+      with no manual config edit. Skipped with a warning if `hermes` isn't
+      installed (the suite still runs via `SPAWN_PROVIDER=local|agentloop`).
+   8. **Pauses only if a daemon tool is missing** from PATH (never in
+      noninteractive/`--yes` mode); otherwise proceeds straight through.
+   9. **Integrates with systemd** (`daemon-reload`) and **activates** the
       service.
-   8. **Verifies** the service is active and prints status.
+   10. **Verifies** the service is active, prints status, and checks how many
+      brain skills `hermes skills list` sees.
 
 ## Configuration / Gotchas
 
 * **WORKSPACE / PATH** — `systemctl --user` services don't inherit your
   shell's environment. `aibrain.service` sets `WORKSPACE=%h/.hermes/workspace`
-  and a minimal `PATH`; if logs show `hermes`/`jq`/`curl`/`python3`/
-  `nvidia-smi`/`rocm-smi` "not found" despite working in your terminal, run
-  `which <tool>` and add the real paths to the unit's `PATH=` line.
+  and a `PATH`; `install.sh` auto-resolves the dirs of `hermes`/`jq`/`curl`/
+  `python3`/`vulkaninfo` from your PATH and patches the deployed unit (Step
+  5.5), so this is normally handled for you. If you still see "not found"
+  for one of these in `journalctl` after install (e.g. you installed a tool
+  afterwards, or it lives in a nonstandard location), run `which <tool>` and
+  add the real dir to the unit's `Environment=PATH=` line, then
+  `systemctl --user daemon-reload && systemctl --user restart aibrain.service`.
+  Re-running `./install.sh` re-patches PATH automatically.
 * **cgroup delegation** — confirm it actually took effect after enabling:
   `systemctl --user show -p DelegateControllers aibrain.service` should list
   `cpu` and `memory`. If empty, see `SETUP_COMMANDS.md` §2 — this is a

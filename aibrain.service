@@ -9,7 +9,10 @@
 #        mkdir -p ~/.config/systemd/user
 #        cp aibrain.service ~/.config/systemd/user/aibrain.service
 #
-#   3. Edit the Environment= lines below (see GOTCHAS), then:
+#   3. install.sh patches Environment=PATH= automatically (it resolves the
+#      dirs of hermes/jq/curl/python3/vulkaninfo from your PATH and rewrites
+#      the deployed unit — Step 5.5). Only edit the Environment= lines below
+#      yourself if you customized the workspace or tool locations, then:
 #        systemctl --user daemon-reload
 #        systemctl --user enable --now aibrain.service
 #

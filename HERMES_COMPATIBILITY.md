@@ -157,6 +157,13 @@ local-first dedup. Keep this loop only if you revert to per-host copies.
 
 ### Option B — `skills.external_dirs` in `~/.hermes/config.yaml` (zero copy, ACTIVE on this host)
 
+**Automated since 2026-08-08:** `install.sh` Step 5.6 performs this merge for
+you — it resolves `~/.hermes/workspace/skills` into `skills.external_dirs` in
+`~/.hermes/config.yaml` (idempotent; no change when already present; first
+change is backed up to `~/.hermes/config.yaml.bak-aibrain-install`), then
+verifies how many brain skills `hermes skills list` sees. The manual version
+below is what that step does, kept here for reference / manual setups:
+
 Point Hermes at the suite's workspace deploy without copying anything:
 
 ```yaml
