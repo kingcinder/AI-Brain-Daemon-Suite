@@ -222,6 +222,15 @@ cat > "$TEST_WORKSPACE/memory/self-mod/autonomy-history.jsonl" << 'EOF'
 {"ts":"2026-08-01T09:00:00Z","mode":"steward_mode","auto":false,"transition":"initial","evidence":{"graduated":false,"clean_streak":5,"clean_streak_target":20,"unhealthy_jobs":0,"auto_rollbacks_in_window":0,"max_auto_rollbacks":3}}
 {"ts":"2026-08-08T09:00:00Z","mode":"auto_mode","auto":true,"transition":"granted","evidence":{"graduated":true,"clean_streak":25,"clean_streak_target":20,"unhealthy_jobs":0,"auto_rollbacks_in_window":0,"max_auto_rollbacks":3}}
 EOF
+# Autonomy gate provenance: seed the audit ledger (what log-provenance.sh
+# event writes) and assert /__daemon surfaces it for the 🛠 Self-Mod tab's
+# gate timeline.
+mkdir -p "$TEST_WORKSPACE/memory/provenance"
+cat > "$TEST_WORKSPACE/memory/provenance/events.jsonl" << 'EOF'
+{"ts":"2026-08-06T09:00:00Z","event":"autonomy.mode.decided","actor":"deep-brain-kernel","detail":{"mode":"steward_mode","auto":false,"transition":"initial"}}
+{"ts":"2026-08-07T09:00:00Z","event":"autonomy.gate.deferred","actor":"run-pipeline","detail":{"autonomy_mode":"steward_mode","review_mode":"full_review","reason":"steward_full_review_deferred"}}
+{"ts":"2026-08-08T09:00:00Z","event":"autonomy.gate.deploy_blocked","actor":"run-pipeline","detail":{"proposal":"p2","autonomy_mode":"steward_mode","review_mode":"full_review","reason":"full_review_human_approval_required"}}
+EOF
 DAEMON3=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/__daemon")
 if echo "$DAEMON3" | jq -e '.autonomy.mode == "auto_mode" and .autonomy.auto == true and (.autonomy.evidence.clean_streak == 22)' >/dev/null 2>&1; then
     pass "/__daemon exposes the autonomy contract mode + evidence"
@@ -232,6 +241,11 @@ if echo "$DAEMON3" | jq -e '(.autonomyHistory | length) == 2 and .autonomyHistor
     pass "/__daemon exposes the autonomy contract history (2 snapshots, granted transition)"
 else
     fail "/__daemon autonomyHistory malformed: $DAEMON3"
+fi
+if echo "$DAEMON3" | jq -e '(.provenanceEvents | length) == 3 and .provenanceEvents[0].event == "autonomy.mode.decided" and .provenanceEvents[1].event == "autonomy.gate.deferred" and .provenanceEvents[2].event == "autonomy.gate.deploy_blocked" and .provenanceEvents[2].detail.reason == "full_review_human_approval_required"' >/dev/null 2>&1; then
+    pass "/__daemon exposes the autonomy gate provenance (3 events, oldest first)"
+else
+    fail "/__daemon provenanceEvents malformed: $DAEMON3"
 fi
 
 # The status bar + regenerate button must be part of the REBUILT dashboard
@@ -261,7 +275,15 @@ if [[ "$BODY2" == *'Autonomy Contract · History'* ]] && [[ "$BODY2" == *'vAutoH
 else
     fail "rebuilt dashboard missing the autonomy history timeline card"
 fi
-rm -f "$TEST_WORKSPACE/memory/self-mod/autonomy-state.json" "$TEST_WORKSPACE/memory/self-mod/autonomy-history.jsonl"
+# The 🛠 tab's gate provenance timeline (deferred / blocked / allowed /
+# mode.decided) must be part of the rebuilt dashboard — the self-mod fragment's
+# card, rendered from the same events.jsonl ledger.
+if [[ "$BODY2" == *'Autonomy Gate · Provenance'* ]] && [[ "$BODY2" == *'smProvTimeline'* ]] && [[ "$BODY2" == *'renderProv'* ]]; then
+    pass "rebuilt dashboard carries the autonomy gate provenance timeline card"
+else
+    fail "rebuilt dashboard missing the gate provenance timeline card"
+fi
+rm -f "$TEST_WORKSPACE/memory/self-mod/autonomy-state.json" "$TEST_WORKSPACE/memory/self-mod/autonomy-history.jsonl" "$TEST_WORKSPACE/memory/provenance/events.jsonl"
 
 # ── Test 7: status / stop lifecycle ─────────────────────────────────────
 echo "Test 7: status and stop lifecycle"

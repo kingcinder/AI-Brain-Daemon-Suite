@@ -91,6 +91,14 @@ EOF
 cat > "$TEST_WORKSPACE/memory/self-mod/graduation-streak.json" << 'EOF'
 {"clean_streak": 7, "clean_streak_target": 20, "review_mode": "full_review"}
 EOF
+# Autonomy gate provenance: seed the audit ledger (what log-provenance.sh
+# event writes) so the fragment's baked timeline has real entries to render.
+mkdir -p "$TEST_WORKSPACE/memory/provenance"
+cat > "$TEST_WORKSPACE/memory/provenance/events.jsonl" << 'EOF'
+{"ts":"2026-08-07T02:00:00Z","event":"autonomy.mode.decided","actor":"deep-brain-kernel","detail":{"mode":"steward_mode","auto":false,"transition":"initial","computed_at":"2026-08-07T02:00:00Z"}}
+{"ts":"2026-08-08T02:00:00Z","event":"autonomy.gate.deferred","actor":"run-pipeline","detail":{"autonomy_mode":"steward_mode","review_mode":"full_review","reason":"steward_full_review_deferred"}}
+{"ts":"2026-08-09T02:00:00Z","event":"autonomy.gate.deploy_allowed","actor":"run-pipeline","detail":{"proposal":"p3","autonomy_mode":"auto_mode","review_mode":"full_review","reason":"autonomy_gate_passed"}}
+EOF
 mkdir -p "$TEST_WORKSPACE/memory/self-mod/proposals" "$TEST_WORKSPACE/memory/self-mod/deploys" "$TEST_WORKSPACE/memory/self-mod/pipeline-runs"
 touch "$TEST_WORKSPACE/memory/self-mod/proposals/p1.json" "$TEST_WORKSPACE/memory/self-mod/proposals/p2.json"
 touch "$TEST_WORKSPACE/memory/self-mod/deploys/d1.json"
@@ -111,6 +119,25 @@ TH_FOCUS=$(jq -r '.data.focus[0]' "$TEST_WORKSPACE/memory/dashboard-fragments/th
 if [ "$E_VAL" = "0.42" ]; then pass "executive fragment carries E=0.42"; else fail "executive E=$E_VAL (want 0.42)"; fi
 if [ "$STREAK" = "7" ] && [ "$PROPOSALS" = "2" ]; then pass "self-mod fragment carries streak=7, proposals=2"; else fail "self-mod streak=$STREAK proposals=$PROPOSALS"; fi
 if [ "$TH_TOTAL" = "47" ] && [ "$TH_FOCUS" = "goal_shipping" ]; then pass "thalamus fragment carries total=47, focus=goal_shipping"; else fail "thalamus total=$TH_TOTAL focus=$TH_FOCUS"; fi
+
+# The 🛠 self-mod fragment must bake the gate provenance timeline: the last
+# autonomy.* events from memory/provenance/events.jsonl (oldest first) and the
+# card markup + renderer that draws the steward's gate history.
+if jq -e '(.data.provenanceEvents | type) == "array" and (.data.provenanceEvents | length) == 3 and .data.provenanceEvents[0].event == "autonomy.mode.decided" and .data.provenanceEvents[2].event == "autonomy.gate.deploy_allowed"' "$TEST_WORKSPACE/memory/dashboard-fragments/self_mod.json" >/dev/null 2>&1; then
+    pass "self-mod fragment bakes 3 gate provenance events (oldest first)"
+else
+    fail "self-mod provenanceEvents malformed: $(jq -c '.data.provenanceEvents' "$TEST_WORKSPACE/memory/dashboard-fragments/self_mod.json")"
+fi
+if jq -e '.html | contains("Autonomy Gate · Provenance") and contains("smProvTimeline")' "$TEST_WORKSPACE/memory/dashboard-fragments/self_mod.json" >/dev/null 2>&1; then
+    pass "self-mod fragment carries the Autonomy Gate · Provenance timeline card"
+else
+    fail "self-mod fragment missing the gate provenance timeline card"
+fi
+if jq -e '.script | contains("renderProv") and contains("provenanceEvents")' "$TEST_WORKSPACE/memory/dashboard-fragments/self_mod.json" >/dev/null 2>&1; then
+    pass "self-mod fragment renderer wired to provenanceEvents"
+else
+    fail "self-mod fragment renderer missing"
+fi
 
 # ── Test 3: builder assembles all 15 tabs ───────────────────────────────
 echo "Test 3: dashboard-builder assembles all 15 tabs"

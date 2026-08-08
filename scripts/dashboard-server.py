@@ -186,6 +186,38 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
         payload["autonomyHistory"] = hist[-30:]
+        # Autonomy gate provenance: every autonomy.* audit event appended to
+        # memory/provenance/events.jsonl by log-provenance.sh event — kernel
+        # autonomy.mode.decided computations plus each deferred /
+        # deploy_blocked / deploy_allowed pipeline gate outcome. Last 30
+        # entries, oldest first — feeds the 🛠 Self-Mod tab's gate timeline
+        # (same ledger the fragment bakes at build time).
+        prov_path = os.path.join(WORKSPACE, "memory", "provenance", "events.jsonl")
+        prov = []
+        try:
+            with open(prov_path, encoding="utf-8") as pf:
+                for line in pf:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        e = json.loads(line)
+                    except ValueError:
+                        continue
+                    if not isinstance(e, dict):
+                        continue
+                    ev = e.get("event")
+                    if not isinstance(ev, str) or not ev.startswith("autonomy."):
+                        continue
+                    prov.append({
+                        "ts": e.get("ts"),
+                        "event": ev,
+                        "actor": e.get("actor", "unknown"),
+                        "detail": e.get("detail") if isinstance(e.get("detail"), dict) else {},
+                    })
+        except OSError:
+            pass
+        payload["provenanceEvents"] = prov[-30:]
         # M5: per-job success-rate trend from the daemon's per-run outcome
         # ledger (memory/daemon-job-history.jsonl, appended by the kernel on
         # every real job run). Mirrors the verification tab's sparkline.
