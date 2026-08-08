@@ -31,6 +31,7 @@ MODEL="${HERMES_MODEL:-}"
 LOCAL_URL="${LOCAL_LLM_URL:-http://127.0.0.1:8080/v1}"
 DRY=0
 STORE=1
+EMIT=0
 TIMEOUT="${LLM_PROPOSAL_TIMEOUT:-300}"
 LOCAL_ONLY="${LLM_LOCAL_ONLY:-1}"
 
@@ -46,6 +47,7 @@ while [[ $# -gt 0 ]]; do
     --dry-run) DRY=1; STORE=0; shift ;;
     --no-store) STORE=0; shift ;;
     --store) STORE=1; shift ;;
+    --emit-target) EMIT=1; STORE=0; shift ;;
     --allow-cloud) LOCAL_ONLY=0; shift ;;
     -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
     *) shift ;;
@@ -130,6 +132,32 @@ bash "$CHECK" --suite-root "$SUITE_ROOT" --proposal "$STUB" >/dev/null || {
   rm -f "$STUB"; exit 1
 }
 rm -f "$STUB"
+
+# ROADMAP M5: `--emit-target` resolves the outcome-driven target (the module
+# steered by real health signals — verification failures, daemon streaks, ACC
+# lessons — or the static preference fallback) and prints it as JSON, then
+# exits BEFORE any LLM call. This is the test seam for the signal → proposal
+# → target linkage: a fixture with a known failing job must produce this
+# module's script as the target, proving the suite aims its self-modification
+# at measured weaknesses rather than a rotating convenience list.
+if [ "$EMIT" -eq 1 ]; then
+  # steered_by computed in shell, passed via --arg — `$HEALTH_MODULE` must
+  # NOT be interpolated inside the jq program (single-quoted = literal jq
+  # text, and an unbound $var would make jq error). Explicit --module wins
+  # over health steering; and health only counts when the health module
+  # actually WON selection (the selection loop falls back to the preference
+  # list if the failing module isn't mutable / has no manifest) — the label
+  # must report the truthful linkage, not merely that a signal existed.
+  STEERED="preference"
+  if [ -n "$MODULE" ]; then
+    STEERED="override"
+  elif [ -n "$HEALTH_MODULE" ] && [ "$TARGET_MODULE" = "$HEALTH_MODULE" ]; then
+    STEERED="health"
+  fi
+  jq -nc --arg module "$TARGET_MODULE" --arg target "$TARGET_REL" --arg steered "$STEERED" \
+    '{module:$module, target:$target, steered_by:$steered}'
+  exit 0
+fi
 
 CURRENT=$(cat "$SUITE_ROOT/$TARGET_REL")
 CURRENT_CLIP=$(printf '%s' "$CURRENT" | head -c 8000)
