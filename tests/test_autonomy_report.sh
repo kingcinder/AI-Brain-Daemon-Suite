@@ -96,5 +96,29 @@ assert astate["mode"] == "auto_mode" and astate["auto"] is True, f"persisted: {a
 assert astate.get("computed_at"), "computed_at present"
 print("print_autonomy persists autonomy-state.json (auto_mode rc=0): ok")
 
+# ── autonomy-history ledger: one entry per run, transition-tagged ───────────
+hist_file = ws / "memory/self-mod/autonomy-history.jsonl"
+lines = hist_file.read_text().splitlines()
+assert len(lines) == 1, f"ledger has exactly one entry after first run: {lines}"
+e1 = json.loads(lines[0])
+assert e1["mode"] == "auto_mode" and e1["transition"] == "initial", f"e1: {e1}"
+assert e1.get("evidence", {}).get("clean_streak") == 25, f"e1 evidence: {e1}"
+assert e1.get("ts"), f"e1 ts present: {e1}"
+print("autonomy history ledger records first computation (transition=initial): ok")
+
+# Same evidence again → steady; then an unhealthy job → revoked.
+dbk.print_autonomy()
+lines = hist_file.read_text().splitlines()
+assert len(lines) == 2 and json.loads(lines[1])["transition"] == "steady", f"steady: {lines}"
+seed_daemon({"verification_pass": 3})
+rc2 = dbk.print_autonomy()
+assert rc2 == 1, f"print_autonomy steward_mode rc: {rc2}"
+lines = hist_file.read_text().splitlines()
+assert len(lines) == 3, f"ledger has 3 entries: {lines}"
+e3 = json.loads(lines[2])
+assert e3["mode"] == "steward_mode" and e3["transition"] == "revoked", f"e3: {e3}"
+assert e3["evidence"]["unhealthy_jobs"] == 1, f"e3 evidence: {e3}"
+print("autonomy history ledger tags granted/revoked/steady transitions: ok")
+
 print("PASS: autonomy-report")
 PY

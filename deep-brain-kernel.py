@@ -1793,7 +1793,10 @@ def print_autonomy() -> int:
     Read-only wrt daemon state; persists the computed mode to
     memory/self-mod/autonomy-state.json so the human (or a status check) can
     see the mode with its evidence later. Returns 0 when auto_mode, 1 when
-    steward_mode (so a steward-monitoring cron can alert on mode regressions)."""
+    steward_mode (so a steward-monitoring cron can alert on mode regressions).
+    Also appends every computation to memory/self-mod/autonomy-history.jsonl
+    (append-only, one entry per --autonomy run, tagged granted/revoked/steady)
+    so the dashboard's 🩺 tab can render the contract's evolution over time."""
     import json as _json
     daemon_state = DaemonState(DAEMON_STATE_FILE)
     thresh = {}
@@ -1815,6 +1818,40 @@ def print_autonomy() -> int:
         state_file = WORKSPACE / "memory" / "self-mod" / "autonomy-state.json"
         state_file.parent.mkdir(parents=True, exist_ok=True)
         state_file.write_text(_json.dumps(mode, indent=2, sort_keys=True) + "\n")
+    except OSError:
+        pass
+    # Append-only history ledger: tag this entry as a transition when the
+    # mode differs from the previous computation, so the dashboard can show
+    # WHEN and WHY auto_mode was granted or revoked. Best-effort — a ledger
+    # write failure must never change the exit code or the persisted state.
+    try:
+        hist_file = WORKSPACE / "memory" / "self-mod" / "autonomy-history.jsonl"
+        prev_mode = None
+        try:
+            lines = hist_file.read_text().splitlines()
+            if lines:
+                prev = _json.loads(lines[-1])
+                prev_mode = prev.get("mode") if isinstance(prev, dict) else None
+        except (OSError, ValueError, TypeError):
+            pass
+        if prev_mode is None:
+            transition = "initial"
+        elif prev_mode == mode["mode"]:
+            transition = "steady"
+        elif mode["mode"] == "auto_mode":
+            transition = "granted"
+        else:
+            transition = "revoked"
+        entry = {
+            "ts": mode["computed_at"],
+            "mode": mode["mode"],
+            "auto": mode["auto"],
+            "transition": transition,
+            "evidence": mode["evidence"],
+        }
+        hist_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(hist_file, "a", encoding="utf-8") as hf:
+            hf.write(_json.dumps(entry) + "\n")
     except OSError:
         pass
     print(_json.dumps(mode, indent=2))

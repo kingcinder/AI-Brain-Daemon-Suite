@@ -31,6 +31,14 @@ HTML=$(cat << 'HTMLEOF'
           .region-row:last-child { border: none; }
           .region-name { flex: 1; font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
           .region-rate { width: 46px; text-align: right; font-size: 0.75rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+          .auto-hist-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.78rem; }
+          .auto-hist-row:last-child { border: none; }
+          .auto-trans { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.03em; white-space: nowrap; }
+          .t-granted { color: var(--emerald); }
+          .t-revoked { color: #f87171; }
+          .t-steady { color: var(--text-muted); }
+          .auto-hist-ev { flex: 1; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .auto-hist-ts { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
         </style>
         <div class="card"><div class="stats-3">
           <div class="stat"><div class="stat-val" id="vTotal">0</div><div class="stat-label">Declared Tests</div></div>
@@ -43,6 +51,10 @@ HTML=$(cat << 'HTMLEOF'
           <div class="health-summary" id="vHealthSummary"></div>
         </div>
         <div class="card"><div class="card-title">Region Health</div><div id="vRegionRows"></div></div>
+        <div class="card"><div class="card-title">Autonomy Contract · History</div>
+          <div class="health-summary" id="vAutoSummary"></div>
+          <div id="vAutoHist"></div>
+        </div>
 HTMLEOF
 )
 
@@ -108,11 +120,65 @@ SCRIPT=$(cat << 'SCRIPTEOF'
   } else {
     rows.innerHTML = '<div class="empty">No per-module history yet.</div>';
   }
+
+  // Autonomy contract history: when and why auto_mode was granted or revoked.
+  // Baked from the ledger at build time (state.verification.autonomyHistory),
+  // then live-refreshed from /__daemon when served (same source as the status
+  // bar's autonomy pill) — so the steward sees the contract's evolution even
+  // without regenerating.
+  const renderAutoHist = (hist) => {
+    const wrap = document.getElementById('vAutoHist');
+    if (!wrap) return;
+    if (!hist || !hist.length) {
+      wrap.innerHTML = '<div class="empty">No snapshots yet — the self-mod cycle records one per run of deep-brain-kernel.py --autonomy.</div>';
+      return;
+    }
+    const rowsHtml = hist.slice().reverse().map(e => {
+      const auto = e.mode === 'auto_mode';
+      const pill = auto ? '🤖 auto' : '🛡 steward';
+      const cls = auto ? 'auto' : 'steward';
+      const trans = e.transition === 'granted' ? '<span class="auto-trans t-granted">▲ granted</span>'
+        : e.transition === 'revoked' ? '<span class="auto-trans t-revoked">▼ revoked</span>'
+        : e.transition === 'initial' ? '<span class="auto-trans t-steady">· initial</span>'
+        : '<span class="auto-trans t-steady">· steady</span>';
+      const ev = e.evidence || {};
+      const evTxt = 'streak ' + (ev.clean_streak ?? '—') + '/' + (ev.clean_streak_target ?? '—')
+        + ' · unhealthy ' + (ev.unhealthy_jobs ?? '—')
+        + ' · rollbacks ' + (ev.auto_rollbacks_in_window ?? '—') + '/' + (ev.max_auto_rollbacks ?? '—');
+      const ts = e.ts ? String(e.ts).slice(5, 16).replace('T', ' ') : '';
+      return `<div class="auto-hist-row"><span class="autonomy-pill ${cls}">${pill}</span>${trans}<span class="auto-hist-ev" title="${evTxt}">${evTxt}</span><span class="auto-hist-ts">${ts}</span></div>`;
+    }).join('');
+    wrap.innerHTML = rowsHtml;
+  };
+  renderAutoHist(s.autonomyHistory || []);
+  const sumEl = document.getElementById('vAutoSummary');
+  if (sumEl) {
+    const latest = (s.autonomyHistory || []).slice(-1)[0];
+    sumEl.innerHTML = latest
+      ? (latest.mode === 'auto_mode'
+        ? `🤖 Auto mode active — pipeline may self-deploy accepted proposals on schedule.`
+        : `🛡 Steward mode — human is consulted for direction, exemptions, and incidents.`)
+      : '';
+  }
+  // Live refresh (served mode only; fetch failure is swallowed).
+  fetch('/__daemon?t=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.json())
+    .then(d => { if (d && d.autonomyHistory) renderAutoHist(d.autonomyHistory); })
+    .catch(() => {});
 })();
 SCRIPTEOF
 )
 
 HISTORY_JSON=$("$SCRIPT_DIR/query-history.sh" --limit 12 2>/dev/null || echo '{}')
+
+# Autonomy contract history: baked from the append-only ledger written by
+# deep-brain-kernel.py --autonomy (one JSON line per computation, tagged
+# granted/revoked/steady). jq -s slurps the JSONL into an array. The fragment
+# also live-refreshes from /__daemon when served, so this is only the fallback.
+AUTOHIST_JSON="[]"
+if [ -f "$WORKSPACE/memory/self-mod/autonomy-history.jsonl" ]; then
+  AUTOHIST_JSON=$(jq -c -s '.' "$WORKSPACE/memory/self-mod/autonomy-history.jsonl" 2>/dev/null || echo '[]')
+fi
 
 DATA_JSON=$(jq -n --argjson total "$TOTAL" --argjson passed "$PASSED" --argjson failed "$FAILED" \
   --argjson failures "$FAILURES" --arg lastRun "$LAST_RUN" \
@@ -120,7 +186,8 @@ DATA_JSON=$(jq -n --argjson total "$TOTAL" --argjson passed "$PASSED" --argjson 
   --argjson modules "$(echo "$HISTORY_JSON" | jq -c '.modules // []' 2>/dev/null)" \
   --argjson healthiest "$(echo "$HISTORY_JSON" | jq -c '.healthiest // null' 2>/dev/null)" \
   --argjson unhealthiest "$(echo "$HISTORY_JSON" | jq -c '.unhealthiest // null' 2>/dev/null)" \
-  '{installed: true, total: $total, passed: $passed, failed: $failed, failures: $failures, lastRun: $lastRun, history: $history, modules: $modules, healthiest: $healthiest, unhealthiest: $unhealthiest}')
+  --argjson autonomyHistory "$AUTOHIST_JSON" \
+  '{installed: true, total: $total, passed: $passed, failed: $failed, failures: $failures, lastRun: $lastRun, history: $history, modules: $modules, healthiest: $healthiest, unhealthiest: $unhealthiest, autonomyHistory: $autonomyHistory}')
 
 echo "$HTML" > /tmp/vm_frag_html.$$
 echo "$SCRIPT" > /tmp/vm_frag_script.$$

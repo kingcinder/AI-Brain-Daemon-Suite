@@ -180,6 +180,16 @@ else
     fail "expected 403 for tokenless regenerate, got $REGEN_NO_TOKEN"
 fi
 
+# The regenerate endpoint rebuilds the dashboard from each skill's
+# sync-state.sh / generate-dashboard.sh. verification-memory's fragment (the
+# 🩺 tab, incl. the autonomy contract history card) is only written when
+# verification-state.json exists — seed it so the rebuilt page genuinely
+# carries the card and every skill is exercised by the rebuild.
+mkdir -p "$TEST_WORKSPACE/memory"
+cat > "$TEST_WORKSPACE/memory/verification-state.json" << 'EOF'
+{"lastRun": "2026-08-08T07:00:00Z", "totals": {"tests": 21, "passed": 21, "failed": 0}, "lastFailure": []}
+EOF
+
 # With the token injected into the served page, regenerate must succeed and
 # report which skills ran.
 BODY=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/brain-dashboard.html")
@@ -206,11 +216,22 @@ cat > "$TEST_WORKSPACE/memory/self-mod/autonomy-state.json" << 'EOF'
   "evidence": {"graduated": true, "clean_streak": 22, "clean_streak_target": 20, "unhealthy_jobs": 0, "auto_rollbacks_in_window": 1, "max_auto_rollbacks": 3, "window_days": 30}
 }
 EOF
+# Autonomy contract history: seed the append-only ledger (what --autonomy
+# writes each run) and assert /__daemon surfaces it for the 🩺 tab timeline.
+cat > "$TEST_WORKSPACE/memory/self-mod/autonomy-history.jsonl" << 'EOF'
+{"ts":"2026-08-01T09:00:00Z","mode":"steward_mode","auto":false,"transition":"initial","evidence":{"graduated":false,"clean_streak":5,"clean_streak_target":20,"unhealthy_jobs":0,"auto_rollbacks_in_window":0,"max_auto_rollbacks":3}}
+{"ts":"2026-08-08T09:00:00Z","mode":"auto_mode","auto":true,"transition":"granted","evidence":{"graduated":true,"clean_streak":25,"clean_streak_target":20,"unhealthy_jobs":0,"auto_rollbacks_in_window":0,"max_auto_rollbacks":3}}
+EOF
 DAEMON3=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/__daemon")
 if echo "$DAEMON3" | jq -e '.autonomy.mode == "auto_mode" and .autonomy.auto == true and (.autonomy.evidence.clean_streak == 22)' >/dev/null 2>&1; then
     pass "/__daemon exposes the autonomy contract mode + evidence"
 else
     fail "/__daemon autonomy malformed: $DAEMON3"
+fi
+if echo "$DAEMON3" | jq -e '(.autonomyHistory | length) == 2 and .autonomyHistory[1].transition == "granted" and .autonomyHistory[1].mode == "auto_mode" and (.autonomyHistory[0].evidence.clean_streak == 5)' >/dev/null 2>&1; then
+    pass "/__daemon exposes the autonomy contract history (2 snapshots, granted transition)"
+else
+    fail "/__daemon autonomyHistory malformed: $DAEMON3"
 fi
 
 # The status bar + regenerate button must be part of the REBUILT dashboard
@@ -233,7 +254,14 @@ if [[ "$BODY2" == *'id="statusAuto"'* ]] && [[ "$BODY2" == *'autonomy-pill'* ]];
 else
     fail "rebuilt dashboard missing the autonomy pill"
 fi
-rm -f "$TEST_WORKSPACE/memory/self-mod/autonomy-state.json"
+# The 🩺 tab's autonomy contract timeline (granted/revoked transitions) must
+# be part of the rebuilt dashboard — the verification fragment's card.
+if [[ "$BODY2" == *'Autonomy Contract · History'* ]] && [[ "$BODY2" == *'vAutoHist'* ]] && [[ "$BODY2" == *'renderAutoHist'* ]]; then
+    pass "rebuilt dashboard carries the autonomy contract history timeline card"
+else
+    fail "rebuilt dashboard missing the autonomy history timeline card"
+fi
+rm -f "$TEST_WORKSPACE/memory/self-mod/autonomy-state.json" "$TEST_WORKSPACE/memory/self-mod/autonomy-history.jsonl"
 
 # ── Test 7: status / stop lifecycle ─────────────────────────────────────
 echo "Test 7: status and stop lifecycle"

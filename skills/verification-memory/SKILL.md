@@ -105,7 +105,7 @@ a full sweep covers the entire regression surface — nothing is CI-only.
 | `run-declared-tests.sh` | Full sweep: discover manifests → run declared tests → record → publish → report. |
 | `run-module-tests.sh` | Targeted: run one module's declared tests (`--module <name>`), with a cooldown so signal storms don't spam the suite. |
 | `sync-state.sh` | Regenerate `VERIFICATION_STATE.md` + dashboard fragment from `verification-state.json`. |
-| `generate-dashboard.sh` | Write this skill's "🩺 Verification" dashboard fragment (incl. long-term health sparkline + healthiest/unhealthiest region). |
+| `generate-dashboard.sh` | Write this skill's "🩺 Verification" dashboard fragment (incl. long-term health sparkline + healthiest/unhealthiest region + the autonomy contract history timeline — when/why `auto_mode` was granted or revoked, live-refreshed from `/__daemon`). |
 | `query-history.sh` | Long-term health query over `verification-report.jsonl`: per-module pass-rate history, sparkline-ready points, healthiest/unhealthiest region. |
 | `backfill-history.sh` | Seed the report ledger with N historical runs (derived from the real full-sweep result) so the 🩺 sparkline shows a trend immediately. |
 | `log-event.sh` | Append to the shared `brain-events.jsonl`. |

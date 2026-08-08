@@ -150,10 +150,42 @@ class Handler(SimpleHTTPRequestHandler):
         if isinstance(au, dict) and au.get("mode"):
             payload["autonomy"] = {
                 "mode": au.get("mode"),
-                "auto": bool(au.get("auto")),
+                # Strict truthiness, matching the history parse below.
+                "auto": au.get("auto") is True,
                 "computed_at": au.get("computed_at"),
                 "evidence": au.get("evidence") or {},
             }
+        # Autonomy contract history: every --autonomy computation (appended by
+        # deep-brain-kernel.py to autonomy-history.jsonl with a granted/
+        # revoked/steady transition tag), so the 🩺 tab can render the contract
+        # over time — when and why auto_mode was granted or revoked — not just
+        # the latest snapshot. Last 30 entries, oldest first.
+        hist_path = os.path.join(WORKSPACE, "memory", "self-mod", "autonomy-history.jsonl")
+        hist = []
+        try:
+            with open(hist_path, encoding="utf-8") as hf:
+                for line in hf:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        e = json.loads(line)
+                    except ValueError:
+                        continue
+                    if not isinstance(e, dict):
+                        continue
+                    hist.append({
+                        "ts": e.get("ts"),
+                        "mode": e.get("mode"),
+                        # Strict truthiness: a hand-written string like
+                        # "auto": "false" must not render as granted.
+                        "auto": e.get("auto") is True,
+                        "transition": e.get("transition", "steady"),
+                        "evidence": e.get("evidence") or {},
+                    })
+        except OSError:
+            pass
+        payload["autonomyHistory"] = hist[-30:]
         # M5: per-job success-rate trend from the daemon's per-run outcome
         # ledger (memory/daemon-job-history.jsonl, appended by the kernel on
         # every real job run). Mirrors the verification tab's sparkline.

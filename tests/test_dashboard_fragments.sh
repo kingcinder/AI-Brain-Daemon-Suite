@@ -124,6 +124,21 @@ cat > "$TEST_WORKSPACE/memory/verification-state.json" << 'EOF'
 EOF
 "$ROOT/skills/verification-memory/scripts/generate-dashboard.sh" >/dev/null 2>&1 || true
 
+# The 🩺 verification fragment must carry the autonomy contract history card
+# (the timeline the steward reads to see when/why auto_mode was granted or
+# revoked). The card is always present; the data array defaults to [] with no
+# ledger, and the served page live-refreshes it from /__daemon.
+if jq -e '.html | contains("Autonomy Contract · History")' "$TEST_WORKSPACE/memory/dashboard-fragments/verification.json" >/dev/null 2>&1; then
+    pass "verification fragment carries the autonomy contract history card"
+else
+    fail "verification fragment missing the autonomy history card"
+fi
+if jq -e '(.data.autonomyHistory | type) == "array"' "$TEST_WORKSPACE/memory/dashboard-fragments/verification.json" >/dev/null 2>&1; then
+    pass "verification fragment bakes autonomyHistory data (defaults to [])"
+else
+    fail "verification fragment autonomyHistory data malformed"
+fi
+
 # Fresh build via the canonical builder (no --focus → deterministic order).
 "$ROOT/skills/cerebellum-memory/scripts/dashboard-builder.sh" >/dev/null 2>&1 || true
 
