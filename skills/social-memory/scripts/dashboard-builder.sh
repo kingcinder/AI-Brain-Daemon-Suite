@@ -228,6 +228,16 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
         .footer { text-align: center; margin-top: 24px; padding-top: 16px; font-size: 0.7rem; color: var(--text-muted); }
         .footer a { color: var(--accent); text-decoration: none; }
         .footer a:hover { color: var(--pink); }
+        .statusbar { display: flex; align-items: center; gap: 14px; padding: 10px 14px; margin-bottom: 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; font-size: 0.72rem; color: var(--text-muted); flex-wrap: wrap; backdrop-filter: blur(8px); }
+        .statusbar-item { display: flex; align-items: center; gap: 6px; }
+        .statusbar-item.warn { color: #f59e0b; }
+        .beat-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); transition: background 0.3s, box-shadow 0.3s; }
+        .beat-dot.alive { background: var(--emerald); box-shadow: 0 0 8px rgba(16,185,129,0.7); }
+        .beat-dot.stale { background: var(--amber); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
+        .beat-dot.down { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.6); }
+        .regen-btn { margin-left: auto; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.72rem; font-weight: 600; padding: 6px 14px; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+        .regen-btn:hover { border-color: var(--accent); color: var(--text); box-shadow: 0 0 12px var(--accent-glow); }
+        .regen-btn:disabled { opacity: 0.5; cursor: wait; }
     </style>
 </head>
 <body>
@@ -249,6 +259,14 @@ cat >> "$OUTPUT_FILE" << HEADER
             <h1>$AGENT_NAME</h1>
             <div class="subtitle">Brain Dashboard</div>
         </div>
+    </div>
+
+    <div class="statusbar">
+        <div class="statusbar-item"><span class="beat-dot" id="statusDot"></span><span id="statusBeat">💓 beat —</span></div>
+        <div class="statusbar-item"><span id="statusJob">⚙️ job —</span></div>
+        <div class="statusbar-item"><span id="statusFrags">🧩 fragments —</span></div>
+        <div class="statusbar-item"><span id="statusHealth">✅ —</span></div>
+        <button class="regen-btn" id="regenBtn" title="Run every skill's sync-state.sh, then rebuild the dashboard">🔄 Regenerate</button>
     </div>
 
     <div class="tabs">
@@ -346,6 +364,86 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 let savedTab = null;
 try { savedTab = localStorage.getItem('brainDashboardTab'); } catch (e) {}
 activateTab(savedTab) || activateTab(FOCUS_HINT) || activateTab(FIRST_TAB);
+
+// ── Live status bar: daemon heartbeat + last job + fragment count ──────
+// Backed by the serve-mode server's /__daemon + /__fragments endpoints; the
+// Regenerate button POSTs to /__regenerate with the server-injected token.
+// Works when served by scripts/serve-dashboard.sh; degrades to static text
+// when the file is opened directly (fetch fails are swallowed).
+const STATUS_POLL_MS = 10000;
+const fmtAgo = (iso) => {
+  if (!iso) return '—';
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.round(s / 60) + 'm ago';
+  if (s < 86400) return Math.round(s / 3600) + 'h ago';
+  return Math.round(s / 86400) + 'd ago';
+};
+
+function setStatus(id, text, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'statusbar-item' + (cls ? ' ' + cls : '');
+}
+
+function pollStatus() {
+  fetch('/__daemon?t=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.json())
+    .then(d => {
+      const dot = document.getElementById('statusDot');
+      if (dot) {
+        const ageH = (d.heartbeat && d.heartbeat.lastBeat)
+          ? (Date.now() - new Date(d.heartbeat.lastBeat).getTime()) / 3600000
+          : 999;
+        dot.className = 'beat-dot ' + (ageH < 2 ? 'alive' : ageH < 24 ? 'stale' : 'down');
+      }
+      setStatus('statusBeat', '💓 beat ' + ((d.heartbeat && d.heartbeat.lastBeat) ? fmtAgo(d.heartbeat.lastBeat) : '—'));
+      const lj = d.summary && d.summary.lastJobRun;
+      setStatus('statusJob', lj ? '⚙️ ' + lj.name + ' · ' + fmtAgo(lj.at) : '⚙️ no runs yet');
+      if (d.summary && d.summary.unhealthyJobs && d.summary.unhealthyJobs.length) {
+        setStatus('statusHealth', '⚠️ ' + d.summary.unhealthyJobs.length + ' unhealthy', 'warn');
+      } else {
+        setStatus('statusHealth', '✅ all healthy');
+      }
+    })
+    .catch(() => { setStatus('statusBeat', '💓 daemon offline'); });
+
+  fetch('/__fragments?t=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.json())
+    .then(d => {
+      setStatus('statusFrags', '🧩 ' + d.count + ' fragments');
+      const sig = (d.fragments || []).map(f => f.id + ':' + f.mtime_ns).join('|');
+      if (window.__fragSig && sig && sig !== window.__fragSig) { location.reload(); return; }
+      if (sig) window.__fragSig = sig;
+    })
+    .catch(() => {});
+}
+
+const regenBtn = document.getElementById('regenBtn');
+if (regenBtn) {
+  regenBtn.addEventListener('click', () => {
+    if (!window.__DASH_TOKEN) { console.warn('regen requires the served dashboard (serve-dashboard.sh start)'); return; }
+    regenBtn.disabled = true;
+    regenBtn.textContent = '♻️ Regenerating…';
+    fetch('/__regenerate', {
+      method: 'POST',
+      headers: { 'X-Dashboard-Token': window.__DASH_TOKEN },
+    })
+      .then(r => {
+        // Token is per-server-session and injected into the page; after a
+        // server restart the page holds a stale token. Reload to pick up
+        // the fresh injected token instead of leaving the button dead.
+        if (r.status === 401 || r.status === 403) { location.reload(); return; }
+        return r.json();
+      })
+      .then(d => { if (d) location.reload(); })
+      .catch(err => { regenBtn.disabled = false; regenBtn.textContent = '🔄 Regenerate'; console.error(err); });
+  });
+}
+
+pollStatus();
+setInterval(pollStatus, STATUS_POLL_MS);
 JSCORE
 
 echo "$JS_SCRIPTS"

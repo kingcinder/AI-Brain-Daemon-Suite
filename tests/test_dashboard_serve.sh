@@ -1,0 +1,240 @@
+#!/bin/bash
+# test_dashboard_serve.sh — Unit tests for the Brain Dashboard serve mode.
+#
+# Tests:
+#  1. serve-dashboard.sh start launches the server and serves HTTP 200
+#  2. The served page injects the auto-refresh script (polls /__dashboard_mtime)
+#  3. /__dashboard_mtime returns the dashboard file's mtime as JSON
+#  4. Regenerating the dashboard changes the mtime (the auto-refresh trigger)
+#  5. Static-file serving works and `..` traversal is blocked
+#  6. serve-dashboard.sh status/stop lifecycle works (status 0 → stop → status 1)
+#
+# Run: bash tests/test_dashboard_serve.sh
+# Requires: python3, curl (both already in the Suite's dependency set)
+
+set -euo pipefail
+
+PASS=0
+FAIL=0
+TEST_WORKSPACE=$(mktemp -d)
+SERVER_PID=""
+
+# Pick a free port dynamically so parallel/local runs never collide.
+PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export WORKSPACE="$TEST_WORKSPACE"
+export DASHBOARD_HOST="127.0.0.1"
+export DASHBOARD_PORT="$PORT"
+export DASHBOARD_PID_FILE="$TEST_WORKSPACE/.dashboard-server.pid"
+export DASHBOARD_LOG="$TEST_WORKSPACE/.dashboard-server.log"
+export DASHBOARD_REFRESH_SECONDS="1"  # fast poll so tests don't wait
+
+# A minimal dashboard fixture with a </body> so the injection has a target.
+cat > "$TEST_WORKSPACE/brain-dashboard.html" << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Brain Dashboard</title></head>
+<body>
+<div class="card"><div class="stat-val">fixture</div></div>
+</body>
+</html>
+EOF
+
+cleanup() {
+    if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+    fi
+    # Belt-and-braces: launcher stop also cleans its own PID file.
+    "$ROOT/scripts/serve-dashboard.sh" stop >/dev/null 2>&1 || true
+    rm -rf "$TEST_WORKSPACE"
+}
+trap cleanup EXIT
+
+pass() { PASS=$((PASS + 1)); echo "  ✅ $1"; }
+fail() { FAIL=$((FAIL + 1)); echo "  ❌ $1"; }
+
+# ── Test 1: start launches the server, serves HTTP 200 ──────────────────
+echo "Test 1: serve-dashboard.sh start serves the dashboard"
+
+START_OUT=$("$ROOT/scripts/serve-dashboard.sh" start 2>&1) || {
+    fail "serve-dashboard.sh start failed: $START_OUT"
+}
+if [ -f "$DASHBOARD_PID_FILE" ]; then
+    SERVER_PID=$(cat "$DASHBOARD_PID_FILE")
+fi
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:$PORT/brain-dashboard.html")
+if [ "$HTTP_CODE" = "200" ]; then
+    pass "server serves brain-dashboard.html (HTTP $HTTP_CODE, pid ${SERVER_PID:-unknown})"
+else
+    fail "expected HTTP 200, got $HTTP_CODE"
+fi
+
+# ── Test 2: auto-refresh script injected into served HTML ───────────────
+echo "Test 2: auto-refresh script is injected"
+
+BODY=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/brain-dashboard.html")
+# Bash-native substring match (NOT `echo "$BODY" | grep -q`): under
+# `set -o pipefail`, grep -q exits on first match and echo dies with SIGPIPE
+# mid-write of the full body, flipping the pipeline to a false failure.
+if [[ "$BODY" == *__dashboard_mtime* ]] && [[ "$BODY" == *'location.reload'* ]]; then
+    pass "served HTML contains the auto-refresh poller"
+else
+    fail "served HTML missing the auto-refresh script"
+fi
+# The on-disk file must be untouched — injection is serve-time only.
+if grep -q "__dashboard_mtime" "$TEST_WORKSPACE/brain-dashboard.html"; then
+    fail "on-disk dashboard was modified by the server"
+else
+    pass "on-disk dashboard file is pristine (injection is serve-time only)"
+fi
+
+# ── Test 3: /__dashboard_mtime returns JSON mtime ───────────────────────
+echo "Test 3: /__dashboard_mtime returns the file's mtime"
+
+MTIME1=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/__dashboard_mtime")
+if echo "$MTIME1" | jq -e '.mtime > 0' >/dev/null 2>&1; then
+    pass "mtime endpoint returns positive mtime ($(echo "$MTIME1" | jq -c .))"
+else
+    fail "mtime endpoint malformed: $MTIME1"
+fi
+
+# ── Test 4: regenerating the dashboard changes the mtime ────────────────
+echo "Test 4: regeneration bumps mtime (the auto-refresh trigger)"
+
+sleep 1.1  # ensure a distinct mtime
+printf '\n<!-- regenerated -->\n' >> "$TEST_WORKSPACE/brain-dashboard.html"
+MTIME2=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/__dashboard_mtime")
+if [ -n "$MTIME2" ] && [ "$(echo "$MTIME1" | jq -r '.mtime')" != "$(echo "$MTIME2" | jq -r '.mtime')" ]; then
+    pass "mtime changed after regeneration ($(echo "$MTIME1" | jq -r '.mtime') → $(echo "$MTIME2" | jq -r '.mtime'))"
+else
+    fail "mtime did not change after regeneration"
+fi
+
+# ── Test 5: static serving + traversal + asset whitelist ────────────────
+echo "Test 5: static serving, traversal guard, and asset whitelist"
+
+echo 'body { color: black; }' > "$TEST_WORKSPACE/probe.css"
+STATIC_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:$PORT/probe.css")
+TRAV_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:$PORT/../../../../etc/passwd")
+if [ "$STATIC_CODE" = "200" ]; then
+    pass "browser asset served (probe.css HTTP $STATIC_CODE)"
+else
+    fail "browser asset should be 200, got $STATIC_CODE"
+fi
+if [ "$TRAV_CODE" = "404" ] || [ "$TRAV_CODE" = "403" ]; then
+    pass "path traversal blocked (HTTP $TRAV_CODE)"
+else
+    fail "path traversal should be blocked, got $TRAV_CODE"
+fi
+# Non-GUI workspace internals (brain state, scripts, keys-adjacent) must 404.
+echo '{"probe": true}' > "$TEST_WORKSPACE/memory-probe.json"
+JSON_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:$PORT/memory-probe.json")
+PY_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:$PORT/probe.py")
+if [ "$JSON_CODE" = "404" ] && [ "$PY_CODE" = "404" ]; then
+    pass "non-GUI workspace files blocked (.json HTTP $JSON_CODE, .py HTTP $PY_CODE)"
+else
+    fail "workspace internals must 404 — .json=$JSON_CODE .py=$PY_CODE"
+fi
+
+# ── Test 6: live-status endpoints ───────────────────────────────────────
+echo "Test 6: /__fragments, /__daemon, and /__regenerate endpoints"
+
+FRAGS=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/__fragments")
+if echo "$FRAGS" | jq -e '(.count | type) == "number" and (.fragments | type) == "array"' >/dev/null 2>&1; then
+    pass "/__fragments returns fragment inventory (count=$(echo "$FRAGS" | jq -r '.count'))"
+else
+    fail "/__fragments malformed: $FRAGS"
+fi
+
+DAEMON=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/__daemon")
+if echo "$DAEMON" | jq -e '(.heartbeat == null or (.heartbeat | type) == "object") and (.jobs | type) == "object" and (.summary | type) == "object"' >/dev/null 2>&1; then
+    pass "/__daemon returns heartbeat + jobs + summary"
+else
+    fail "/__daemon malformed: $DAEMON"
+fi
+
+# The regenerate endpoint must reject anonymous POSTs (token-gated mutation).
+REGEN_NO_TOKEN=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 -X POST "http://127.0.0.1:$PORT/__regenerate")
+if [ "$REGEN_NO_TOKEN" = "403" ]; then
+    pass "POST /__regenerate without token is rejected (HTTP $REGEN_NO_TOKEN)"
+else
+    fail "expected 403 for tokenless regenerate, got $REGEN_NO_TOKEN"
+fi
+
+# With the token injected into the served page, regenerate must succeed and
+# report which skills ran.
+BODY=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/brain-dashboard.html")
+TOKEN=$(echo "$BODY" | sed -n 's/.*window.__DASH_TOKEN = "\([a-f0-9]*\)".*/\1/p' | head -1)
+if [ -n "$TOKEN" ]; then
+    REGEN_OK=$(curl -s --max-time 60 -X POST "http://127.0.0.1:$PORT/__regenerate" -H "X-Dashboard-Token: $TOKEN")
+    if echo "$REGEN_OK" | jq -e '(.ran | type) == "array"' >/dev/null 2>&1; then
+        pass "POST /__regenerate with token succeeds ($(echo "$REGEN_OK" | jq -c '.ran') ran)"
+    else
+        fail "regenerate with token failed: $REGEN_OK"
+    fi
+else
+    fail "token not injected into served page"
+fi
+
+# The status bar + regenerate button must be part of the REBUILT dashboard
+# (regenerate rebuilds via the shared builder — the minimal fixture page had
+# no status bar, so this must be checked after the rebuild, not on the first
+# fixture response).
+BODY2=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/brain-dashboard.html")
+if [[ "$BODY2" == *'id="statusDot"'* ]] && [[ "$BODY2" == *'id="regenBtn"'* ]]; then
+    pass "rebuilt dashboard carries live status bar + regenerate button"
+else
+    fail "rebuilt dashboard missing status bar or regenerate button"
+fi
+
+# ── Test 7: status / stop lifecycle ─────────────────────────────────────
+echo "Test 7: status and stop lifecycle"
+
+if "$ROOT/scripts/serve-dashboard.sh" status >/dev/null 2>&1; then
+    pass "status reports running while server is up"
+else
+    fail "status should report running"
+fi
+
+STOP_OUT=$("$ROOT/scripts/serve-dashboard.sh" stop 2>&1)
+SERVER_PID=""  # launcher stop owns the process now
+if "$ROOT/scripts/serve-dashboard.sh" status >/dev/null 2>&1; then
+    fail "status should report stopped after stop (out: $STOP_OUT)"
+else
+    pass "status reports stopped after stop"
+fi
+
+# ── Test 8: self-heal — start rebuilds a missing dashboard ─────────────
+echo "Test 8: start self-heals a missing brain-dashboard.html"
+
+rm -f "$TEST_WORKSPACE/brain-dashboard.html"
+HEAL_OUT=$("$ROOT/scripts/serve-dashboard.sh" start 2>&1) || {
+    fail "start should self-heal a missing dashboard: $HEAL_OUT"
+    true
+}
+if [ -f "$DASHBOARD_PID_FILE" ]; then
+    SERVER_PID=$(cat "$DASHBOARD_PID_FILE")
+fi
+HEAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:$PORT/brain-dashboard.html")
+if [ "$HEAL_CODE" = "200" ] && [ -s "$TEST_WORKSPACE/brain-dashboard.html" ]; then
+    pass "missing dashboard rebuilt and served (HTTP $HEAL_CODE)"
+else
+    fail "self-heal failed — HTTP $HEAL_CODE, file $( [ -s "$TEST_WORKSPACE/brain-dashboard.html" ] && echo present || echo absent )"
+fi
+
+# Clean up the self-healed server before summary.
+"$ROOT/scripts/serve-dashboard.sh" stop >/dev/null 2>&1 || true
+SERVER_PID=""
+
+# ── Summary ─────────────────────────────────────────────────────────────
+echo ""
+echo "─────────────────────────────────────────"
+echo "Dashboard Serve Tests: $PASS passed, $FAIL failed"
+echo "─────────────────────────────────────────"
+
+if [ "$FAIL" -gt 0 ]; then
+    exit 1
+fi
+exit 0

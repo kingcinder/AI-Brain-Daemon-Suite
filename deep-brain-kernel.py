@@ -1071,6 +1071,13 @@ JOBS: list[Job] = [
     # Minute 54 unique. Direct / non-inference.
     Job("signal_dispatch", "direct", "1,3,5,7,9,11,13,15,17,19,21,23", "54",
         "thalamus-memory/scripts/gate.sh"),
+    # V4.1: daily brain-state preservation snapshot (hippocampus). Minute 03
+    # unique in this table. Direct / non-inference. Runs core/snapshot/snapshot.sh
+    # via snapshot-tick.sh at 23:03 UTC — a last-known-good restore point that
+    # predates any bad day, the same snapshot machinery the self-mod pipeline
+    # uses for baseline divergence. Retention: 14 snapshots, pruned by the tick.
+    Job("brain_snapshot", "direct", "23", "3",
+        "hippocampus-memory/scripts/snapshot-tick.sh"),
     # Verification region (proprioception): runs every test each module
     # declared in its capability-manifest.json (manifest-driven discovery in
     # verification-memory/scripts/run-declared-tests.sh). A red suite exits

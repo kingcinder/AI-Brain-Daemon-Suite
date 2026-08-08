@@ -397,4 +397,11 @@ case "$MODE" in
     *)       echo "Unknown mode: $MODE" >&2; exit 1 ;;
 esac
 
+# Keep the 🚦 Thalamus tab fresh with the latest gate state — but only on
+# state-mutating modes. --status is read-only and called frequently (e.g.
+# session startup per AGENTS.md); it must not rebuild the dashboard.
+if [ "$MODE" != "status" ]; then
+    [ -x "$SCRIPT_DIR/generate-dashboard.sh" ] && bash "$SCRIPT_DIR/generate-dashboard.sh" >/dev/null 2>&1 || true
+fi
+
 exit 0

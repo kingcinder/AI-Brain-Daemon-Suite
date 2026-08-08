@@ -2,10 +2,14 @@
 # sync-state.sh — Regenerate THALAMUS_STATE.md and dashboard fragment.
 set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/thalamus-state.json"
 OUTPUT="$WORKSPACE/THALAMUS_STATE.md"
 
 mkdir -p "$(dirname "$OUTPUT")"
+
+# The 🚦 dashboard fragment is always written (graceful when state missing).
+[ -x "$SCRIPT_DIR/generate-dashboard.sh" ] && bash "$SCRIPT_DIR/generate-dashboard.sh" >/dev/null 2>&1 || true
 
 if [[ ! -f "$STATE_FILE" ]]; then
     cat > "$OUTPUT" << 'EOF'

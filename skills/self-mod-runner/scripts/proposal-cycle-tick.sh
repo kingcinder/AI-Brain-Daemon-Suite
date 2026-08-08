@@ -26,13 +26,22 @@ fi
 # (run-pipeline.sh creates its own dirs, but the redirect happens first).
 mkdir -p "$WORKSPACE/memory/self-mod"
 
+# Forward the daemon's TERM/INT (it signals only this tracked PID — Pillar 3)
+# to the pipeline so a timeout-kill can't orphan a running proposal cycle.
+rc=0
 bash "$PIPELINE" \
   --suite-root "$SUITE_ROOT" \
   --workspace "$WORKSPACE" \
   --generate-llm \
   --autonomy-gate \
-  2>"$WORKSPACE/memory/self-mod/proposal-cycle.err" \
-  || {
-    echo "proposal-cycle-tick: pipeline failed — see $WORKSPACE/memory/self-mod/proposal-cycle.err" >&2
-    exit 1
-  }
+  2>"$WORKSPACE/memory/self-mod/proposal-cycle.err" &
+PIPE_PID=$!
+trap 'kill "$PIPE_PID" 2>/dev/null || true' TERM INT
+wait "$PIPE_PID" || rc=$?
+trap - TERM INT
+# Keep the 🛠️ Self-Mod tab fresh with the updated proposal store + streak.
+[ -x "$SCRIPT_DIR/generate-dashboard.sh" ] && bash "$SCRIPT_DIR/generate-dashboard.sh" >/dev/null 2>&1 || true
+if [ "$rc" -ne 0 ]; then
+  echo "proposal-cycle-tick: pipeline failed — see $WORKSPACE/memory/self-mod/proposal-cycle.err" >&2
+  exit 1
+fi

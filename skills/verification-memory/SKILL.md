@@ -107,6 +107,7 @@ a full sweep covers the entire regression surface — nothing is CI-only.
 | `sync-state.sh` | Regenerate `VERIFICATION_STATE.md` + dashboard fragment from `verification-state.json`. |
 | `generate-dashboard.sh` | Write this skill's "🩺 Verification" dashboard fragment (incl. long-term health sparkline + healthiest/unhealthiest region). |
 | `query-history.sh` | Long-term health query over `verification-report.jsonl`: per-module pass-rate history, sparkline-ready points, healthiest/unhealthiest region. |
+| `backfill-history.sh` | Seed the report ledger with N historical runs (derived from the real full-sweep result) so the 🩺 sparkline shows a trend immediately. |
 | `log-event.sh` | Append to the shared `brain-events.jsonl`. |
 | `dashboard-builder.sh` | Shared AI Brain Series dashboard assembler (identical copy, per the suite convention). |
 
@@ -164,7 +165,29 @@ region can answer "is this region getting healthier over time?":
 ```
 
 The query returns overall + per-module pass-rate history (old ledger entries
-without a `modules` field still count toward the overall trend). The overall
+without a `modules` field still count toward the overall trend).
+
+### Seeding the trend (backfill)
+
+On a fresh workspace the ledger has zero or one entry, so the sparkline renders
+a single bar until the daily `verification_pass` job has run for days. To make
+the trend visible immediately:
+
+```bash
+./scripts/backfill-history.sh            # seed the past 7 days from the real sweep result
+./scripts/backfill-history.sh --days 14  # seed two weeks instead
+```
+
+Every backfilled entry is derived from the **most recent real full-sweep entry**
+already in the ledger (`filter=all`, with its per-module breakdown) — no
+pass/fail data is invented. Only the timestamps are historical, stamped at the
+daemon's scheduled `verification_pass` minute (07:56 UTC), and each entry
+carries `"source":"backfill"` so the ledger stays auditable. The ledger is
+rebuilt atomically (backfill entries chronological, then originals unchanged)
+with a timestamped backup kept alongside; a day that already has an entry is
+never double-filled, and a second run without `--force` is a no-op. The script
+refuses (exit 1) if there's no ledger or no full-sweep entry to derive from —
+run a sweep first in that case. The overall
 trend spans every run — full sweeps and signal-triggered `--module` re-checks
 alike — while each module's rate is scoped to that region's own runs. It names the
 **healthiest / unhealthiest region** — regions seen in fewer than `--min-runs`
@@ -178,7 +201,9 @@ run's green/red state. `VERIFICATION_STATE.md` includes the same trend table.
 `deep-brain-kernel.py` JOBS table includes `verification_pass` (minute 56,
 daily 07:56 UTC, direct/non-inference) so the scheduled brain verifies itself
 once a day without touching CI. A red suite surfaces as job failure in
-`--status` output.
+`--status` output. Each scheduled run appends one entry to the report ledger,
+so the 🩺 sparkline grows one bar per day on its own — run
+`backfill-history.sh` once on a fresh workspace to seed the trend immediately.
 
 **Timeout note:** the daemon applies one global `--direct-timeout` (default
 300s) to direct jobs. A full sweep runs every phase harness sequentially, so

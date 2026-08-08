@@ -58,6 +58,7 @@ rollback only — see `legacy-IGNORE/README.md`.
 | `HERMES_COMPATIBILITY.md` | **Hermes Agent compatibility audit.** File-by-file inspection of the whole suite against the installed `hermes` binary — CLI invocations, skill packaging, and nomenclature — with per-file verdicts and open items. |
 | `deep-brain-kernel.py` | **The engine.** Async scheduler + pressure supervisor: epoll-driven PSI monitoring, GPU VRAM checking, cgroups v2 throttling, pidfd-based process tracking, single-instance locking. `--check` validates the job table without starting anything. |
 | `aibrain.service` | Systemd (user) unit supervising `deep-brain-kernel.py`, using systemd's own delegated cgroup controls rather than hand-rolled cgroup paths. |
+| `aibrain-dashboard.service` | Optional systemd (user) unit running the Brain Dashboard GUI serve mode (`scripts/serve-dashboard.sh foreground`) — boot-started, always-on, auto-restart on crash. |
 | `skills/` | All 15 skill packages (11 memory skills + `executive-function`, `self-mod-runner`, `verification-memory`, `thalamus-memory`). `anterior-cingulate-memory` includes a fix (see below) so every skill's LLM-backed encoding runs against your local model, none against a paid cloud API. |
 | `SETUP_COMMANDS.md` | Host-level verification steps (PSI, cgroup v2 delegation, GPU tooling) to run once before or after enabling the service. |
 | `docs/V4_STATUS.md` | V4.0 phase ledger (plumbing vs live-exercised; full-cycle close-out pointer). |
@@ -66,10 +67,11 @@ rollback only — see `legacy-IGNORE/README.md`.
 | `install.sh` | Automates workspace setup, deployment, host prerequisite checks, pre-flight validation, and service activation. |
 | `legacy-IGNORE/` | Prior bash daemon (`brain-daemon.sh`) — **not live**; live engine is `deep-brain-kernel.py`, fully working, kept for rollback only. Not used by `install.sh`. |
 | `tests/pfc_decide_harness.sh` | Closed-loop verification that `prefrontal-cortex-memory/scripts/decide.sh` actually changes its output based on sibling state (not just documented to) — synthetic sibling state files, 7 pass/fail assertions, no LLM or real siblings required. Run: `bash tests/pfc_decide_harness.sh`. |
-| `skills/verification-memory/` | **Verification region (the suite's proprioception):** runs every test each module declares in its `capability-manifest.json` `tests` array (manifest-driven, zero per-region wiring), publishes `tests_passed`/`test_failure` signals into the brain's routing table, is scheduled daily as `verification_pass` in `deep-brain-kernel.py`, and is the self-mod pre-deploy regression gate (`core/self-mod/evaluate-proposal.sh` runs the sweep + `deep-brain-kernel.py --check` in its sandbox; phase1 fallback). Long-term health: `query-history.sh` computes per-module pass-rate history over the report ledger, with a sparkline + healthiest/unhealthiest region in the dashboard tab. It also gates CI: `.github/workflows/verification.yml` runs manifest validation + the daemon job-table check (`deep-brain-kernel.py --check`) + the unit suite + this sweep on every pull request, nightly on the default branch, and on demand from the Actions tab. Run: `bash skills/verification-memory/scripts/run-declared-tests.sh`. |
+| `skills/verification-memory/` | **Verification region (the suite's proprioception):** runs every test each module declares in its `capability-manifest.json` `tests` array (manifest-driven, zero per-region wiring), publishes `tests_passed`/`test_failure` signals into the brain's routing table, is scheduled daily as `verification_pass` in `deep-brain-kernel.py`, and is the self-mod pre-deploy regression gate (`core/self-mod/evaluate-proposal.sh` runs the sweep + `deep-brain-kernel.py --check` in its sandbox; phase1 fallback). Long-term health: `query-history.sh` computes per-module pass-rate history over the report ledger, with a sparkline + healthiest/unhealthiest region in the dashboard tab. It also gates CI: `.github/workflows/verification.yml` runs manifest validation + the daemon job-table check (`deep-brain-kernel.py --check`) + the unit suite + this sweep on every pull request, nightly on the default branch, and on demand from the Actions tab. Run: `bash skills/verification-memory/scripts/run-declared-tests.sh`. On a fresh workspace, `backfill-history.sh` seeds the report ledger with historical runs (derived from the real sweep result, `source=backfill`) so the 🩺 sparkline shows a trend immediately instead of a single bar. |
 | `tests/test_verification_region.sh` | verification-memory self-test — the gate that gates the gate (auto-included in the unit suite). Run: `bash tests/test_verification_region.sh`. |
 | `scripts/ci-gate.sh` | One-command local replay of the CI Verification Gate — runs the same four commands with the exact CI env (`WORKSPACE` at the checkout + `DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1` for `--check`, isolated scratch workspace for the sweep). Run: `bash scripts/ci-gate.sh`. |
 | `scripts/deep-verify.sh` | One-command local replay of the weekly deep verify — runs the self-mod proposal pipeline's sandbox gate (`core/self-mod/evaluate-proposal.sh`) against HEAD with a no-op probe proposal, accepted iff every declared test passes and the daemon job table is intact (the workflow's weekly `47 4 * * 1` schedule entry). Run: `bash scripts/deep-verify.sh`. |
+| `scripts/serve-dashboard.sh` | **Always-on GUI serve mode for the Brain Dashboard.** Serves `$WORKSPACE/brain-dashboard.html` on a fixed port (default `8123`) with auto-refresh — the page polls the server and reloads itself the instant a job regenerates the file, instead of a one-off `python3 -m http.server` showing stale data. `start`/`stop`/`status`/`restart`/`foreground`; self-heals a missing dashboard on start. Run: `bash scripts/serve-dashboard.sh start`. |
 
 ### Why are there two ACC skills?
 
@@ -235,6 +237,48 @@ unhealthy jobs, so it doubles as a monitoring check, e.g. in a cron line:
 Deferrals (VRAM limit, PSI pressure, missing `hermes`, missing script) are
 deliberately not counted as failures — only jobs that actually ran and then
 errored or timed out.
+
+## Dashboard GUI (serve mode)
+
+The suite's visual dashboard (`$WORKSPACE/brain-dashboard.html`, assembled
+from every skill's fragment by the shared `dashboard-builder.sh`) can be
+served as an always-on GUI instead of a one-off static-file open:
+
+```bash
+bash scripts/serve-dashboard.sh start    # → http://127.0.0.1:8123/brain-dashboard.html
+bash scripts/serve-dashboard.sh status
+bash scripts/serve-dashboard.sh restart
+bash scripts/serve-dashboard.sh stop
+```
+
+`start` launches the stdlib-only Python server (`scripts/dashboard-server.py`)
+on a **fixed port** (default `8123`, override with `DASHBOARD_PORT`;
+`DASHBOARD_HOST` defaults to loopback-only `127.0.0.1`) and **auto-refreshes**:
+the served page injects a tiny poller that watches the dashboard file's mtime
+via `GET /__dashboard_mtime` and calls `location.reload()` the instant a job
+regenerates it — no manual refresh, and your selected tab survives reloads
+(the builder persists it in `localStorage`). If `brain-dashboard.html` is
+missing, `start` builds it first via the shared builder, so it self-heals on a
+fresh workspace.
+
+The dashboard shell is **live**: a status bar under the header re-fetches
+`GET /__fragments` and `GET /__daemon` every 10s, showing the daemon
+heartbeat (last beat + age), the most recent successful job run, the live
+fragment count, and a health flag for jobs at 3+ consecutive failures. A
+**🔄 Regenerate** button POSTs to `POST /__regenerate`, which runs every
+skill's `sync-state.sh` (falling back to `generate-dashboard.sh`) across
+`skills/*` and rebuilds the dashboard in place — a live, token-gated
+mutation (the server injects a per-session token into the page; cross-origin
+POSTs can't supply it, so only the dashboard itself can trigger a rebuild).
+
+For a **boot-started, always-on** GUI, install the optional systemd user unit
+(`aibrain-dashboard.service`) — same install pattern as `aibrain.service`
+(copy `scripts/serve-dashboard.sh` + `scripts/dashboard-server.py` into your
+workspace's `scripts/`, copy the unit to `~/.config/systemd/user/`, edit the
+`Environment=` lines for your workspace, then
+`systemctl --user enable --now aibrain-dashboard.service`). Auto-restarts on
+crash, logs to journald. Only expose `DASHBOARD_HOST=0.0.0.0` on a trusted
+network.
 
 ## Decommissioning the Old Cron Jobs
 

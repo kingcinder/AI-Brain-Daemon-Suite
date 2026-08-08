@@ -19,4 +19,16 @@ else
   exit 1
 fi
 
-exec bash "$CORE_EXEC" --workspace "$WORKSPACE" "$@"
+# Run the cycle with the daemon's Pillar 3 shutdown semantics preserved: this
+# wrapper is the tracked PID, so forward TERM/INT to the real worker rather
+# than letting a timeout-kill orphan it (the daemon signals only this PID).
+rc=0
+bash "$CORE_EXEC" --workspace "$WORKSPACE" "$@" &
+CYCLE_PID=$!
+trap 'kill "$CYCLE_PID" 2>/dev/null || true' TERM INT
+wait "$CYCLE_PID" || rc=$?
+trap - TERM INT
+# Keep the 🎛️ Governance tab fresh with this cycle's load/goals/reflections.
+# (Runs on failure too — the tab should show the latest state either way.)
+[ -x "$SCRIPT_DIR/generate-dashboard.sh" ] && bash "$SCRIPT_DIR/generate-dashboard.sh" >/dev/null 2>&1 || true
+exit "$rc"

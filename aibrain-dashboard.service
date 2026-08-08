@@ -1,0 +1,70 @@
+# aibrain-dashboard.service — optional systemd --user unit for the Brain
+# Dashboard GUI serve mode (scripts/serve-dashboard.sh → scripts/dashboard-server.py).
+#
+# Unlike aibrain.service (the daemon), this unit is OPTIONAL: the suite's
+# dashboard is also served on demand via:
+#     bash scripts/serve-dashboard.sh start
+#     bash scripts/serve-dashboard.sh stop
+# Install this unit only if you want the GUI boot-started and always-on.
+#
+# INSTALLATION:
+#   1. Copy serve-dashboard.sh + dashboard-server.py to your workspace:
+#        mkdir -p ~/.hermes/workspace/scripts
+#        cp scripts/serve-dashboard.sh scripts/dashboard-server.py ~/.hermes/workspace/scripts/
+#        chmod +x ~/.hermes/workspace/scripts/serve-dashboard.sh
+#
+#   2. Copy this file into place:
+#        mkdir -p ~/.config/systemd/user
+#        cp aibrain-dashboard.service ~/.config/systemd/user/aibrain-dashboard.service
+#
+#   3. Edit the Environment=/ExecStart lines below if your workspace isn't
+#      the default (same gotcha as aibrain.service — systemd --user does NOT
+#      inherit your shell's environment), then:
+#        systemctl --user daemon-reload
+#        systemctl --user enable --now aibrain-dashboard.service
+#
+#   4. Verify:
+#        systemctl --user status aibrain-dashboard.service
+#        journalctl --user -u aibrain-dashboard.service -f
+#        curl -s http://127.0.0.1:8123/brain-dashboard.html | head -5
+#
+# GOTCHAS:
+#   (a) The dashboard auto-refreshes by polling the server, so the HTML is
+#       served with Cache-Control: no-cache — the server does this itself,
+#       nothing to configure here.
+#   (b) Bind address is 127.0.0.1 by default (loopback only). To expose it
+#       on your LAN, set DASHBOARD_HOST=0.0.0.0 here and open the firewall
+#       port — only do this on a trusted network.
+#   (c) If brain-dashboard.html is missing when the unit starts, the server
+#       will 404 until the daemon's next dashboard-regenerating job runs (or
+#       you run a skill's generate-dashboard.sh). serve-dashboard.sh's `start`
+#       builds it first; under systemd the builder runs in `foreground` too
+#       (ensure_dashboard), so a missing file self-heals on start.
+
+[Unit]
+Description=AI Brain Suite Brain Dashboard GUI (auto-refresh serve mode)
+Documentation=file:README.md
+After=network-online.target
+
+[Service]
+Type=simple
+
+# Same WORKSPACE gotcha as aibrain.service — systemd --user doesn't inherit
+# your shell env. Adjust if your workspace isn't the default.
+Environment=WORKSPACE=%h/.hermes/workspace
+Environment=DASHBOARD_PORT=8123
+Environment=DASHBOARD_HOST=127.0.0.1
+Environment=DASHBOARD_REFRESH_SECONDS=5
+Environment=PATH=/usr/bin:/bin:/usr/local/bin:%h/.local/bin
+
+ExecStart=%h/.hermes/workspace/scripts/serve-dashboard.sh foreground
+
+# Crash recovery — the GUI should be as resilient as the daemon.
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
