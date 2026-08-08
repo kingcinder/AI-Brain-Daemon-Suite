@@ -18,6 +18,14 @@
 #     auditable — e.g. every autonomy-mode decision (kernel --autonomy
 #     computation, run-pipeline deploy/defer gate outcomes).
 #
+#   log-provenance.sh events [--filter SUBSTRING] [--limit N]
+#     Compact audit table over events.jsonl (the mirror of `show`, which
+#     reads the patch DAG): TS | EVENT | ACTOR | DETAIL. --filter matches
+#     the event name case-insensitively — `events --filter autonomy` gives
+#     the steward every autonomy-mode decision (mode.decided + gate
+#     deferred/blocked/allowed) in one terminal command. --limit caps the
+#     newest rows shown (default 25).
+#
 #   log-provenance.sh show [--limit N]
 #   log-provenance.sh hash <path-or-string>
 #
@@ -155,13 +163,60 @@ cmd_show() {
   tail -n "$limit" "$PROV_LOG" | jq -s '.'
 }
 
+cmd_events() {
+  # Compact audit table over events.jsonl (generic audit events written by
+  # `log-provenance.sh event`). Mirrors `show` — which renders the patch
+  # DAG — but for the event trail, as a human-readable table instead of raw
+  # JSON: TS | EVENT | ACTOR | DETAIL. The steward audits every autonomy-mode
+  # decision from the terminal with `events --filter autonomy` (mode.decided
+  # computations + deferred / deploy_blocked / deploy_allowed gate outcomes).
+  local filter="" limit=25
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --filter) filter="$2"; shift 2 ;;
+      --limit) limit="$2"; shift 2 ;;
+      *) echo "Unknown arg: $1" >&2; exit 2 ;;
+    esac
+  done
+  local ev_file="$PROV_DIR/events.jsonl"
+  if [ ! -f "$ev_file" ]; then
+    echo "No events logged yet ($ev_file)."
+    return 0
+  fi
+  local filter_lc
+  filter_lc=$(printf '%s' "$filter" | tr 'A-Z' 'a-z')
+  printf '%-22s  %-30s  %-18s  %s\n' "TS" "EVENT" "ACTOR" "DETAIL"
+  printf '%-22s  %-30s  %-18s  %s\n' "---" "-----" "-----" "------"
+  # NOTE: the select guard needs explicit parens — in jq, `and` binds tighter
+  # than `|`, so without them `.event` would be re-indexed on the piped string
+  # ("Cannot index string with string \"event\"").
+  if ! jq -r -s --arg f "$filter_lc" --argjson lim "$limit" '
+    (if $f == "" then . else [.[] | select((.event | type == "string") and ((.event | ascii_downcase) | contains($f)))] end)
+    | .[-$lim:]
+    | .[]
+    | [.ts // "-", .event // "-", .actor // "-",
+       ((.detail // {}) | if type == "object" then
+          (if .transition then "\(.mode) · \(.transition)"
+           elif .reason then "\(.autonomy_mode) + \(.review_mode) · \(.reason)"
+           else (tostring | .[0:80]) end)
+        else (tostring | .[0:80]) end)]
+    | @tsv
+  ' "$ev_file" | awk -F'\t' '{ printf "%-22s  %-30s  %-18s  %s\n", $1, $2, $3, $4 }'; then
+    # Corrupt/truncated events.jsonl (or a non-numeric --limit): degrade to a
+    # readable message instead of a raw jq error under set -euo pipefail.
+    echo "(events.jsonl unreadable or malformed — skipping table)" >&2
+    return 1
+  fi
+}
+
 case "${1:-}" in
   append) shift; cmd_append "$@" ;;
   event)  shift; cmd_event "$@" ;;
+  events) shift; cmd_events "$@" ;;
   show)   shift; cmd_show "$@" ;;
   hash)   shift; cmd_hash "$@" ;;
   *)
-    echo "Usage: $0 {append|event|show|hash} ..." >&2
+    echo "Usage: $0 {append|event|events|show|hash} ..." >&2
     exit 2
     ;;
 esac
