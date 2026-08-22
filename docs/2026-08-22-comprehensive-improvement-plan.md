@@ -399,16 +399,31 @@ Week 6-7:  Initiative 11 (self-mod architectural refactoring — M6 precursor)
 5. **Don't gate on M0 completion.** M0 (host hardening) can proceed in
    parallel with Initiatives 1-3.
 
----
-
-## Acceptance for the whole plan
+---## Acceptance for the whole plan
 
 Every initiative lands as sequenced commits. After each commit:
 - `bash -n` on all touched files passes.
-- All 27 existing tests + any new tests pass.
+- All 28 existing tests + any new tests pass.
 - `python3 deep-brain-kernel.py --check` reports 0 problems.
 - The three phase harnesses used in CI (`run_phase2_harness.sh`,
   `run_phase5_harness.sh`, `run_skill_unit_tests.sh`) stay green.
+
+## Progress log
+
+| Initiative | Status | Commit | Summary |
+|---|---|---|---|
+| 1 — Shell hardening | ✅ COMPLETE | `8194561` | 116 scripts → `set -euo pipefail`; 4 unbound-$1 bugs fixed |
+| 2 — Per-skill unit tests | ⏳ | — | All skills have test files; manifest declarations pending |
+| 3 — VTA→PFC goal loop | ✅ COMPLETE | `4e83b83` | `vta/encode-pipeline.sh` calls `record-goal-outcome.sh` on accomplishment overlap |
+| 4 — Default agent-loop | ✅ COMPLETE | `4e83b83` | `SPAWN_PROVIDER` default: `hermes` → `agentloop` |
+| 5 — Cognitive dashboard | ✅ COMPLETE | `4e83b83` | `python3 deep-brain-kernel.py --brain` (--json supported) |
+| 6 — Outcome-driven proposals | ⏳ | — | M5: signal data → LLM proposal prompts |
+| 7 — Semantic knowledge extraction | ⏳ | — | Weekly pattern extraction from episodic store |
+| 8 — Manifest completion | ⏳ | — | Most manifests already comprehensive |
+| 9 — Install/uninstall isolation | ⏳ | — | Per-skill install.sh contract |
+| 10 — Multi-agent negotiation | ⏳ | — | Basal-ganglia action selection between competing signals |
+| 11 — Self-mod architectural refactoring | ⏳ | — | Multi-file patches + new-module creation (M6) |
+| 12 — Run-it-anywhere portability | ⏳ | — | macOS/container support for daemon |
 
 The plan is *done* when Initiatives 1-12 are all committed and pushed,
 and the `docs/2026-08-22-comprehensive-improvement-plan.md` itself has a
