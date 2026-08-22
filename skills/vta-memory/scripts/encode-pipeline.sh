@@ -217,3 +217,24 @@ fi
 
 echo ""
 echo "✅ Pipeline phase 1 complete. Sub-agent will handle reward detection."
+
+# Closed-loop: accomplishment rewards that overlap active PFC goals ⇒
+# close the goal as success (ROADMAP M4 feedback arc).
+if [ -x "$SKILL_DIR/../../core/executive/record-goal-outcome.sh" ]; then
+    PFC="$WORKSPACE/memory/pfc-state.json"
+    if [ -f "$PFC" ] && [ -f "$PENDING_FILE" ]; then
+        ACTIVE_GOALS=$(jq -r '[.goals[]? | select(.status == "active") | .description] | join("\n")' "$PFC" 2>/dev/null || echo "")
+        if [ -n "$ACTIVE_GOALS" ]; then
+            while IFS= read -r goal; do
+                [ -z "$goal" ] && continue
+                # Check if any pending reward text overlaps this goal
+                OVERLAP=$(jq -r --arg g "$goal" '[.pending[]? | select(.detected_rewards | contains(["accomplishment","competence"])) | .text] | join(" ")' "$PENDING_FILE" 2>/dev/null)
+                if [ -n "$OVERLAP" ]; then
+                    for word in $goal; do
+                        case "$OVERLAP" in *"$word"*) bash "$SKILL_DIR/../../core/executive/record-goal-outcome.sh" outcome --goal-description "$goal" --outcome success --job vta_encode --evidence "VTA reward detection: accomplishment"; break ;; esac
+                    done
+                fi
+            done <<< "$ACTIVE_GOALS"
+        fi
+    fi
+fi

@@ -122,7 +122,7 @@ SKILLS_DIR = WORKSPACE / "skills"
 # llm-call.sh endpoint), or agentloop (internal agentic loop — tool use +
 # session memory, core/agent-loop/agent-loop.sh). Unknown values fall back to
 # hermes with a warning — never fail to launch.
-SPAWN_PROVIDER = os.environ.get("SPAWN_PROVIDER", "hermes").strip().lower()
+SPAWN_PROVIDER = os.environ.get("SPAWN_PROVIDER", "agentloop").strip().lower()
 if SPAWN_PROVIDER not in ("hermes", "local", "agentloop"):
     log.warning("unknown SPAWN_PROVIDER '%s' — defaulting to hermes", SPAWN_PROVIDER)
     SPAWN_PROVIDER = "hermes"
@@ -1715,6 +1715,202 @@ async def run_daemon(vram_limit: float, tick_seconds: int, psi_threshold: float,
     )
 
 
+def print_brain_state() -> int:
+    """Read-only cognitive dashboard: one-page summary of every brain region."""
+    import json as _json
+    import os as _os
+
+    mem = _os.environ.get("WORKSPACE", _os.path.expanduser("~/.hermes/workspace")) + "/memory"
+
+    def read(path, default):
+        p = _os.path.join(mem, path)
+        if not _os.path.isfile(p):
+            return default
+        try:
+            with open(p) as f:
+                return _json.load(f)
+        except Exception:
+            return default
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # ── Gather state ─────────────────────────────────────────────────
+    thalamus   = read("thalamus-state.json", {})
+    pfc        = read("pfc-state.json", {})
+    neuromod   = read("neuromod-state.json", {})
+    emotion    = read("emotional-state.json", {})
+    conflict   = read("conflict-state.json", {})
+    cerebellum = read("cerebellum-state.json", {})
+    habit      = read("habit-state.json", {})
+    social     = read("social-state.json", {})
+    insula     = read("interoceptive-state.json", {})
+    reward     = read("reward-state.json", {})
+    heartbeat  = read("heartbeat-state.json", {})
+    acc        = read("acc-state.json", {})
+    workspace  = read("workspace.json", {})
+    autonomy   = read("self-mod/autonomy-state.json", {})
+    daemon_st  = read("aibrain-daemon-state.json", {})
+
+    # ── Extract key fields ───────────────────────────────────────────
+    focus = thalamus.get("attentionFocus", [])
+    pending_signals = len(thalamus.get("suppressedQueue", []))
+    stats = thalamus.get("stats", {})
+
+    active_goals = [g for g in pfc.get("goals", []) if g.get("status") == "active"]
+    inhibitions = len(pfc.get("inhibitions", []))
+
+    mods = neuromod.get("modulators", {})
+    da  = mods.get("dopamine", {}).get("value", 0.5)
+    na  = mods.get("noradrenaline", {}).get("value", 0.5)
+    serotonin = mods.get("serotonin", {}).get("value", 0.5)
+    ach = mods.get("acetylcholine", {}).get("value", 0.5)
+    cort = mods.get("cortisol", {}).get("value", 0.5)
+    oxt = mods.get("oxytocin", {}).get("value", 0.5)
+    sp  = mods.get("sleepPressure", {}).get("value", 0)
+    composites = neuromod.get("composites", {})
+
+    dims = emotion.get("dimensions", {})
+    val = dims.get("valence", 0)
+    arousal = dims.get("arousal", 0)
+    energy = dims.get("energy", 0.5)
+
+    conf_load = conflict.get("conflictLoad", 0)
+    uncertainty = len(conflict.get("attentionFlags", []))
+
+    cal = cerebellum.get("globalCalibration", 0.5)
+    habit_avg = 0
+    habits = habit.get("habits", [])
+    if habits:
+        habit_avg = sum(h.get("strength", 0) for h in habits) / len(habits)
+
+    rels = social.get("relationships", {})
+    rel_count = len(rels)
+    trust_vals = [r.get("trust", 0) for r in rels.values()]
+    avg_trust = sum(trust_vals) / len(trust_vals) if trust_vals else 0
+    open_loops = sum(len(r.get("openLoops", [])) for r in rels.values())
+
+    channels = insula.get("channels", {})
+    cog_load = channels.get("cognitiveLoad", 0.3)
+    gut_sig  = channels.get("gutSignal", 0.1)
+
+    drive = reward.get("drive", 0.5)
+
+    circadian = heartbeat.get("circadian", {})
+    wake_h = circadian.get("wakeHour", 8)
+    sleep_h = circadian.get("sleepHour", 22)
+    beats = heartbeat.get("beatCount", 0)
+
+    patterns = acc.get("activePatterns", [])
+    error_patterns = len(patterns)
+    lessons = acc.get("lessons", [])
+
+    phase = workspace.get("context", {}).get("phase", "unknown")
+
+    auto_mode = autonomy.get("mode", "steward_mode")
+    streak = autonomy.get("current_streak", 0)
+
+    jobs = daemon_st.get("jobs", {})
+    total_jobs = len(jobs)
+    unhealthy = sum(1 for j in jobs.values() if j.get("consecutive_failures", 0) >= 3)
+    last_defer = "never"
+    for j in jobs.values():
+        if j.get("last_error"):
+            last_defer = j["last_error"]
+            break
+
+    # ── Build output ─────────────────────────────────────────────────
+    brain = {
+        "at": now,
+        "attention": {
+            "focus": focus,
+            "pending_signals": pending_signals,
+            "processed": stats.get("totalSignalsProcessed", 0),
+        },
+        "goals": {
+            "active": [g.get("description") for g in active_goals],
+            "count": len(active_goals),
+            "inhibitions": inhibitions,
+        },
+        "neuromod": {
+            "dopamine": da,
+            "noradrenaline": na,
+            "serotonin": serotonin,
+            "acetylcholine": ach,
+            "cortisol": cort,
+            "oxytocin": oxt,
+            "sleepPressure": sp,
+            "composites": composites,
+        },
+        "emotion": {
+            "valence": val,
+            "arousal": arousal,
+            "energy": energy,
+        },
+        "conflict": {
+            "load": conf_load,
+            "uncertainty_flags": uncertainty,
+        },
+        "motor": {
+            "calibration": cal,
+            "habit_strength": round(habit_avg, 3),
+        },
+        "social": {
+            "relationships": rel_count,
+            "avg_trust": round(avg_trust, 3),
+            "open_loops": open_loops,
+        },
+        "interoception": {
+            "cognitive_load": cog_load,
+            "gut_signal": gut_sig,
+            "drive": drive,
+        },
+        "circadian": {
+            "phase": phase,
+            "wake_hour": wake_h,
+            "sleep_hour": sleep_h,
+            "beats": beats,
+        },
+        "error": {
+            "active_patterns": error_patterns,
+            "lessons": len(lessons),
+        },
+        "autonomy": {
+            "mode": auto_mode,
+            "self_mod_streak": streak,
+        },
+        "daemon": {
+            "jobs": total_jobs,
+            "unhealthy": unhealthy,
+            "last_defer_or_error": last_defer[:80] if last_defer != "never" else "none",
+        },
+    }
+
+    # When --json is requested alongside --brain, print structured output
+    if "--json" in sys.argv:
+        print(_json.dumps(brain, indent=2))
+        return 0
+
+    # ── Human-readable dashboard ─────────────────────────────────────
+    print(f"🧠 AI Brain Suite — Cognitive State at {now}")
+    print("═══════════════════════════════════════════════════════")
+    print(f"Attention:    {', '.join(focus) if focus else 'none'}"
+          f"  ({pending_signals} pending)")
+    goals_str = ", ".join(g.get("description", "") for g in active_goals)
+    print(f"Goals:        {len(active_goals)} active ({goals_str})" if goals_str else f"Goals:        {len(active_goals)} active")
+    print(f"Neuromod:     DA {da:.2f}  NA {na:.2f}  5-HT {serotonin:.2f}  ACh {ach:.2f}  "
+          f"CORT {cort:.2f}  OXT {oxt:.2f}")
+    print(f"              Sleep pressure {sp:.2f}  |  Phase: {phase}")
+    print(f"Emotion:      valence {val:+.2f}  arousal {arousal:.2f}  energy {energy:.2f}")
+    print(f"Conflict:     load {conf_load:.2f}  ({uncertainty} uncertainty flags)")
+    print(f"Motor:        calibration {cal:.2f}  habit strength {habit_avg:.3f}")
+    print(f"Social:       {rel_count} relationships (avg trust {avg_trust:.3f}, {open_loops} open loops)")
+    print(f"Intero:       cognitive load {cog_load:.2f}  gut signal {gut_sig:.2f}  reward drive {drive:.2f}")
+    print(f"Error:        {error_patterns} active patterns  {len(lessons)} lessons")
+    print(f"Autonomy:     {auto_mode}  |  Self-mod streak: {streak}")
+    print(f"Daemon:       {total_jobs} jobs, {unhealthy} unhealthy" if unhealthy else f"Daemon:       {total_jobs} jobs, all healthy")
+    return 0
+
+
 def print_status() -> int:
     """FIX #3: read-only health report — doesn't need the daemon running,
     doesn't need the lock, just reads DAEMON_STATE_FILE. Answers "which of
@@ -1969,6 +2165,11 @@ def main() -> None:
                               "daemon is active. Exit code is the number of jobs currently at or "
                               "above the unhealthy consecutive-failure threshold, so this can "
                               "double as a monitoring check.")
+    parser.add_argument("--brain", action="store_true",
+                         help="Read-only cognitive dashboard: prints a single-page summary of "
+                              "every brain region's current state (attention, goals, neuromod, "
+                              "emotion, conflict, calibration, social, interoception, daemon). "
+                              "Add --json for machine-readable output.")
     parser.add_argument("--autonomy", action="store_true",
                          help="ROADMAP M7: report the operational autonomy contract mode "
                               "(auto_mode vs steward_mode) with its evidence, persist it to "
@@ -2015,6 +2216,9 @@ def main() -> None:
 
     if args.status:
         sys.exit(print_status())
+
+    if args.brain:
+        sys.exit(print_brain_state())
 
     if args.autonomy:
         sys.exit(print_autonomy())
