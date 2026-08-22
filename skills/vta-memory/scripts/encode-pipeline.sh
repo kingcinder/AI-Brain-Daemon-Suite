@@ -53,6 +53,10 @@ fi
 echo ""
 echo "🔄 Step 3: Scoring reward signals..."
 
+# Integrative State Layer: reward-starved dopamine (< 0.4) amplifies intensity
+NEURO_DA=$("$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get dopamine 2>/dev/null || echo "0.5")
+export NEURO_DA
+
 python3 << 'PYTHON'
 import json
 import os
@@ -163,6 +167,9 @@ for sig in signals:
         continue
     
     intensity = estimate_intensity(text, rewards)
+    dopamine = float(os.environ.get('NEURO_DA', '0.5'))
+    if dopamine < 0.4:
+        intensity *= 1.15   # reward-starved: small wins feel bigger
     
     pending.append({
         "id": sig_id,

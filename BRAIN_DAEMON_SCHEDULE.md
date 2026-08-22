@@ -134,8 +134,8 @@ well under the default on this host.
 Not every job in the table replaced a per-skill cron entry — the jobs below
 were added by the V4.0 kernel itself (Phase 1/2/3 machinery + roadmap
 milestones) and never had an `install.sh --with-cron` counterpart. They live
-in the `JOBS` table only, and are documented here so the full 29-job table
-(21 direct + 8 spawn) has a single reference:
+in the `JOBS` table only, and are documented here so the full 30-job table
+(22 direct + 8 spawn) has a single reference:
 
 | Job | Kind | Days | Hours | Minute | Runs |
 |---|---|---|---|---|---|
@@ -146,6 +146,7 @@ in the `JOBS` table only, and are documented here so the full 29-job table
 | `thalamus_decay` | direct | * | 0,4,8,12,16,20 | 48 | `thalamus-memory/scripts/decay.sh` — releases suppressed signals past their retryAfter window |
 | `signal_dispatch` | direct | * | 1,3,5,7,9,11,13,15,17,19,21,23 | 54 | `thalamus-memory/scripts/gate.sh` — polls `brain-signals.jsonl` and dispatches through the gate (opposite 2-hour cycle from `thalamus_gate`) |
 | `brain_snapshot` | direct | * | 23 | 3 | `hippocampus-memory/scripts/snapshot-tick.sh` — V4.1 daily state-preservation snapshot via `core/snapshot/snapshot.sh` (retention 14) |
+| `neuromod_update` | direct | * | * | 6,21,36,51 | `thalamus-memory/scripts/neuromod-update.sh` — Integrative State Layer (A): composes the global neuromodulator vector from VTA/amygdala/ACC/insula/social/heartbeat state, then chains `workspace-refresh.sh` to assemble `workspace.json`'s context block. Minutes 6/21/36/51 are globally unique (every 15 min) |
 
 All three Phase-1 signaling/attention jobs share the attention machinery in
 `thalamus-memory`; `signal_dispatch` polls `brain-signals.jsonl` (written by

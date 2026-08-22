@@ -56,6 +56,15 @@ HABIT_STRENGTH=$(read_field "$WORKSPACE/memory/habit-state.json" '([.habits[].st
 CALIBRATION=$(read_field "$WORKSPACE/memory/cerebellum-state.json" '.globalCalibration' "0.5")
 OPEN_LOOPS=$(read_field "$WORKSPACE/memory/social-state.json" '([.relationships[].openLoops[]?] | length)' "0")
 
+# ── Integrative State Layer: global neuromod + workspace context ───────────
+NEURO_DA=0.5
+NEURO_CORT=0.5
+if [ -x "$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" ]; then
+    NEURO_DA=$("$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get dopamine 2>/dev/null || echo "0.5")
+    NEURO_CORT=$("$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get cortisol 2>/dev/null || echo "0.5")
+fi
+WORKSPACE_CONTEXT=$(read_field "$WORKSPACE/memory/workspace.json" '.context' "{}")
+
 # ── Goals & inhibitions (PFC's own state) ────────────────────────────────────
 GOALS=$(jq -c '[.goals[] | select(.status == "active")]' "$STATE_FILE")
 INHIBITIONS=$(jq -c '.inhibitions' "$STATE_FILE")
@@ -99,7 +108,7 @@ echo "$INHIBITIONS" > /tmp/pfc_inhibitions.$$
 echo "$SEMANTIC_GOAL_MATCHES" > /tmp/pfc_semantic_goals.$$
 echo "$SEMANTIC_INHIBITION_MATCHES" > /tmp/pfc_semantic_inhibitions.$$
 
-RESULT=$(CALIBRATION="$CALIBRATION" COGNITIVE_LOAD="$COGNITIVE_LOAD" CONFLICT_LOAD="$CONFLICT_LOAD" CONTEXT="$CONTEXT" DRIVE="$DRIVE" ENERGY="$ENERGY" ERROR_PATTERNS="$ERROR_PATTERNS" GUT_SIGNAL="$GUT_SIGNAL" HABIT_STRENGTH="$HABIT_STRENGTH" OPEN_LOOPS="$OPEN_LOOPS" SATURATION="$SATURATION" SEEKING="$SEEKING" SEMANTIC_METHOD="$SEMANTIC_METHOD" VALENCE="$VALENCE" \
+RESULT=$(CALIBRATION="$CALIBRATION" COGNITIVE_LOAD="$COGNITIVE_LOAD" CONFLICT_LOAD="$CONFLICT_LOAD" CONTEXT="$CONTEXT" DRIVE="$DRIVE" ENERGY="$ENERGY" ERROR_PATTERNS="$ERROR_PATTERNS" GUT_SIGNAL="$GUT_SIGNAL" HABIT_STRENGTH="$HABIT_STRENGTH" NEURO_CORT="$NEURO_CORT" NEURO_DA="$NEURO_DA" OPEN_LOOPS="$OPEN_LOOPS" SATURATION="$SATURATION" SEEKING="$SEEKING" SEMANTIC_METHOD="$SEMANTIC_METHOD" VALENCE="$VALENCE" \
   OPTIONS_FILE="/tmp/pfc_options.$$" GOALS_FILE="/tmp/pfc_goals.$$" INHIBITIONS_FILE="/tmp/pfc_inhibitions.$$" \
   SEMANTIC_GOALS_FILE="/tmp/pfc_semantic_goals.$$" SEMANTIC_INHIBITIONS_FILE="/tmp/pfc_semantic_inhibitions.$$" \
   python3 << 'PYTHON'
@@ -126,6 +135,8 @@ error_patterns = int(os.environ['ERROR_PATTERNS'])
 habit_strength = float(os.environ['HABIT_STRENGTH'])
 calibration = float(os.environ['CALIBRATION'])
 open_loops = int(os.environ['OPEN_LOOPS'])
+dopamine = float(os.environ['NEURO_DA'])
+cortisol = float(os.environ['NEURO_CORT'])
 
 notes = []
 scores = {}
@@ -180,14 +191,14 @@ for opt in options:
         for gm in semantic_goal_matches:
             if gm.get('option_id') == oid:
                 g = goals[gm['goal_index']]
-                score *= (1.0 + g.get('priority', 0.5))
-                notes.append(f"active goal '{g.get('description')}' boosts {oid} (semantic match)")
+                score *= (1.0 + g.get('priority', 0.5)) * (0.8 + 0.4 * dopamine)
+                notes.append(f"active goal '{g.get('description')}' boosts {oid} (semantic match, DA={dopamine:.2f})")
     else:
         for g in goals:
             desc = g.get('description') or ''
             if desc and overlaps(desc, label):
-                score *= (1.0 + g.get('priority', 0.5))
-                notes.append(f"active goal '{g.get('description')}' boosts {oid} (heuristic match)")
+                score *= (1.0 + g.get('priority', 0.5)) * (0.8 + 0.4 * dopamine)
+                notes.append(f"active goal '{g.get('description')}' boosts {oid} (heuristic match, DA={dopamine:.2f})")
 
     # Inhibitions suppress matching options entirely (impulse control)
     if using_semantic:
@@ -221,6 +232,14 @@ for opt in options:
     if open_loops > 0 and oid == 'social_interaction':
         score *= (1.0 + min(open_loops, 5) * 0.08)
         notes.append(f'{open_loops} open loop(s) favor social_interaction')
+
+    # Somatic bias: under acute stress (cortisol > 0.6), options that look
+    # uncertain/novel get dampened — prefer the known over the unknown.
+    if cortisol > 0.6:
+        UNCERTAINTY_MARKERS = ('maybe', 'uncertain', 'try', 'experiment', 'new', 'explore')
+        if any(m in label for m in UNCERTAINTY_MARKERS):
+            score *= (1.0 - 0.2 * cortisol)
+            notes.append(f"stress (cortisol={cortisol:.2f}) dampens uncertain option {oid}")
 
     scores[oid] = round(score, 3)
 

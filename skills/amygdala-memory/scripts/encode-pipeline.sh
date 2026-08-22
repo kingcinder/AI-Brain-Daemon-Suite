@@ -53,6 +53,10 @@ fi
 echo ""
 echo "🔄 Step 3: Scoring emotional signals..."
 
+# Integrative State Layer: noradrenaline amplifies emotional intensity
+NEURO_NA=$("$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get noradrenaline 2>/dev/null || echo "0.5")
+export NEURO_NA
+
 python3 << 'PYTHON'
 import json
 import os
@@ -139,6 +143,8 @@ for sig in signals:
         continue
     
     intensity = estimate_intensity(text, emotions)
+    na = float(os.environ.get('NEURO_NA', '0.5'))
+    intensity *= (1.0 + 0.3 * (na - 0.5))   # arousal amplifies emotional intensity
     
     pending.append({
         "id": sig_id,

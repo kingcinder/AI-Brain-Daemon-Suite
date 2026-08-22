@@ -35,7 +35,19 @@ fi
 EXCHANGES=$("$SKILL_DIR/scripts/preprocess-exchanges.sh")
 EXCHANGE_COUNT=$(echo "$EXCHANGES" | jq 'length' 2>/dev/null || echo 0)
 
-if [ "$EXCHANGE_COUNT" -lt 2 ]; then
+# Integrative State Layer: under acute stress (stressIndex > 0.6) conflicts
+# are flagged on thinner evidence — exchange threshold drops 2 -> 1.
+# NOTE: this file uses jq only (no bc anywhere in it) — use jq for the
+# comparison, not bc, to avoid introducing a new dependency in this file.
+MIN_EXCHANGES=2
+if [ -x "$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" ]; then
+    STRESS_INDEX=$("$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" --composite stressIndex 2>/dev/null || echo "0.5")
+    if jq -e --argjson s "$STRESS_INDEX" '$s > 0.6' /dev/null > /dev/null 2>&1; then
+        MIN_EXCHANGES=1
+    fi
+fi
+
+if [ "$EXCHANGE_COUNT" -lt "$MIN_EXCHANGES" ]; then
   echo "⚡ encode-pipeline: insufficient exchanges ($EXCHANGE_COUNT) — skipping."
   exit 0
 fi

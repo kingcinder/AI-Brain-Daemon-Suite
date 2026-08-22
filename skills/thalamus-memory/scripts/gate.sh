@@ -102,6 +102,28 @@ _get_circadian_gain() {
     fi
 }
 
+# ── Read the global neuromodulator vector (neutral when absent) ─────────
+_get_neuromod() {
+    # Reads once per call; called from within _score_signal (a pipeline
+    # subshell), so state set here cannot be hoisted to _process.
+    if [[ -x "$SCRIPT_DIR/get-neuromod.sh" ]]; then
+        NEURO_NA=$("$SCRIPT_DIR/get-neuromod.sh" --get noradrenaline 2>/dev/null || echo "0.5")
+        NEURO_DA=$("$SCRIPT_DIR/get-neuromod.sh" --get dopamine 2>/dev/null || echo "0.5")
+        NEURO_ACH=$("$SCRIPT_DIR/get-neuromod.sh" --get acetylcholine 2>/dev/null || echo "0.5")
+        NEURO_CORT=$("$SCRIPT_DIR/get-neuromod.sh" --get cortisol 2>/dev/null || echo "0.5")
+        NEURO_SP=$("$SCRIPT_DIR/get-neuromod.sh" --get sleepPressure 2>/dev/null || echo "0")
+        NEURO_PRESENT=$([[ -f "$WORKSPACE/memory/neuromod-state.json" ]] && echo "1" || echo "0")
+        # Absent vector = NO stress: cortisol must read 0 (so the out-of-focus
+        # suppression factor is (1 - 0.25*0) = 1.0), NOT the 0.5 baseline —
+        # the 0.5 baseline would scale every out-of-focus score by 0.875 on a
+        # fresh install, violating the neutral-by-default guarantee.
+        [[ "$NEURO_PRESENT" = "1" ]] || NEURO_CORT="0"
+    else
+        NEURO_NA="0.5"; NEURO_DA="0.5"; NEURO_ACH="0.5"; NEURO_CORT="0"; NEURO_SP="0"
+        NEURO_PRESENT="0"
+    fi
+}
+
 # ── Score a single signal ───────────────────────────────────────────────
 _score_signal() {
     local signal_json="$1"
@@ -145,7 +167,9 @@ _score_signal() {
         novelty=$(echo "scale=4; if ($recent_count > 5) 0.1 else if ($recent_count > 2) 0.3 else if ($recent_count > 0) 0.5 else 0.7" | bc 2>/dev/null || echo "0.3")
     fi
 
-    # 3. Urgency: from intensity and source priority
+    # 3. Urgency: from intensity and source priority, chemically modulated
+    #    (noradrenaline: urgency_factor = 0.7 + 0.6*NA, range 0.7-1.3).
+    _get_neuromod
     local source_priority=0.5
     case "$source" in
         acc-error-memory|anterior-cingulate-memory) source_priority=0.9 ;;
@@ -154,8 +178,9 @@ _score_signal() {
         vta-memory) source_priority=0.6 ;;
         *) source_priority=0.5 ;;
     esac
-    local urgency
-    urgency=$(echo "scale=4; $intensity * $source_priority" | bc 2>/dev/null || echo "0.5")
+    local urgency urgency_factor
+    urgency_factor=$(echo "scale=4; 0.7 + 0.6 * $NEURO_NA" | bc 2>/dev/null || echo "1.0")
+    urgency=$(echo "scale=4; $intensity * $source_priority * $urgency_factor" | bc 2>/dev/null || echo "0.5")
 
     # 4. Load headroom: inverse of executive load
     local exec_load
@@ -170,9 +195,28 @@ _score_signal() {
     local circadian
     circadian=$(_get_circadian_gain)
 
-    # Final score
-    local score
-    score=$(echo "scale=6; ($goal_relevance * 0.35 + $novelty * 0.15 + $urgency * 0.25 + $headroom * 0.25) * $circadian" | bc 2>/dev/null || echo "0.3")
+    # Final score — dopamine modulates the goal-relevance weight
+    # (0.35*(0.8+0.4*DA), range 0.28-0.42); sleep pressure floors the
+    # circadian gain (gain' = gain*(1 - 0.3*SP)).
+    local da_weight circadian_final score
+    da_weight=$(echo "scale=6; 0.35 * (0.8 + 0.4 * $NEURO_DA)" | bc 2>/dev/null || echo "0.35")
+    circadian_final=$(echo "scale=4; $circadian * (1.0 - 0.3 * $NEURO_SP)" | bc 2>/dev/null || echo "$circadian")
+    score=$(echo "scale=6; ($goal_relevance * $da_weight + $novelty * 0.15 + $urgency * 0.25 + $headroom * 0.25) * $circadian_final" | bc 2>/dev/null || echo "0.3")
+
+    # Focus sharpening + off-focus suppression (ACh and cortisol act only on
+    # signals OUTSIDE the boosted attentionFocus list).
+    local in_focus=0
+    if jq -e --arg s "$signal_name" --arg src "$source" \
+      '[.attentionFocus[]? | contains($s) or contains($src)] | any' \
+      "$STATE_FILE" > /dev/null 2>&1; then
+        in_focus=1
+    fi
+    if [[ "$in_focus" -eq 0 ]]; then
+        if (( $(echo "$NEURO_ACH > 0.6" | bc -l 2>/dev/null) )); then
+            score=$(echo "scale=6; $score * (1.0 - 0.3 * (($NEURO_ACH - 0.6) / 0.4))" | bc 2>/dev/null || echo "$score")
+        fi
+        score=$(echo "scale=6; $score * (1.0 - 0.25 * $NEURO_CORT)" | bc 2>/dev/null || echo "$score")
+    fi
 
     # Determine action
     local action
@@ -248,6 +292,14 @@ _dispatch() {
             reason: "gate score below threshold"
         }]' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
         return 0
+    fi
+
+    # Integrative State Layer: broadcast the passing signal to the global
+    # workspace (event-driven currentFocus / recentBroadcasts).
+    if [[ -x "$SCRIPT_DIR/broadcast.sh" ]]; then
+        ( exec 200>&- 2>/dev/null || true
+          bash "$SCRIPT_DIR/broadcast.sh" --source "$source" --signal "$signal_name" \
+               --action "$action" --gate-score "$score" 2>/dev/null ) &
     fi
 
     # Determine dispatch intensity
@@ -360,6 +412,9 @@ _stdin_process() {
 
     _update_stats "$action"
     _dispatch "$source" "$signal_name" "$action" "$intensity" "$gate_score" "$raw_signal"
+
+    # Emit the scored envelope so callers (tests, manual runs) can consume it.
+    echo "$scored"
 }
 
 # ── Status display ──────────────────────────────────────────────────────
