@@ -6,7 +6,7 @@
 #   ./flag-attention.sh --remove "topic name"
 #   ./flag-attention.sh --list
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

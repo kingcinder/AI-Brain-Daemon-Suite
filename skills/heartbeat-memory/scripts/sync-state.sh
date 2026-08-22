@@ -1,6 +1,6 @@
 #!/bin/bash
 # sync-state.sh — Generate HEARTBEAT_STATE.md for session injection
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/heartbeat-state.json"
 OUTPUT_FILE="$WORKSPACE/HEARTBEAT_STATE.md"

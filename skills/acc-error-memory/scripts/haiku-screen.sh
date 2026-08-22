@@ -14,7 +14,7 @@
 # Output: Filtered JSON array to stdout (only confirmed errors)
 # Logs screening stats to stderr (including which models were used)
 
-set -e
+set -euo pipefail
 
 INPUT_FILE="${1:?Usage: haiku-screen.sh <pending-errors.json>}"
 

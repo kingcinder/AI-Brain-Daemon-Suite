@@ -2,7 +2,7 @@
 # ACC: Check for patterns that should be resolved (30+ days without occurrence)
 # Run as part of daily analysis
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"

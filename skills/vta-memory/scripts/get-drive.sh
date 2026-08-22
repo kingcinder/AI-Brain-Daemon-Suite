@@ -2,7 +2,7 @@
 # get-drive.sh — Read current motivation/drive state
 # Usage: ./get-drive.sh [--json]
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"
@@ -12,7 +12,7 @@ if [ ! -f "$STATE_FILE" ]; then
   exit 1
 fi
 
-if [ "$1" = "--json" ]; then
+if [ "${1:-}" = "--json" ]; then
   cat "$STATE_FILE"
 else
   DRIVE=$(jq -r '.drive' "$STATE_FILE")

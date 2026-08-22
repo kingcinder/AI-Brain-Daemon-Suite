@@ -9,7 +9,7 @@
 #
 # Output: pending-errors.json with exchanges to analyze
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 AGENT_ID="${AGENT_ID:-main}"

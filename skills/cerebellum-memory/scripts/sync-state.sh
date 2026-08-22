@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
 OUTPUT_FILE="$WORKSPACE/CEREBELLUM_STATE.md"

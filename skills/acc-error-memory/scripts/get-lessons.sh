@@ -7,7 +7,7 @@
 #   get-lessons.sh --pattern "name"   # Get specific lesson
 #   get-lessons.sh --json             # Output raw JSON
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"

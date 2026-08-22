@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 LOG_FILE="$WORKSPACE/memory/brain-events.jsonl"
 mkdir -p "$(dirname "$LOG_FILE")"

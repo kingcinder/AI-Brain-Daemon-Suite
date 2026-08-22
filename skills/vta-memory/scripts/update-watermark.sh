@@ -5,7 +5,7 @@
 # If --from-signals, reads the last ID from reward-signals.jsonl
 # Otherwise, requires --id <signal_id>
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"

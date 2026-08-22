@@ -8,7 +8,7 @@
 #   ./preprocess-exchanges.sh <transcript_file> [--max-exchanges N]
 #   Output: JSON to stdout
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

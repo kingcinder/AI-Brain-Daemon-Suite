@@ -6,7 +6,7 @@
 #   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 #   THRESHOLD - Minimum importance score (default: 0.7)
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 INDEX="$WORKSPACE/memory/index.json"

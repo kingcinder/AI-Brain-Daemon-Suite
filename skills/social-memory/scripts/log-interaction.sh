@@ -1,7 +1,7 @@
 #!/bin/bash
 # log-interaction.sh — Record an interaction with a relationship
 # Usage: log-interaction.sh --id <id> --summary "..." [--trust-delta +/-0.x] [--affinity-delta +/-0.x]
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 exec 200>"$STATE_FILE.lock"

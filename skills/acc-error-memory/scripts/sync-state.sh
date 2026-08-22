@@ -2,7 +2,7 @@
 # ACC: Generate ACC_STATE.md from acc-state.json
 # Creates human-readable state for context injection
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"

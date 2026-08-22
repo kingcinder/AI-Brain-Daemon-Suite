@@ -5,7 +5,7 @@
 #        ./update-state.sh --dimension <name> --delta <+/-value>
 #        ./update-state.sh --dimension <name> --set <value>
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"

@@ -2,7 +2,7 @@
 # sync-motivation.sh — Generate VTA_STATE.md for auto-injection
 # First-person framing for inhabited experience
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"

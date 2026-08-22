@@ -9,7 +9,7 @@
 # Environment:
 #   BATCH_SIZE - Signals per batch (default: 30)
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 PENDING_FILE="$WORKSPACE/memory/pending-memories.json"

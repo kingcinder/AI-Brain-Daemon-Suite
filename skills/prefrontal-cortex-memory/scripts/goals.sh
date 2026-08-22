@@ -4,7 +4,7 @@
 #   goals.sh add --description "..." [--priority 0.0-1.0] [--deadline "..."]
 #   goals.sh list [--status active|complete]
 #   goals.sh complete --id <id>
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No PFC state found"; exit 1; }

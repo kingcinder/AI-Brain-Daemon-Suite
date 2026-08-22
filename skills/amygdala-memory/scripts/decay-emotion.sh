@@ -4,7 +4,7 @@
 # Run via cron (e.g., every 6 hours) to gradually normalize emotions
 # Now supports per-dimension decay rates!
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"

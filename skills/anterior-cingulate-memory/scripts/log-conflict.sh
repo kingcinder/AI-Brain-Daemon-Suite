@@ -17,7 +17,7 @@
 #   intent        — Ambiguous user intent
 #   knowledge_gap — Agent's knowledge insufficient to proceed
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

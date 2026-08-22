@@ -4,7 +4,7 @@
 #
 # Without rewards, motivation fades. This mimics dopamine baseline return.
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"

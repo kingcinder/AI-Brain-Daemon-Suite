@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
 OUTPUT_FILE="$WORKSPACE/PFC_STATE.md"

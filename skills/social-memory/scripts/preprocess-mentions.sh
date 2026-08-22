@@ -2,7 +2,7 @@
 # preprocess-mentions.sh — Scan transcripts for relationship-relevant signals:
 # new people/agents mentioned, trust/affinity-relevant moments, things promised.
 # Usage: preprocess-mentions.sh [--full]
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 AGENT_ID="${AGENT_ID:-main}"
 TRANSCRIPT_DIR="${TRANSCRIPT_DIR:-$HOME/.hermes/sessions}"

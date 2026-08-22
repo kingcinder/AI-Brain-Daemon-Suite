@@ -7,7 +7,7 @@
 #   encode-pipeline.sh --no-spawn      # Just preprocess, don't spawn agent
 #   encode-pipeline.sh --full          # Process all history
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(dirname "$0")/.."

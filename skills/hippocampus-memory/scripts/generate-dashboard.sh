@@ -1,7 +1,7 @@
 #!/bin/bash
 # generate-dashboard.sh — Write hippocampus's own dashboard fragment, then call
 # the shared dashboard-builder.sh. Reads ONLY hippocampus's own state file.
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"

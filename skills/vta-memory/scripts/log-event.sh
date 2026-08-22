@@ -10,7 +10,7 @@
 #   log-event.sh decay drive_before=0.6 drive_after=0.53
 #   log-event.sh reward type=accomplishment intensity=0.8
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 LOG_FILE="$WORKSPACE/memory/brain-events.jsonl"

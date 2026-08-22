@@ -10,7 +10,7 @@
 # so a missing sibling just means "no adjustment from that signal" rather
 # than a crash — decide.sh must work standalone too.
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -276,7 +276,7 @@ if [ -x "$SCRIPT_DIR/safe-write.sh" ]; then
   echo "$LOG_ENTRY" > /tmp/pfc_log_entry.$$
   cat > "$MUTATE_SCRIPT" << 'MUTATE_EOF'
 #!/bin/bash
-set -e
+set -euo pipefail
 ENTRY=$(cat "$PFC_LOG_ENTRY_FILE")
 jq --argjson entry "$ENTRY" \
   '.decisionLog = ([$entry] + .decisionLog | .[0:30]) | .lastUpdated = $entry.timestamp' \

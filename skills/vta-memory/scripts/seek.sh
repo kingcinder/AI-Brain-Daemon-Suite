@@ -4,7 +4,7 @@
 #        ./seek.sh --remove "creative work"
 #        ./seek.sh --list
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"

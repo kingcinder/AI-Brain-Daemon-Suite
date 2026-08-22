@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 OUTPUT_FILE="$WORKSPACE/SOCIAL_STATE.md"

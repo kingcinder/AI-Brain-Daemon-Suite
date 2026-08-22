@@ -3,7 +3,7 @@
 # Designed to run on cron every 4 hours.
 # No new conflicts → load moves 20% closer to baseline per run.
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

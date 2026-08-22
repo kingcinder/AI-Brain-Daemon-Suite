@@ -1,6 +1,6 @@
 #!/bin/bash
 # get-state.sh — Human-readable heartbeat overview
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/heartbeat-state.json"
 exec 200>"$STATE_FILE.lock"
@@ -8,7 +8,7 @@ flock 200
 [ ! -f "$STATE_FILE" ] && { echo "❌ No heartbeat state found"; exit 1; }
 { jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
 
-[ "$1" = "--json" ] && { cat "$STATE_FILE"; exit 0; }
+[ "${1:-}" = "--json" ] && { cat "$STATE_FILE"; exit 0; }
 
 BEAT_COUNT=$(jq -r '.beatCount' "$STATE_FILE")
 LAST_BEAT=$(jq -r '.lastBeat // "never"' "$STATE_FILE")

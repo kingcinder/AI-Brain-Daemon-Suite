@@ -2,7 +2,7 @@
 # load-motivation.sh — Load motivation state for session context
 # Usage: ./load-motivation.sh [--format prose|json|brief]
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"

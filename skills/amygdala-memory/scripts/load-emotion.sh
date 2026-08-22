@@ -2,7 +2,7 @@
 # load-emotion.sh — Load emotional state for session context
 # Usage: ./load-emotion.sh [--format prose|json|brief]
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"

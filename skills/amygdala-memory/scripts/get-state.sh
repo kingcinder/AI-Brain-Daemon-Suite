@@ -2,7 +2,7 @@
 # get-state.sh — Read current emotional state
 # Usage: ./get-state.sh [--json] [--dimension <name>]
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"

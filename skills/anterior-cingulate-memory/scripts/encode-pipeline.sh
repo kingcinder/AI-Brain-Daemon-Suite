@@ -17,7 +17,7 @@
 #
 # Designed to run on the daemon's schedule (see BRAIN_DAEMON_SCHEDULE.md).
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -166,7 +166,7 @@ if [ -x "$SAFE_WRITE" ]; then
   trap 'rm -f "$MUTATE_SCRIPT"' EXIT
   cat > "$MUTATE_SCRIPT" << 'MUTATE_EOF'
 #!/bin/bash
-set -e
+set -euo pipefail
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 jq --arg now "$NOW" \
   '.stats.encodingRuns = (.stats.encodingRuns // 0) + 1 | .lastUpdated = $now' \

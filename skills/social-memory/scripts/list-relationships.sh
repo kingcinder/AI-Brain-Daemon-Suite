@@ -1,12 +1,12 @@
 #!/bin/bash
 # list-relationships.sh — Usage: list-relationships.sh [--type human|ai_agent]
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No social state found"; exit 1; }
 
 TYPE_FILTER=""
-[ "$1" = "--type" ] && TYPE_FILTER="$2"
+[ "${1:-}" = "--type" ] && TYPE_FILTER="$2"
 
 FILTER='.relationships | to_entries[]'
 [ -n "$TYPE_FILTER" ] && FILTER="$FILTER | select(.value.type == \"$TYPE_FILTER\")"

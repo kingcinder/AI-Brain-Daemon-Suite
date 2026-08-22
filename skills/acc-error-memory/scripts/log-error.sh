@@ -2,7 +2,7 @@
 # ACC: Log an error pattern
 # Usage: log-error.sh --pattern "name" --context "what happened" [--mitigation "how to avoid"]
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"

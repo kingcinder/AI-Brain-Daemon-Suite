@@ -9,7 +9,7 @@
 #
 # Usage: beat.sh [--dry-run]
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

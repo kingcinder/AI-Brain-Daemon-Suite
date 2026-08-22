@@ -10,7 +10,7 @@
 #   log-event.sh decay valence_before=0.9 valence_after=0.85
 #   log-event.sh update emotion=joy intensity=0.7
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 LOG_FILE="$WORKSPACE/memory/brain-events.jsonl"

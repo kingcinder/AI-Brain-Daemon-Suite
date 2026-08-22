@@ -30,7 +30,7 @@
 # Usage:
 #   dashboard-builder.sh [--focus <tab-id>] [--output <path>]
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"

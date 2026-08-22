@@ -5,7 +5,7 @@
 #   update-watermark.sh --timestamp "2026-02-11T10:00:00Z"
 #   update-watermark.sh --from-pending    # Use latest timestamp from pending-errors.json
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 WATERMARK_FILE="$WORKSPACE/memory/acc-watcher-watermark.json"

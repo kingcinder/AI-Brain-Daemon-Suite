@@ -1,7 +1,7 @@
 #!/bin/bash
 # set-circadian.sh — Configure wake/sleep hours (24h, local-to-UTC-already)
 # Usage: set-circadian.sh --wake 7 --sleep 23
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/heartbeat-state.json"
 exec 200>"$STATE_FILE.lock"

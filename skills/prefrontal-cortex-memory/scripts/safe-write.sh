@@ -39,7 +39,7 @@
 # never deleted — a persistent zero-byte lock file is the normal, correct
 # way to use flock, not a leak.
 
-set -e
+set -euo pipefail
 
 STATE_FILE="$1"
 shift || true
@@ -76,6 +76,6 @@ export STATE_FILE
 set +e
 "$@"
 STATUS=$?
-set -e
+set -euo pipefail
 
 exit $STATUS

@@ -2,7 +2,7 @@
 # ACC: Load state at session start
 # Shows current error patterns and lessons learned
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # get-relationship.sh — Usage: get-relationship.sh --id <id> [--json]
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 exec 200>"$STATE_FILE.lock"

@@ -11,7 +11,7 @@
 #   CHUNK_THRESHOLD - Minimum strength for "chunked" habits (default: 0.7)
 #   ACTIVE_THRESHOLD - Minimum strength for procedures/suppressions (default: 0.4)
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"

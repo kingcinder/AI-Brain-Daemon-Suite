@@ -1,12 +1,12 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200
 [ ! -f "$STATE_FILE" ] && { echo "❌ No PFC state found"; exit 1; }
 { jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
-[ "$1" = "--json" ] && { cat "$STATE_FILE"; exit 0; }
+[ "${1:-}" = "--json" ] && { cat "$STATE_FILE"; exit 0; }
 
 LOAD=$(jq -r '.executiveLoad' "$STATE_FILE")
 ACTIVE_GOALS=$(jq '[.goals[] | select(.status=="active")] | length' "$STATE_FILE")

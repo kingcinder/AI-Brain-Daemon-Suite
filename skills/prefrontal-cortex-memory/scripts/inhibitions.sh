@@ -5,7 +5,7 @@
 #   inhibitions.sh list
 #   inhibitions.sh remove --id <id>
 #   inhibitions.sh check --text "..."   # does this text match an active inhibition?
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No PFC state found"; exit 1; }

@@ -2,7 +2,7 @@
 # sync-state.sh — Generate AMYGDALA_STATE.md for auto-injection into OpenClaw sessions
 # Generates FIRST-PERSON emotional state that can be inhabited, not just observed
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"

@@ -2,7 +2,7 @@
 # ACC: Analyze yesterday's transcript for errors
 # Called by daily cron job
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"

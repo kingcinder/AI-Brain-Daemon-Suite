@@ -2,7 +2,7 @@
 # generate-dashboard.sh — Write PFC's own dashboard fragment, then call the
 # shared dashboard-builder.sh. Reads ONLY PFC's own state file (its decide.sh
 # cross-reads siblings for arbitration, but the dashboard tab does not).
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"

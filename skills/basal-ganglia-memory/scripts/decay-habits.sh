@@ -13,7 +13,7 @@
 # Environment:
 #   WORKSPACE - Hermes workspace directory (default: ~/.hermes/workspace)
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"

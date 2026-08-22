@@ -5,7 +5,7 @@
 #   update-watermark.sh --from-signals   # Set to last signal ID
 #   update-watermark.sh --to <id>        # Set to specific ID
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"

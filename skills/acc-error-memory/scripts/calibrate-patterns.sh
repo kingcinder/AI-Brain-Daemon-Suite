@@ -9,7 +9,7 @@
 #
 # Output: Stats to stderr, updates learned-patterns.json in place
 
-set -e
+set -euo pipefail
 
 INPUT_FILE="${1:?Usage: calibrate-patterns.sh <pending-errors.json> [sample_rate]}"
 SAMPLE_RATE="${2:-0.15}"

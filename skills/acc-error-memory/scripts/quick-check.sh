@@ -12,7 +12,7 @@
 #
 # Design: Fast heuristic only. For deep analysis, use the full cron pipeline.
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 

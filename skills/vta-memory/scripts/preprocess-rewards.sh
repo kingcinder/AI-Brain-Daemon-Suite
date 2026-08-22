@@ -2,7 +2,7 @@
 # Preprocess conversation for reward/accomplishment signals
 # Extracts signals about wins, completions, social rewards, etc.
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 AGENT_ID="${AGENT_ID:-main}"

@@ -10,7 +10,7 @@
 # Environment:
 #   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 INDEX="$WORKSPACE/memory/index.json"

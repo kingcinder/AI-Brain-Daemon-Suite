@@ -6,7 +6,7 @@
 #   preprocess-emotions.sh          # Process since last watermark
 #   preprocess-emotions.sh --full   # Process all messages
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 AGENT_ID="${AGENT_ID:-main}"

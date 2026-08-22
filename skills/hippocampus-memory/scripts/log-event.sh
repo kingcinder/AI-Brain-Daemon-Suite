@@ -9,7 +9,7 @@
 #   log-event.sh encoding memories_created=3 memories_reinforced=7
 #   log-event.sh decay memories_decayed=2
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 LOG_FILE="$WORKSPACE/memory/brain-events.jsonl"

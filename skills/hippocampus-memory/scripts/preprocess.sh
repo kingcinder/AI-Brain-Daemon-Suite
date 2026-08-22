@@ -13,7 +13,7 @@
 #                    populate via `hermes sessions export --format jsonl <dir>`)
 #   AGENT_ID - retained for compatibility; transcripts are no longer per-agent by default
 
-set -e
+set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 AGENT_ID="${AGENT_ID:-main}"

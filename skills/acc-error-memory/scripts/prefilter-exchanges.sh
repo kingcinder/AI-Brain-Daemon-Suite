@@ -9,7 +9,7 @@
 # Output: Filtered JSON array to stdout
 # Expects input: array of {assistant_text, user_text, timestamp, ...}
 
-set -e
+set -euo pipefail
 
 INPUT_FILE="${1:?Usage: prefilter-exchanges.sh <pending-errors.json>}"
 

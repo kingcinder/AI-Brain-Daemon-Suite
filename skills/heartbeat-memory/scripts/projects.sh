@@ -8,7 +8,7 @@
 #   projects.sh complete --id <id>
 #   projects.sh pause --id <id>
 
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/heartbeat-state.json"
 exec 200>"$STATE_FILE.lock"

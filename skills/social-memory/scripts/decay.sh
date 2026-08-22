@@ -1,7 +1,7 @@
 #!/bin/bash
 # decay.sh — Trust/affinity drift gently toward neutral (0.5) without contact.
 # Models distance, not punishment: only relationships untouched for 7+ days move.
-set -e
+set -euo pipefail
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No social state found"; exit 1; }
