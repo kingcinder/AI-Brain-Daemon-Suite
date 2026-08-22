@@ -1146,6 +1146,14 @@ JOBS: list[Job] = [
     # besides heartbeat's :07/:37 beats, so this never contends for resources.
     Job("verification_pass", "direct", "7", "56",
         "verification-memory/scripts/run-declared-tests.sh"),
+    # Integrative State Layer (A): global neuromodulator vector + workspace of
+    # attention, composed from every region's state (VTA drive, amygdala
+    # valence/arousal, ACC conflict load, insula channels, social trust,
+    # heartbeat recency). Minutes 6,21,36,51 are globally unique in this table
+    # (every 15 min). Direct / non-inference. Writes neuromod-state.json then
+    # chains workspace-refresh.sh for workspace.json.
+    Job("neuromod_update", "direct", "*", "6,21,36,51",
+        "thalamus-memory/scripts/neuromod-update.sh"),
 ]
 
 
