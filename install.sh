@@ -9,9 +9,9 @@
 #   - single-instance flock so concurrent installs can't corrupt the deploy
 #   - backs up the current workspace + unit and restores them via an ERR trap
 #     if anything fails mid-deploy
-#   - replace-style deploy of the four shipped targets (skills/, core/, tests/,
-#     kernel) so stale files never survive; the daemon's runtime state dirs
-#     (e.g. $WS/memory/) are never touched
+#   - replace-style deploy of the five shipped targets (skills/, core/, tests/,
+#     scripts/, kernel) so stale files never survive; the daemon's runtime state
+#     dirs (e.g. $WS/memory/) are never touched
 #   - pre-flight --check gates the deploy; skill-file-count sanity check
 #   - TTY-safe conditional pause (never hangs CI); systemd-user-session
 #     detection so containers/WSL degrade gracefully instead of failing late
@@ -37,7 +37,7 @@ Usage: ./install.sh [--yes|-y|--noninteractive] [--help|-h]
   --help | -h
       Show this help and exit.
 
-Deploys deep-brain-kernel.py, skills/, core/ and tests/ into
+Deploys deep-brain-kernel.py, skills/, core/, tests/ and scripts/ into
 ~/.hermes/workspace/, patches aibrain.service's Environment=PATH=, registers
 the skills with Hermes (Option B), and enables the systemd --user service.
 The previous install is preserved at ~/.hermes/workspace.bak-aibrain-install
@@ -136,7 +136,7 @@ if [ -f "$UNIT_FILE" ]; then
 fi
 
 echo "--- Step 2: Deploying Artifacts ---"
-# Replace-style deploy: wipe and re-copy only the four shipped targets so no
+# Replace-style deploy: wipe and re-copy only the five shipped targets so no
 # stale files survive from older versions. Everything the daemon writes at
 # runtime (e.g. $WS/memory/, $WS/state/) is never touched.
 rm -rf "$WS/deep-brain-kernel.py" "$WS/skills" "$WS/core" "$WS/tests"
@@ -151,6 +151,17 @@ fi
 # verification-memory can run them in a deployed workspace, not just the repo.
 if [ -d "tests" ]; then
     cp -r tests "$WS/tests"
+fi
+# Dashboard + verification scripts (serve-dashboard.sh, dashboard-server.py,
+# ci-gate.sh, deep-verify.sh): the deployed tests reference $ROOT/scripts/*,
+# so shipping scripts/ keeps the deployed tree self-consistent (the dashboard
+# tests resolve ROOT relative to the test file and call serve-dashboard.sh).
+if [ -d "scripts" ]; then
+    rm -rf "$WS/scripts"
+    cp -r scripts "$WS/scripts"
+    # Python bytecode cache is runtime-generated, not source — keep the
+    # deployed tree pristine.
+    rm -rf "$WS/scripts/__pycache__"
 fi
 
 echo "--- Step 3: Configuring Permissions ---"

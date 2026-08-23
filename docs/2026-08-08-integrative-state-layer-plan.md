@@ -61,7 +61,7 @@
 - Consumes: `memory/reward-state.json` (`.drive`, `.recentRewards`, `.anticipating`, `.lastUpdated`), `memory/emotional-state.json` (`.dimensions.valence`, `.dimensions.arousal`, `.lastUpdated`), `memory/conflict-state.json` (`.conflictLoad`, `.lastUpdated`), `memory/interoceptive-state.json` (`.channels.cognitiveLoad`, `.channels.gutSignal`, `.lastUpdated`), `memory/acc-state.json` (`.activePatterns`, `.lastUpdated`), `memory/social-state.json` (`.relationships[].trust`, `.lastUpdated`), `memory/heartbeat-state.json` (`.lastBeat`, `.circadian.wakeHour`, `.circadian.sleepHour`), `memory/thalamus-state.json` (`.attentionFocus`).
 - Produces: `memory/neuromod-state.json` (schema below); `get-neuromod.sh --json` / `--get <name>` / `--composite <name>` — the contract Tasks 3–6 consume.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_neuromod_state.sh`:
 
@@ -281,12 +281,12 @@ fi
 exit 0
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `bash tests/test_neuromod_state.sh`
 Expected: FAIL with "neuromod-state.json not created" (neither script exists yet).
 
-- [ ] **Step 3: Write `get-neuromod.sh`**
+- [x] **Step 3: Write `get-neuromod.sh`**
 
 Create `skills/thalamus-memory/scripts/get-neuromod.sh`:
 
@@ -344,7 +344,7 @@ echo "Usage: get-neuromod.sh --json | --get <modulator> | --composite <name>" >&
 exit 1
 ```
 
-- [ ] **Step 4: Write `neuromod-update.sh`**
+- [x] **Step 4: Write `neuromod-update.sh`**
 
 Create `skills/thalamus-memory/scripts/neuromod-update.sh`:
 
@@ -524,7 +524,7 @@ if [[ -x "$SCRIPT_DIR/workspace-refresh.sh" ]]; then
 fi
 ```
 
-- [ ] **Step 5: Add the `neuromod_update` job to `deep-brain-kernel.py`**
+- [x] **Step 5: Add the `neuromod_update` job to `deep-brain-kernel.py`**
 
 In `deep-brain-kernel.py`, after the `verification_pass` entry in `JOBS` (the last entry), add:
 
@@ -539,12 +539,12 @@ In `deep-brain-kernel.py`, after the `verification_pass` entry in `JOBS` (the la
         "thalamus-memory/scripts/neuromod-update.sh"),
 ```
 
-- [ ] **Step 6: Run the test — it must pass**
+- [x] **Step 6: Run the test — it must pass**
 
 Run: `bash tests/test_neuromod_state.sh`
 Expected: all 9 test groups PASS (0 failed).
 
-- [ ] **Step 7: Run the whole-suite green-check for A1**
+- [x] **Step 7: Run the whole-suite green-check for A1**
 
 Run:
 ```bash
@@ -557,7 +557,7 @@ for t in tests/test_*.sh; do bash "$t" >/dev/null 2>&1 && tpass=$((tpass+1)) || 
 echo "tests: $tpass passed, $tfail failed"; [ "$tfail" -eq 0 ]
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add skills/thalamus-memory/scripts/neuromod-update.sh \
@@ -579,7 +579,7 @@ git commit -m "A1: neuromod-state.json composition + reader helper + neuromod_up
 - Consumes: `memory/neuromod-state.json` (from Task 1), `memory/pfc-state.json` (`.goals[]` active), `memory/thalamus-state.json` (`.attentionFocus`, `.lastGateRun`), circadian phase (replicated from `beat.sh`'s logic: `waking`/`active`/`winding_down`/`asleep`), the gate's scored envelope from `gate.sh` (Task 3 passes `--source --signal --action --gate-score`).
 - Produces: `memory/workspace.json` (schema below); the `context` block (phase + goals + neuromod snapshot) that Task 4 injects into arbitration.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_workspace_broadcast.sh`:
 
@@ -713,12 +713,12 @@ fi
 exit 0
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `bash tests/test_workspace_broadcast.sh`
 Expected: FAIL ("workspace.json not created by broadcast.sh").
 
-- [ ] **Step 3: Write `broadcast.sh`**
+- [x] **Step 3: Write `broadcast.sh`**
 
 Create `skills/thalamus-memory/scripts/broadcast.sh`:
 
@@ -773,7 +773,7 @@ jq --arg src "$SOURCE" --arg sig "$SIGNAL" --arg action "$ACTION" \
   "$WS" > "$WS.tmp.$$" && mv "$WS.tmp.$$" "$WS"
 ```
 
-- [ ] **Step 4: Write `workspace-refresh.sh`**
+- [x] **Step 4: Write `workspace-refresh.sh`**
 
 Create `skills/thalamus-memory/scripts/workspace-refresh.sh`:
 
@@ -859,12 +859,12 @@ jq --arg phase "$PHASE" --argjson goals "$GOALS" --argjson focus "$FOCUS" \
   "$WS" > "$WS.tmp.$$" && mv "$WS.tmp.$$" "$WS"
 ```
 
-- [ ] **Step 5: Run the test — it must pass**
+- [x] **Step 5: Run the test — it must pass**
 
 Run: `bash tests/test_workspace_broadcast.sh`
 Expected: all 5 test groups PASS.
 
-- [ ] **Step 6: Run the A2 green-check**
+- [x] **Step 6: Run the A2 green-check**
 
 Run:
 ```bash
@@ -876,7 +876,7 @@ for t in tests/test_*.sh; do bash "$t" >/dev/null 2>&1 && tpass=$((tpass+1)) || 
 echo "tests: $tpass passed, $tfail failed"; [ "$tfail" -eq 0 ]
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add skills/thalamus-memory/scripts/broadcast.sh \
@@ -907,7 +907,7 @@ git commit -m "A2: global workspace.json — event broadcast + periodic context 
 | cortisol | off-focus suppression: `score ×= (1 − 0.25·cortisol)` for signals outside `attentionFocus` |
 | sleepPressure | circadian gain floor: `gain' = gain·(1 − 0.3·sleepPressure)` |
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_gate_neuromod.sh`:
 
@@ -1052,12 +1052,12 @@ fi
 exit 0
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `bash tests/test_gate_neuromod.sh`
 Expected: FAIL — the NA-relative assertions fail (no modulation yet) and Test (c) finds no workspace.json.
 
-- [ ] **Step 3: Implement the gate.sh changes**
+- [x] **Step 3: Implement the gate.sh changes**
 
 In `skills/thalamus-memory/scripts/gate.sh`:
 
@@ -1171,12 +1171,12 @@ with:
 
 Place this right after the `if [[ "$action" = "suppress" ]]` block closes, before `local dispatch_intensity`. The `exec 200>&-` subshell drops the inherited gate lock so the backgrounded broadcast can take the workspace lock without a deadlock chain.
 
-- [ ] **Step 4: Run the test — it must pass**
+- [x] **Step 4: Run the test — it must pass**
 
 Run: `bash tests/test_gate_neuromod.sh`
 Expected: (a), (b), (c) all PASS. Note (b) is the regression lock: with no vector the score must equal today's unmodulated score — verify manually against `gate.sh`'s formula before this run by comparing to the pre-change `--stdin` output.
 
-- [ ] **Step 5: Run the A3a green-check**
+- [x] **Step 5: Run the A3a green-check**
 
 Run:
 ```bash
@@ -1186,7 +1186,7 @@ for t in tests/test_*.sh; do bash "$t" >/dev/null 2>&1 && tpass=$((tpass+1)) || 
 echo "tests: $tpass passed, $tfail failed"; [ "$tfail" -eq 0 ]
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add skills/thalamus-memory/scripts/gate.sh tests/test_gate_neuromod.sh
@@ -1209,7 +1209,7 @@ git commit -m "A3a: gate.sh neuromod gain factors + broadcast hook (with absent-
 - Somatic bias: when `cortisol > 0.6`, options whose description contains high-uncertainty markers get `weight ×= (1 − 0.2·cortisol)`.
 - The `context` block (phase + goals + neuromod snapshot) is included in the arbitration context.
 
-- [ ] **Step 1: Add the reads near the other `read_field` calls**
+- [x] **Step 1: Add the reads near the other `read_field` calls**
 
 In `skills/prefrontal-cortex-memory/scripts/decide.sh`, after the `OPEN_LOOPS` read_field line, add:
 
@@ -1226,7 +1226,7 @@ WORKSPACE_CONTEXT=$(read_field "$WORKSPACE/memory/workspace.json" '.context' "{}
 
 (Note: `get-neuromod.sh` lives in the sibling `thalamus-memory` skill, reached via `$SCRIPT_DIR/../thalamus-memory/scripts/` — same relative hop `beat.sh` uses for `decide.sh`.)
 
-- [ ] **Step 2: Export the new values to the python arbitration**
+- [x] **Step 2: Export the new values to the python arbitration**
 
 In the `RESULT=$(CALIBRATION=... python3 << 'PYTHON'` env-var list, add `NEURO_DA` and `NEURO_CORT` (and `WORKSPACE_CONTEXT` if the reasoning string should mention it):
 
@@ -1234,7 +1234,7 @@ In the `RESULT=$(CALIBRATION=... python3 << 'PYTHON'` env-var list, add `NEURO_D
 RESULT=$(CALIBRATION="$CALIBRATION" COGNITIVE_LOAD="$COGNITIVE_LOAD" CONFLICT_LOAD="$CONFLICT_LOAD" CONTEXT="$CONTEXT" DRIVE="$DRIVE" ENERGY="$ENERGY" ERROR_PATTERNS="$ERROR_PATTERNS" GUT_SIGNAL="$GUT_SIGNAL" HABIT_STRENGTH="$HABIT_STRENGTH" NEURO_CORT="$NEURO_CORT" NEURO_DA="$NEURO_DA" OPEN_LOOPS="$OPEN_LOOPS" SATURATION="$SATURATION" SEEKING="$SEEKING" SEMANTIC_METHOD="$SEMANTIC_METHOD" VALENCE="$VALENCE" \
 ```
 
-- [ ] **Step 3: Apply the multipliers inside the python**
+- [x] **Step 3: Apply the multipliers inside the python**
 
 In the python body, after the existing `scores[oid] = round(score, 3)` accumulation loop's goal-overlap sections (both the semantic and heuristic branches), apply the DA multiplier where a goal overlap already boosted the option:
 
@@ -1283,7 +1283,7 @@ Then add the somatic-bias block after the open-loops block (before `scores[oid] 
             notes.append(f"stress (cortisol={cortisol:.2f}) dampens uncertain option {oid}")
 ```
 
-- [ ] **Step 4: Validate**
+- [x] **Step 4: Validate**
 
 Run:
 ```bash
@@ -1303,7 +1303,7 @@ bash skills/prefrontal-cortex-memory/scripts/decide.sh --context test \
 
 Also verify the regression property explicitly: with no `neuromod-state.json`, `NEURO_DA=0.5` ⇒ `(0.8 + 0.4*0.5) = 1.0` ⇒ weights identical to today.
 
-- [ ] **Step 5: Run the full suite + harnesses**
+- [x] **Step 5: Run the full suite + harnesses**
 
 Run:
 ```bash
@@ -1315,7 +1315,7 @@ for h in run_phase2_harness run_phase5_harness run_skill_unit_tests; do
 done
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add skills/prefrontal-cortex-memory/scripts/decide.sh
@@ -1342,7 +1342,7 @@ git commit -m "A3b: decide.sh reads neuromod — DA goal-alignment multiplier + 
 | vta | when `dopamine < 0.4`, estimated reward intensity `×= 1.15` |
 | amygdala | estimated emotion intensity `×= (1 + 0.3·(NA − 0.5))` |
 
-- [ ] **Step 1: anterior-cingulate encode-pipeline.sh**
+- [x] **Step 1: anterior-cingulate encode-pipeline.sh**
 
 In `skills/anterior-cingulate-memory/scripts/encode-pipeline.sh`, after the `LLM_CALL` check (before the exchange-count guard), add the stress read, then replace the `-lt 2` guard:
 
@@ -1363,7 +1363,7 @@ if [ "$EXCHANGE_COUNT" -lt "$MIN_EXCHANGES" ]; then
 fi
 ```
 
-- [ ] **Step 2: vta encode-pipeline.sh**
+- [x] **Step 2: vta encode-pipeline.sh**
 
 In `skills/vta-memory/scripts/encode-pipeline.sh` (bash wrapper around the embedded python), export the dopamine value into the python environment. Find where the pipeline invokes its python (the heredoc that computes `intensity = estimate_intensity(text, rewards)`), and pass `NEURO_DA` in. Then in the python body, after `intensity = estimate_intensity(text, rewards)`, add:
 
@@ -1380,7 +1380,7 @@ NEURO_DA=$("$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get dopamin
 export NEURO_DA
 ```
 
-- [ ] **Step 3: amygdala encode-pipeline.sh**
+- [x] **Step 3: amygdala encode-pipeline.sh**
 
 Same pattern as vta — in `skills/amygdala-memory/scripts/encode-pipeline.sh`, before the python heredoc:
 
@@ -1396,7 +1396,7 @@ na = float(os.environ.get('NEURO_NA', '0.5'))
 intensity *= (1.0 + 0.3 * (na - 0.5))   # arousal amplifies emotional intensity
 ```
 
-- [ ] **Step 4: Validate**
+- [x] **Step 4: Validate**
 
 Run:
 ```bash
@@ -1410,11 +1410,11 @@ bash -n skills/anterior-cingulate-memory/scripts/encode-pipeline.sh \
 python3 -m py_compile deep-brain-kernel.py
 ```
 
-- [ ] **Step 5: Run the full suite + harnesses**
+- [x] **Step 5: Run the full suite + harnesses**
 
 Same green-check as Task 4 Step 5 (24 tests + phase2/phase5/skill-unit).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add skills/anterior-cingulate-memory/scripts/encode-pipeline.sh \
@@ -1431,7 +1431,7 @@ git commit -m "A3c: encode pipelines read neuromod — acc stress threshold, vta
 - Modify: `skills/thalamus-memory/capability-manifest.json`
 - Modify: `BRAIN_DAEMON_SCHEDULE.md`
 
-- [ ] **Step 1: Update `skills/thalamus-memory/capability-manifest.json`**
+- [x] **Step 1: Update `skills/thalamus-memory/capability-manifest.json`**
 
 Add the three new tests to the `tests` array (keep the existing two entries):
 
@@ -1469,7 +1469,7 @@ Also add a capability entry for the layer:
 
 (append to the `capabilities` array).
 
-- [ ] **Step 2: Update `BRAIN_DAEMON_SCHEDULE.md`**
+- [x] **Step 2: Update `BRAIN_DAEMON_SCHEDULE.md`**
 
 In the "Daemon-native jobs (no old-cron equivalent)" table (the one that says "the full 29-job table (21 direct + 8 spawn)"), change the parenthetical to "the full 30-job table (22 direct + 8 spawn)" and add a row:
 
@@ -1477,7 +1477,7 @@ In the "Daemon-native jobs (no old-cron equivalent)" table (the one that says "t
 | `neuromod_update` | direct | * | * | 6,21,36,51 | `thalamus-memory/scripts/neuromod-update.sh` — Integrative State Layer (A): composes the global neuromodulator vector from VTA/amygdala/ACC/insula/social/heartbeat state, then chains `workspace-refresh.sh` to assemble `workspace.json`'s context block. Minutes 6/21/36/51 are globally unique (every 15 min) |
 ```
 
-- [ ] **Step 3: Final whole-suite validation**
+- [x] **Step 3: Final whole-suite validation**
 
 Run:
 ```bash
@@ -1507,7 +1507,7 @@ done
 
 Expected: 27 tests green (24 existing + 3 new), all harnesses pass, `--check` prints 30 job rows with `neuromod_update ... ok` and zero collisions/problems.
 
-- [ ] **Step 4: Live smoke test (event path)**
+- [x] **Step 4: Live smoke test (event path)**
 
 Run the A-layer end-to-end against a scratch workspace (mirrors the B17 smoke-test style):
 
@@ -1538,7 +1538,7 @@ rm -rf "$WS"
 
 Expected: neuromod vector with sane bounded values (0–1), workspace context with phase/goals/neuromod, and (unless the signal was suppressed) a `currentFocus` written by the gate dispatch.
 
-- [ ] **Step 5: Spawn the required reviewer over the complete diff, then commit**
+- [x] **Step 5: Spawn the required reviewer over the complete diff, then commit**
 
 ```bash
 git add skills/thalamus-memory/capability-manifest.json BRAIN_DAEMON_SCHEDULE.md
