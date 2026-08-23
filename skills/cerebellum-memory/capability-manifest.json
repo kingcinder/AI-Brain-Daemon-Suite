@@ -1,11 +1,12 @@
 {
   "schema": 1,
   "module": "cerebellum-memory",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "capabilities": [
     "procedural_calibration",
     "precision_tracking",
-    "smoothness_ema"
+    "smoothness_ema",
+    "forward_model_prediction"
   ],
   "inputs": [
     {
@@ -44,6 +45,10 @@
     },
     {
       "path": "tests/test_cerebellum_calibration.sh",
+      "kind": "unit"
+    },
+    {
+      "path": "tests/test_cerebellum_prediction.sh",
       "kind": "unit"
     }
   ],

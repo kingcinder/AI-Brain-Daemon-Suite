@@ -8,9 +8,9 @@
 
 ## Documentation Index
 
-Six docs carry the suite's story, and they're designed to be read in this
+Eight docs carry the suite's story, and they're designed to be read in this
 order — each hands off to the next, so the repository reads as a single
-navigable document set rather than six disconnected files:
+navigable document set rather than eight disconnected files:
 
 | Doc | What it answers |
 |---|---|
@@ -19,6 +19,7 @@ navigable document set rather than six disconnected files:
 | [`AUDIT.md`](AUDIT.md) | Which vision gaps are open or closed, and what code proves it? |
 | [`HERMES_COMPATIBILITY.md`](HERMES_COMPATIBILITY.md) | How does the suite interoperate with the Hermes Agent harness? |
 | [`BRAIN_DAEMON_SCHEDULE.md`](BRAIN_DAEMON_SCHEDULE.md) | What jobs does the daemon run, on what schedule, and why? |
+| [`NEUROSCIENCE_MAPPING.md`](NEUROSCIENCE_MAPPING.md) | Which brain-region skill names are functionally grounded, which are structural or label-only, and why? (honesty audit) |
 | [`docs/V4_STATUS.md`](docs/V4_STATUS.md) | The V4.0 implementation ledger (plumbing vs live-exercised). |
 | [`docs/2026-08-22-comprehensive-improvement-plan.md`](docs/2026-08-22-comprehensive-improvement-plan.md) | The 12-initiative improvement plan — audit findings + per-initiative status (all ✅ COMPLETE). |
 | [`docs/2026-08-08-integrative-state-layer-design.md`](docs/2026-08-08-integrative-state-layer-design.md) | The Integrative State Layer (A) design spec — global neuromodulation + workspace composition. |
@@ -313,13 +314,14 @@ journalctl --user -u aibrain.service -f # live logs
 ### SPAWN_PROVIDER — who runs the agent turns
 
 Spawn jobs dispatch through `core/spawn/spawn-provider.sh`, selected by the
-`SPAWN_PROVIDER` env var (default `hermes`):
+`SPAWN_PROVIDER` env var (default `agentloop` — the internal agentic loop
+became the default in the completed agent-loop initiative):
 
 | Provider | Runs spawn jobs via | Needs `hermes`? |
 |---|---|---|
-| `hermes` (default) | `hermes chat -q "<task>" --source daemon` | yes |
+| `agentloop` (default) | the internal agentic loop (`core/agent-loop/`, tool use + session memory) | no |
+| `hermes` | `hermes chat -q "<task>" --source daemon` | yes |
 | `local` | the suite's own `llm-call.sh` against your local LLM endpoint | no |
-| `agentloop` | the internal agentic loop (`core/agent-loop/`, tool use + session memory) | no |
 
 Set it in `~/.config/systemd/user/aibrain.service`'s `Environment=` line (or
 export it before a manual `spawn-provider.sh` run).

@@ -1,13 +1,13 @@
 ---
 name: vta-memory
-description: "Reward and motivation system for AI agents. Dopamine-like wanting, not just doing. Part of the AI Brain series."
+description: "Reward and motivation system for AI agents. Dopamine-like wanting, not just doing. Implements a Schultz-style temporal-difference reward-prediction error (RPE = reward − expected): log-reward.sh keeps a per-type expected value updated by the TD(0) delta rule, and the drive boost is scaled by positive RPE — the phasic dopamine signal encodes the prediction error, not reward magnitude (see NEUROSCIENCE_MAPPING.md). Part of the AI Brain series."
 metadata:
   hermes:
     emoji: "⭐"
     tags: ["memory", "motivation", "reward", "ai-brain"]
   openclaw:
     emoji: "⭐"
-    version: "1.2.0"
+    version: "1.3.0"
     author: "ImpKind"
     requires:
       os: ["darwin", "linux"]

@@ -8,7 +8,7 @@ exec 200>"$STATE_FILE.lock"
 flock 200
 [ ! -f "$STATE_FILE" ] && { echo "❌ No social state found"; exit 1; }
 
-ID=""; SUMMARY=""; TRUST_DELTA="0"; AFFINITY_DELTA="0"
+ID=""; SUMMARY=""; TRUST_DELTA="0"; AFFINITY_DELTA="0"; EXPECTED=""; OUTCOME=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -16,6 +16,8 @@ while [[ $# -gt 0 ]]; do
         --summary) SUMMARY="$2"; shift 2 ;;
         --trust-delta) TRUST_DELTA="$2"; shift 2 ;;
         --affinity-delta) AFFINITY_DELTA="$2"; shift 2 ;;
+        --expected) EXPECTED="$2"; shift 2 ;;
+        --outcome) OUTCOME="$2"; shift 2 ;;
         *) shift ;;
     esac
 done
@@ -31,7 +33,22 @@ fi
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 NOTE=$(jq -n --arg text "$SUMMARY" --arg ts "$NOW" '{text: $text, timestamp: $ts}')
 
-jq --arg id "$ID" --argjson note "$NOTE" --argjson td "$TRUST_DELTA" --argjson ad "$AFFINITY_DELTA" --arg now "$NOW" '
+# ── Social prediction error (Behrens, Hunt, Woolrich & Rushworth 2008) ───
+# When BOTH --expected and --outcome are supplied, trust/affinity update by
+# the social prediction error SPE = outcome − expected (trust α=0.2,
+# affinity α=0.1) instead of a caller-supplied delta — trust moves toward a
+# surprise-corrected estimate, the associative social-value learning the
+# anterior cingulate / orbitofrontal circuits implement. Callers that pass
+# explicit --trust-delta/--affinity-delta (or neither) are unchanged.
+SPE_JSON="null"
+if [ -n "$EXPECTED" ] && [ -n "$OUTCOME" ]; then
+    SPE=$(awk -v e="$EXPECTED" -v o="$OUTCOME" 'BEGIN {printf "%.4f", o - e}')
+    TRUST_DELTA=$(awk -v s="$SPE" 'BEGIN {printf "%.4f", 0.2 * s}')
+    AFFINITY_DELTA=$(awk -v s="$SPE" 'BEGIN {printf "%.4f", 0.1 * s}')
+    SPE_JSON=$(jq -cn --arg id "$ID" --argjson e "$EXPECTED" --argjson o "$OUTCOME" --argjson s "$SPE" --arg ts "$NOW" '{id: $id, expected: $e, outcome: $o, spe: $s, timestamp: $ts}')
+fi
+
+jq --arg id "$ID" --argjson note "$NOTE" --argjson td "$TRUST_DELTA" --argjson ad "$AFFINITY_DELTA" --argjson spe "$SPE_JSON" --arg now "$NOW" '
   .relationships[$id].notes = ([$note] + .relationships[$id].notes | .[0:20]) |
   .relationships[$id].interactionCount += 1 |
   .relationships[$id].lastContact = $now |
@@ -39,10 +56,14 @@ jq --arg id "$ID" --argjson note "$NOTE" --argjson td "$TRUST_DELTA" --argjson a
   .relationships[$id].trust = (if $nt < 0 then 0 elif $nt > 1 then 1 else $nt end) |
   (.relationships[$id].affinity + $ad) as $na |
   .relationships[$id].affinity = (if $na < 0 then 0 elif $na > 1 then 1 else $na end) |
+  .recentSPE = (([$spe] | map(select(. != null))) + (.recentSPE // []) | .[0:10]) |
   .lastUpdated = $now
 ' "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
 
 echo "✅ Logged interaction with $ID: $SUMMARY"
+if [ -n "$EXPECTED" ] && [ -n "$OUTCOME" ]; then
+    echo "   SPE: $(printf '%+.2f' "$SPE") (expected $EXPECTED, outcome $OUTCOME) → trust $TRUST_DELTA, affinity $AFFINITY_DELTA"
+fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 "$SCRIPT_DIR/log-event.sh" interaction id="$ID" trustDelta="$TRUST_DELTA" affinityDelta="$AFFINITY_DELTA" 2>/dev/null || true
 "$SCRIPT_DIR/sync-state.sh" 2>/dev/null || true

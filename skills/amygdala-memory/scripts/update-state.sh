@@ -98,10 +98,24 @@ if [ -n "$EMOTION" ]; then
     --arg ts "$NOW" \
     '{label: $label, intensity: ($intensity|tonumber), trigger: $trigger, timestamp: $ts}')
   
+  # ── Salience tag (LeDoux dual-pathway; McGaugh consolidation) ──────────
+  # salience = intensity × (0.5 + 0.5·arousal). High-salience events get a
+  # fast threat/importance tag written to salienceTags — the amygdala's
+  # computational output is a TAG that biases how strongly an event gets
+  # encoded downstream (McGaugh's memory-enhancement), not the emotion
+  # itself. Arousal is read before the cascade below adjusts it.
+  AROUSAL=$(jq -r '.dimensions.arousal // 0.5' "$STATE_FILE")
+  SALIENCE=$(awk -v i="$INTENSITY" -v a="$AROUSAL" 'BEGIN {v=i*(0.5+0.5*a); if(v>1)print 1; else printf "%.3f", v}')
+  TAG_JSON="null"
+  if [ "$(awk -v s="$SALIENCE" 'BEGIN {print (s>=0.6)?1:0}')" = "1" ]; then
+    TAG_JSON=$(jq -cn --arg e "$EMOTION" --argjson i "$INTENSITY" --argjson s "$SALIENCE" --arg t "$TRIGGER" --arg ts "$NOW" '{emotion: $e, intensity: $i, salience: $s, trigger: $t, timestamp: $ts}')
+    echo "⚠️ Salience tag: $EMOTION (salience $SALIENCE) — flagged for stronger encoding."
+  fi
+
   # Add to recent emotions (keep last 10) — lock released before the cascade
   # subprocesses below re-enter this script.
   exec 200>"$STATE_FILE.lock"; flock 200
-  jq ".recentEmotions = ([$ENTRY] + .recentEmotions | .[0:10]) | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
+  jq --argjson tag "$TAG_JSON" ".recentEmotions = ([$ENTRY] + .recentEmotions | .[0:10]) | .salienceTags = (([\$tag] | map(select(. != null))) + (.salienceTags // []) | .[0:20]) | .lastSalience = (\$tag // .lastSalience) | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
   mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
   exec 200>&-
   

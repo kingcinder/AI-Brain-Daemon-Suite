@@ -202,8 +202,8 @@ spec.loader.exec_module(dbk)
 print(dbk.SPAWN_PROVIDER)
 PY
 )
-if [ "$DEFAULT_PROVIDER" = "hermes" ]; then
-  pass "SPAWN_PROVIDER defaults to hermes"
+if [ "$DEFAULT_PROVIDER" = "agentloop" ]; then
+  pass "SPAWN_PROVIDER defaults to agentloop"
 else
   fail "SPAWN_PROVIDER default (got $DEFAULT_PROVIDER)"
 fi

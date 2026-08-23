@@ -1,13 +1,13 @@
 ---
 name: amygdala-memory
-description: "Emotional processing layer for AI agents. Persistent emotional states that influence behavior and responses. Part of the AI Brain series."
+description: "Emotional processing layer for AI agents. Persistent emotional states that influence behavior and responses. update-state.sh computes a salience tag (salience = intensity × (0.5 + 0.5·arousal)) for high-arousal events — the LeDoux dual-pathway threat-tag whose computational role is biasing how strongly an event is encoded downstream (McGaugh's amygdala-mediated memory enhancement), not the emotion itself. Part of the AI Brain series. See NEUROSCIENCE_MAPPING.md."
 metadata:
   hermes:
     emoji: "🎭"
     tags: ["memory", "emotions", "ai-brain"]
   openclaw:
     emoji: "🎭"
-    version: "1.7.0"
+    version: "1.8.0"
     author: "ImpKind"
     repo: "https://github.com/ImpKind/amygdala-memory"
     requires:

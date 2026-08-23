@@ -1,14 +1,14 @@
 ---
 name: hippocampus-memory
 title: "Hippocampus - Memory System"
-description: "Persistent memory system for AI agents. Automatic encoding, decay, and semantic reinforcement — just like the hippocampus in your brain. Based on Stanford Generative Agents (Park et al., 2023)."
+description: "Persistent memory system for AI agents. Automatic encoding, decay, and semantic reinforcement — just like the hippocampus in your brain. Consolidation now implements Complementary Learning Systems replay (McClelland/McNaughton/O'Reilly, Marr 1971): the weekly consolidation job replays recent episodic traces into domain/category cortical themes in memory/cortical.json — episodic-to-semantic transfer via offline replay (Buzsáki), not just a checklist. Based on Stanford Generative Agents (Park et al., 2023). See NEUROSCIENCE_MAPPING.md."
 metadata:
   hermes:
     emoji: "🧠"
     tags: ["memory", "encoding", "decay", "ai-brain"]
   openclaw:
     emoji: "🧠"
-    version: "3.8.6"
+    version: "3.9.0"
     author: "Community"
     repo: "https://github.com/ImpKind/hippocampus-skill"
     requires:

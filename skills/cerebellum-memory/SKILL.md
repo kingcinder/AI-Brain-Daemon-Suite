@@ -1,13 +1,13 @@
 ---
 name: cerebellum-memory
-description: "Procedural precision and smoothness — HOW something is executed, not WHAT to do. Tracks per-skill calibration via exponential moving average across repetitions. Part of the AI Brain series."
+description: "Procedural precision and smoothness — HOW something is executed, not WHAT to do. Tracks per-skill calibration via exponential moving average across repetitions. log-execution.sh now records a Wolpert/Miall/Kawato forward-model prediction error when --predicted is supplied: PE = |predicted − actual| is tracked per skill, and accurate predictions gate faster learning (teaching signal). Part of the AI Brain series. See NEUROSCIENCE_MAPPING.md."
 metadata:
   hermes:
     emoji: "🎚️"
     tags: ["memory", "procedural", "ai-brain", "calibration"]
   openclaw:
     emoji: "🎚️"
-    version: "1.0.0"
+    version: "1.1.0"
     author: "ImpKind"
     repo: "https://github.com/ImpKind/cerebellum-memory"
     requires:

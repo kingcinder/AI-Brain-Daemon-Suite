@@ -1,13 +1,13 @@
 ---
 name: social-memory
-description: "Relationships and theory of mind for AI agents. Tracks specific people and other AI agents across conversations: who they are, trust and affinity, what we believe they want/feel, and what's owed or pending. Part of the AI Brain series."
+description: "Relationships and theory of mind for AI agents. Tracks specific people and other AI agents across conversations: who they are, trust and affinity, what we believe they want/feel, and what's owed or pending. log-interaction.sh updates trust by a Behrens-style social prediction error (SPE = outcome − expected) when both are supplied, implementing associative social-value learning. Part of the AI Brain series. See NEUROSCIENCE_MAPPING.md."
 metadata:
   hermes:
     emoji: "🫂"
     tags: ["memory", "social", "theory-of-mind", "ai-brain", "relationships"]
   openclaw:
     emoji: "🫂"
-    version: "1.0.0"
+    version: "1.1.0"
     author: "ImpKind"
     repo: "https://github.com/ImpKind/social-memory"
     requires:

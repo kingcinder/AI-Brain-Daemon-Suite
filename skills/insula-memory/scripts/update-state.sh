@@ -85,20 +85,52 @@ if not deltas:
 limits = {'gutSignal':(-1,1),'somaticComfort':(-1,1)}
 default_limits = (0, 1)
 
+# ── Interoceptive prediction error (Craig's predictive-coding model;      ──
+# ── Critchley's decision-confidence extension)                            ──
+# Each channel carries a PREDICTED value (the prior). The discrepancy
+# |actual − predicted| is the signal of interest — the anterior insula
+# integrates predicted vs actual body state, and that error feeds decision
+# confidence downstream. Predicted tracks actual with α=0.2; large errors
+# are recorded as recentDiscrepancies and summarized in the composite
+# interoceptiveDiscrepancy.
+predicted = state.setdefault('predictedChannels', {})
+for k, v in defaults.items():
+    predicted.setdefault(k, v)
+
 print(f"🌡️ Logged signal: {signal} (intensity: {intensity:.1f})")
+disc = []
 for ch, raw_delta in deltas.items():
     delta = raw_delta * intensity
     old = c.get(ch, defaults.get(ch, 0))
     mn, mx = limits.get(ch, default_limits)
     new = max(mn, min(mx, old + delta))
     c[ch] = round(new, 3)
+    pred = float(predicted.get(ch, old))
+    pe = abs(new - pred)
+    predicted[ch] = round(pred + 0.2 * (new - pred), 3)
+    if pe > 0.05:
+        disc.append({'channel': ch, 'predicted': round(pred, 3), 'actual': new,
+                     'error': round(pe, 3), 'timestamp': datetime.now(timezone.utc).isoformat()})
     print(f"   {ch}: {old:+.3f} → {new:+.3f} (Δ{delta:+.3f})")
+
+if disc:
+    state.setdefault('recentDiscrepancies', []).extend(disc)
+    state['recentDiscrepancies'] = state['recentDiscrepancies'][-10:]
+    # Two lines for the same evaluation-order reason as the stats fix above.
+    state.setdefault('composite', {})
+    state['composite']['interoceptiveDiscrepancy'] = round(
+        sum(d['error'] for d in state['recentDiscrepancies']) / len(state['recentDiscrepancies']), 3)
 
 recent = state.setdefault('recentSignals', [])
 recent.append({'label': signal, 'intensity': intensity, 'source': source,
                'timestamp': datetime.now(timezone.utc).isoformat()})
 state['recentSignals'] = recent[-20:]
-state.setdefault('stats', {})['totalSignalsLogged'] = state['stats'].get('totalSignalsLogged', 0) + 1
+# Two lines on purpose: in `state.setdefault('stats', {})['x'] = state['stats']...`
+# the RHS is evaluated BEFORE the same-line setdefault, so a state file without
+# a `stats` key raises KeyError (exposed by test_insula_discrepancy's minimal
+# seed). Ensure the key exists first, then read-modify-write it.
+state.setdefault('stats', {})
+state['stats']['totalSignalsLogged'] = state['stats'].get('totalSignalsLogged', 0) + 1
 state['lastUpdated'] = datetime.now(timezone.utc).isoformat()
 
 with open(state_path, 'w') as f:

@@ -45,6 +45,78 @@ echo "  - $MEMORY_DIR/self/*.md"
 echo "  - $MEMORY_DIR/relationship/*.md"
 echo "  - $MEMORY_DIR/world/*.md"
 
+# ═══════════════════════════════════════════════════════════════════════
+# CLS replay pass (McClelland, McNaughton & O'Reilly; Marr 1971; Buzsáki)
+# The consolidation job actually CONSOLIDATES: it replays a sample of the
+# most recent episodic traces (the fast hippocampal store) and, grouping
+# them by domain/category theme, slowly strengthens a cortical aggregate
+# (memory/cortical.json) — episodic → semantic transfer via offline replay.
+# Each replayed trace adds a small weight increment to its theme, so
+# repeatedly-replayed themes drift toward stable cortex-level knowledge
+# while the episodic traces themselves are never touched. Purely additive.
+# ═══════════════════════════════════════════════════════════════════════
+INDEX_FILE="$MEMORY_DIR/index.json"
+CORTICAL_FILE="$MEMORY_DIR/cortical.json"
+echo ""
+echo "🔄 Replay pass (episodic → cortical consolidation):"
+if [ ! -f "$INDEX_FILE" ]; then
+    echo "   (no episodic index at $INDEX_FILE — nothing to replay)"
+else
+    python3 - "$INDEX_FILE" "$CORTICAL_FILE" << 'PYTHON' || echo "   (replay pass failed — continuing)"
+import json, os, sys
+from datetime import datetime, timezone
+
+index_path, cortical_path = sys.argv[1], sys.argv[2]
+try:
+    with open(index_path) as f:
+        index = json.load(f)
+    memories = index.get('memories', [])
+except Exception:
+    memories = []
+
+if not memories:
+    print("   (no episodic traces in index — nothing to replay)")
+    sys.exit(0)
+
+# Sample the most recently accessed / created traces (max 8 per pass)
+ordered = sorted(
+    memories,
+    key=lambda m: (m.get('lastAccessed', ''), m.get('created', '')),
+    reverse=True,
+)[:8]
+
+try:
+    with open(cortical_path) as f:
+        cortical = json.load(f)
+except Exception:
+    cortical = {"version": 1, "themes": {}, "replays": []}
+
+themes = cortical.setdefault('themes', {})
+replays = cortical.setdefault('replays', [])
+now = datetime.now(timezone.utc).isoformat()
+replayed = 0
+for m in ordered:
+    theme = f"{m.get('domain', 'unknown')}/{m.get('category', 'general')}"
+    t = themes.setdefault(theme, {"weight": 0.0, "traceCount": 0, "lastReplayed": None})
+    t["weight"] = round(t["weight"] + 0.1, 4)   # slow cortical strengthening
+    t["traceCount"] = t.get("traceCount", 0) + 1
+    t["lastReplayed"] = now
+    replays.append({"memory_id": m.get('id'), "theme": theme, "at": now})
+    replayed += 1
+
+cortical['replays'] = replays[-50:]
+cortical['lastReplayAt'] = now
+tmp = cortical_path + '.tmp.' + str(os.getpid())
+with open(tmp, 'w') as f:
+    json.dump(cortical, f, indent=2)
+os.rename(tmp, cortical_path)
+
+for theme, t in sorted(themes.items()):
+    print(f"   theme {theme}: weight={t['weight']:.2f} (traces replayed: {t['traceCount']})")
+print(f"   Replayed {replayed} episodic trace(s) → cortical themes strengthened.")
+PYTHON
+fi
+
 # ── Closed-loop: signal PFC that consolidation happened — the next executive
 #    cycle's isolated-reflect.sh will pick up this marker and trigger a
 #    reflection pass over the freshly consolidated memory. ────────────────────

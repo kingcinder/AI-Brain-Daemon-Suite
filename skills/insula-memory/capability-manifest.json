@@ -1,11 +1,12 @@
 {
   "schema": 1,
   "module": "insula-memory",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "capabilities": [
     "interoception",
     "cognitive_load_sensing",
-    "context_saturation"
+    "context_saturation",
+    "interoceptive_prediction_error"
   ],
   "inputs": [
     {
@@ -39,6 +40,10 @@
     },
     {
       "path": "tests/test_insula_state.sh",
+      "kind": "unit"
+    },
+    {
+      "path": "tests/test_insula_discrepancy.sh",
       "kind": "unit"
     }
   ],

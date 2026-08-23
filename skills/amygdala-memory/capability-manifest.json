@@ -1,11 +1,12 @@
 {
   "schema": 1,
   "module": "amygdala-memory",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "capabilities": [
     "emotion_encoding",
     "emotion_decay",
-    "valence_arousal_tracking"
+    "valence_arousal_tracking",
+    "salience_tagging"
   ],
   "inputs": [
     {
@@ -40,6 +41,10 @@
     },
     {
       "path": "tests/test_amygdala_get_state.sh",
+      "kind": "unit"
+    },
+    {
+      "path": "tests/test_amygdala_salience.sh",
       "kind": "unit"
     }
   ],

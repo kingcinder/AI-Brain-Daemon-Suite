@@ -1,11 +1,12 @@
 {
   "schema": 1,
   "module": "hippocampus-memory",
-  "version": "3.8.6",
+  "version": "3.9.0",
   "capabilities": [
     "episodic_encoding",
     "episodic_retrieval",
     "consolidation",
+    "replay_consolidation",
     "decay",
     "reflection"
   ],
@@ -60,6 +61,10 @@
     },
     {
       "path": "tests/test_snapshot_tick.sh",
+      "kind": "unit"
+    },
+    {
+      "path": "tests/test_hippocampus_replay.sh",
       "kind": "unit"
     }
   ],

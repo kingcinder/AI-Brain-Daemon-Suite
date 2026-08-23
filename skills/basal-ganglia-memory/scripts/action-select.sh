@@ -19,14 +19,16 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 OPTIONS_JSON='[]'
 EPSILON="${EPSILON:-0.1}"
+THRESHOLD="${THRESHOLD:-0.0}"
 NO_RECORD=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --options) OPTIONS_JSON="$2"; shift 2 ;;
     --epsilon) EPSILON="$2"; shift 2 ;;
+    --threshold) THRESHOLD="$2"; shift 2 ;;
     --no-record) NO_RECORD=1; shift ;;
-    -h|--help) echo "Usage: $0 --options JSON [--epsilon 0.1] [--no-record]"; exit 0 ;;
+    -h|--help) echo "Usage: $0 --options JSON [--epsilon 0.1] [--threshold 0-1] [--no-record]"; exit 0 ;;
     *) shift ;;
   esac
 done
@@ -40,7 +42,7 @@ trap 'rm -f "$HABIT_FILE" "$OPT_FILE"' EXIT
 if [ -f "$STATE_FILE" ]; then cp "$STATE_FILE" "$HABIT_FILE"; else echo '{"habits":[],"suppressions":[]}' > "$HABIT_FILE"; fi
 echo "$OPTIONS_JSON" > "$OPT_FILE"
 
-RESULT=$(HABIT_FILE="$HABIT_FILE" OPT_FILE="$OPT_FILE" EPSILON="$EPSILON" NO_RECORD="$NO_RECORD" python3 << 'PYTHON'
+RESULT=$(HABIT_FILE="$HABIT_FILE" OPT_FILE="$OPT_FILE" EPSILON="$EPSILON" THRESHOLD="$THRESHOLD" NO_RECORD="$NO_RECORD" python3 << 'PYTHON'
 import json, os, random, re, copy
 
 habit_file = os.environ['HABIT_FILE']
@@ -97,7 +99,17 @@ else:
     chosen = max(adjusted, key=lambda x: x['adjusted'])
     method = 'greedy'
 
-losers = [a for a in adjusted if a['id'] != chosen['id']]
+# ── Selection threshold / no-go gate (Mink's gating framework; Frank) ────
+# Basal-ganglia selection RELEASES a candidate only when the strongest
+# adjusted score crosses a threshold; below it the no-go pathway holds the
+# action. Default threshold 0 changes nothing (scores are ≥ 0); raising it
+# gates weak candidates entirely (chosen: null, method: 'gated').
+threshold = float(os.environ.get('THRESHOLD', '0.0'))
+if chosen is not None and chosen['adjusted'] < threshold:
+    chosen = None
+    method = f'gated (best {max(a["adjusted"] for a in adjusted)} < threshold {threshold})'
+
+losers = adjusted if chosen is None else [a for a in adjusted if a['id'] != chosen['id']]
 
 # ── Record losers (unless --no-record) ────────────────────────────────────
 if not no_record and losers:
@@ -123,7 +135,8 @@ print(json.dumps({
     'adjusted_scores': adjusted,
     'losers': [{'id': l['id'], 'label': l.get('label',''), 'score': l['score'], 'adjusted': l['adjusted']} for l in losers],
     'method': method,
-    'epsilon': epsilon
+    'epsilon': epsilon,
+    'threshold': threshold
 }, indent=2))
 PYTHON
 )

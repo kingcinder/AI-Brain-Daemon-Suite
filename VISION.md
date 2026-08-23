@@ -57,9 +57,10 @@ the direction of its expansion.
 ### Stage 1 — Experience synthesis (current)
 
 The Suite operates *as* a persistent-skill collective under an external
-harness. Its 15 skill packages (11 neurologically-mapped memory skills plus
-thalamus, executive-function, self-mod-runner, and verification-memory)
-encode, decay, consolidate, and reflect on experience; the Integrative State
+harness. Its 15 skill packages — named after brain regions as an
+organizational metaphor, with the actual functional grounding of each mapping
+documented in NEUROSCIENCE_MAPPING.md rather than asserted by the names
+themselves — encode, decay, consolidate, and reflect on experience; the Integrative State
 Layer (2026-08) composes them into a global neuromodulator vector
 (`neuromod-state.json`) and a shared workspace snapshot
 (`workspace.json`), so regions don't just record state — they modulate each
@@ -86,6 +87,8 @@ self-correcting rather than self-recording; multi-agent action selection
 (`basal-ganglia-memory/scripts/action-select.sh`) gives competing regions a
 negotiation stage; and `deep-brain-kernel.py --no-systemd --no-cgroups`
 runs the daemon without Linux-only infrastructure.
+
+> The brain-region names are an organizational metaphor. NEUROSCIENCE_MAPPING.md is the authoritative account of which skills implement a named computational mechanism (RPE, replay, conflict monitoring, top-down biasing…) and which carry their region's name structurally; neither this file nor the skill names assert cognitive fidelity on their own.
 
 ### Stage 3 — Crystallized self-improvement
 

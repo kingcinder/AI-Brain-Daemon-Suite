@@ -1,12 +1,13 @@
 {
   "schema": 1,
   "module": "social-memory",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "capabilities": [
     "relationship_tracking",
     "theory_of_mind",
     "open_loop_tracking",
-    "social_decay"
+    "social_decay",
+    "social_prediction_error"
   ],
   "inputs": [
     {
@@ -41,6 +42,10 @@
     },
     {
       "path": "tests/test_social_relationships.sh",
+      "kind": "unit"
+    },
+    {
+      "path": "tests/test_social_spe.sh",
       "kind": "unit"
     }
   ],

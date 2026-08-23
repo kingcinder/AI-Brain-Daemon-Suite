@@ -224,8 +224,8 @@ spec.loader.exec_module(dbk)
 print(dbk.SPAWN_PROVIDER)
 PY
 )
-if [ "$KPROV" = "hermes" ]; then
-  pass "kernel default SPAWN_PROVIDER still hermes (back-compat)"
+if [ "$KPROV" = "agentloop" ]; then
+  pass "kernel default SPAWN_PROVIDER is agentloop"
 else
   fail "kernel default provider ($KPROV)"
 fi

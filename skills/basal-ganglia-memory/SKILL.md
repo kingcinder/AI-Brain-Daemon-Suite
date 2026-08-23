@@ -1,13 +1,13 @@
 ---
 name: basal-ganglia-memory
-description: "Habit formation and procedural learning for AI agents. Develops preferences and shortcuts through repetition. Tracks cue-routine-reward loops, chunked procedures, and active suppressions. Part of the AI Brain series."
+description: "Habit formation and procedural learning for AI agents. Develops preferences and shortcuts through repetition. Tracks cue-routine-reward loops, chunked procedures, and active suppressions. action-select.sh arbitrates competing candidates (Frank's BG models; Mink's gating framework) — habit-biased scoring, epsilon-greedy exploration, loser suppression, and an optional selection threshold that holds sub-threshold actions behind a no-go gate. Part of the AI Brain series. See NEUROSCIENCE_MAPPING.md."
 metadata:
   hermes:
     emoji: "🎯"
     tags: ["memory", "habits", "procedural", "ai-brain"]
   openclaw:
     emoji: "🎯"
-    version: "0.2.2"
+    version: "0.3.0"
     author: "ImpKind"
     requires:
       os: ["darwin", "linux"]

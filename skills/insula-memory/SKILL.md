@@ -1,14 +1,14 @@
 ---
 name: insula-memory
 title: "Insula - Interoceptive Awareness System"
-description: "Internal state sensing for AI agents. Gut feelings, cognitive load, friction, and somatic coherence — the felt sense beneath emotion. Part of the AI Brain series."
+description: "Internal state sensing for AI agents. Gut feelings, cognitive load, friction, and somatic coherence — the felt sense beneath emotion. Each channel carries a predicted value, and update-state.sh records the interoceptive prediction error |actual − predicted| (Craig's predictive-coding model; Critchley's decision-confidence extension) in recentDiscrepancies plus a composite interoceptiveDiscrepancy. Part of the AI Brain series. See NEUROSCIENCE_MAPPING.md."
 metadata:
   hermes:
     emoji: "🌡️"
     tags: ["memory", "interoception", "awareness", "ai-brain"]
   openclaw:
     emoji: "🌡️"
-    version: "0.2.0"
+    version: "0.3.0"
     author: "ImpKind"
     repo: "https://github.com/ImpKind/insula-memory"
     requires:

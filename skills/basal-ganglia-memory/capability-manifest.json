@@ -1,11 +1,12 @@
 {
   "schema": 1,
   "module": "basal-ganglia-memory",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "capabilities": [
     "habit_encoding",
     "habit_reinforcement",
-    "habit_decay"
+    "habit_decay",
+    "selection_threshold_gating"
   ],
   "inputs": [
     {
@@ -40,6 +41,10 @@
     },
     {
       "path": "tests/test_basal_ganglia_habits.sh",
+      "kind": "unit"
+    },
+    {
+      "path": "tests/test_bg_threshold.sh",
       "kind": "unit"
     }
   ],
