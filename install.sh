@@ -15,20 +15,32 @@
 #   - pre-flight --check gates the deploy; skill-file-count sanity check
 #   - TTY-safe conditional pause (never hangs CI); systemd-user-session
 #     detection so containers/WSL degrade gracefully instead of failing late
+#   - --refresh re-deploys the five shipped targets from the repo into the
+#     existing workspace and restarts the daemon — no config change, no
+#     re-enable (use after pulling new code, e.g. a new daemon job)
 set -euo pipefail
 
 # ── CLI / env ──────────────────────────────────────────────────────────────
 # Non-interactive install: AIBRAIN_NONINTERACTIVE=1 or --yes skips the manual
 # pause and still enables the service (use for CI / verification).
 NONINTERACTIVE=0
+REFRESH=0
 for arg in "$@"; do
   case "$arg" in
     --yes|-y|--noninteractive) NONINTERACTIVE=1 ;;
+    --refresh) REFRESH=1 ;;
     --help|-h)
         cat <<'EOF'
 AI Brain Suite installer
 
-Usage: ./install.sh [--yes|-y|--noninteractive] [--help|-h]
+Usage: ./install.sh [--refresh] [--yes|-y|--noninteractive] [--help|-h]
+
+  --refresh
+      Re-deploy the suite from this repo into the existing
+      ~/.hermes/workspace and restart aibrain.service — without touching
+      the Hermes config, the unit file, or re-enabling. Use after pulling
+      new repo code (e.g. a new daemon job like neuromod_update) so the
+      live daemon picks it up in one command. Requires an existing install.
 
   --yes | -y | --noninteractive
       Fully unattended: no interactive pause; still enables the service.
@@ -109,6 +121,121 @@ rollback() {
 }
 trap rollback ERR
 
+# ── deploy_workspace: replace-style deploy of the five shipped targets ─────
+# Wipe and re-copy only the five shipped targets (deep-brain-kernel.py,
+# skills/, core/, tests/, scripts/) so no stale files survive from older
+# versions. Everything the daemon writes at runtime (e.g. $WS/memory/,
+# $WS/state/) is never touched. Shared by the install path (Step 2+3) and
+# --refresh so the shipped-target list can't drift between the two.
+deploy_workspace() {
+    rm -rf "$WS/deep-brain-kernel.py" "$WS/skills" "$WS/core" "$WS/tests" "$WS/scripts"
+    cp deep-brain-kernel.py "$WS/deep-brain-kernel.py"
+    cp -r skills "$WS/skills"
+    # V4.0: foundation + executive function live under core/ (Phase 1–2)
+    if [ -d core ]; then
+        cp -r core "$WS/core"
+    fi
+    # Verification region: the declared-test harnesses ship with the suite so
+    # verification-memory can run them in a deployed workspace, not just the repo.
+    if [ -d tests ]; then
+        cp -r tests "$WS/tests"
+    fi
+    # Dashboard + verification scripts (serve-dashboard.sh, dashboard-server.py,
+    # ci-gate.sh, deep-verify.sh): the deployed tests reference $ROOT/scripts/*,
+    # so shipping scripts/ keeps the deployed tree self-consistent (the dashboard
+    # tests resolve ROOT relative to the test file and call serve-dashboard.sh).
+    if [ -d scripts ]; then
+        cp -r scripts "$WS/scripts"
+        # Python bytecode cache is runtime-generated, not source — keep the
+        # deployed tree pristine.
+        rm -rf "$WS/scripts/__pycache__"
+    fi
+    chmod +x "$WS/deep-brain-kernel.py"
+    find "$WS/skills" -name "*.sh" -exec chmod +x {} \;
+    find "$WS/core" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+    find "$WS/tests" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+}
+
+# ── systemd --user availability ─────────────────────────────────────────────
+# A live user manager is present iff the private socket exists under
+# $XDG_RUNTIME_DIR. Containers, WSL, and not-yet-logged-in sessions lack it;
+# there the deploy still completes and the user enables the service later.
+# Defined here (not near Step 6) because --refresh below also uses it.
+systemd_available() {
+    command -v systemctl >/dev/null 2>&1 || return 1
+    [ -n "${XDG_RUNTIME_DIR:-}" ] || return 1
+    [ -S "$XDG_RUNTIME_DIR/systemd/private" ] || return 1
+    return 0
+}
+
+# ── --refresh mode ──────────────────────────────────────────────────────────
+# Re-deploy the five shipped targets from this repo into the existing
+# workspace and restart the daemon — no Hermes config merge, no unit-file
+# copy/PATH patch, no re-enable. Use after pulling new repo code (e.g. a new
+# daemon job like neuromod_update) so the live daemon picks it up in one
+# command. Same flock + backup/rollback discipline as install.
+if [ "${REFRESH:-0}" = "1" ]; then
+    if [ ! -d "$WS" ]; then
+        echo "Error: no workspace at $WS — run ./install.sh first." >&2
+        exit 1
+    fi
+    echo "--- Refresh: Re-deploying suite into $WS ---"
+    # Same single-instance guard as install.
+    exec 9>"$HOME/.hermes/.aibrain-install.lock"
+    if ! flock -n 9; then
+        echo "Error: another install/refresh is already running (lock held)." >&2
+        exit 1
+    fi
+    # Back up the current workspace so a mid-deploy failure can roll back.
+    rm -rf "$BK"
+    cp -a "$WS" "$BK"
+    BK_CREATED=1
+    echo "  backed up existing workspace -> $BK"
+    # Replace-style deploy of the five shipped targets only (shared helper —
+    # the unit file and the Hermes config are deliberately untouched).
+    deploy_workspace
+    # Gate the refresh on the same pre-flight check the install uses.
+    echo "--- Refresh: Pre-flight --check ---"
+    if ! WORKSPACE="$WS" python3 "$WS/deep-brain-kernel.py" --check; then
+        echo ""
+        echo "Refresh pre-flight check reported problems (see above)." >&2
+        echo "Rolling back to the previous workspace." >&2
+        rollback
+        exit 1
+    fi
+    # Deploy-count sanity (same as install).
+    REPO_SKILL_FILES=$(find skills -type f | wc -l)
+    DEPLOYED_SKILL_FILES=$(find "$WS/skills" -type f | wc -l)
+    if [ "$REPO_SKILL_FILES" -eq "$DEPLOYED_SKILL_FILES" ]; then
+        echo "  OK: $DEPLOYED_SKILL_FILES skill files deployed (matches repo)."
+    else
+        echo "  WARN: skill file count mismatch (repo $REPO_SKILL_FILES vs deployed $DEPLOYED_SKILL_FILES)."
+    fi
+    # Restart the running daemon onto the new code (no enable, no unit edit).
+    if systemd_available; then
+        echo "--- Refresh: Restarting aibrain.service ---"
+        systemctl --user restart aibrain.service
+        sleep 1
+        if systemctl --user is-active --quiet aibrain.service; then
+            echo "Refresh complete: workspace re-deployed and daemon restarted."
+            systemctl --user status aibrain.service --no-pager | head -n 5 || true
+            echo "Tail logs with: journalctl --user -u aibrain.service -f"
+        else
+            echo "Refresh error: aibrain.service failed to restart." >&2
+            echo "Check: journalctl --user -u aibrain.service -e" >&2
+            exit 1
+        fi
+    else
+        echo "--- Refresh: no systemd --user session detected (container/WSL) ---"
+        echo "  Workspace re-deployed. Restart the daemon manually once a user session exists:"
+        echo "    systemctl --user restart aibrain.service"
+    fi
+    if [ -d "$BK" ]; then
+        echo "Note: previous workspace preserved at $BK — remove it with: rm -rf $BK"
+    fi
+    exit 0
+fi
+
 echo "--- Step 1: Initializing Workspace ---"
 mkdir -p "$WS/skills"
 mkdir -p "$WS/core"
@@ -136,39 +263,16 @@ if [ -f "$UNIT_FILE" ]; then
 fi
 
 echo "--- Step 2: Deploying Artifacts ---"
-# Replace-style deploy: wipe and re-copy only the five shipped targets so no
-# stale files survive from older versions. Everything the daemon writes at
-# runtime (e.g. $WS/memory/, $WS/state/) is never touched.
-rm -rf "$WS/deep-brain-kernel.py" "$WS/skills" "$WS/core" "$WS/tests"
-cp deep-brain-kernel.py "$WS/deep-brain-kernel.py"
+# Replace-style deploy of the five shipped targets (shared deploy_workspace
+# helper — also used by --refresh, so the shipped-target list can't drift)
+# plus the unit file. Wiping only the shipped targets means no stale files
+# survive from older versions; everything the daemon writes at runtime
+# (e.g. $WS/memory/, $WS/state/) is never touched.
 cp aibrain.service "$UNIT_FILE"
-cp -r skills "$WS/skills"
-# V4.0: foundation + executive function live under core/ (Phase 1–2)
-if [ -d "core" ]; then
-    cp -r core "$WS/core"
-fi
-# Verification region: the declared-test harnesses ship with the suite so
-# verification-memory can run them in a deployed workspace, not just the repo.
-if [ -d "tests" ]; then
-    cp -r tests "$WS/tests"
-fi
-# Dashboard + verification scripts (serve-dashboard.sh, dashboard-server.py,
-# ci-gate.sh, deep-verify.sh): the deployed tests reference $ROOT/scripts/*,
-# so shipping scripts/ keeps the deployed tree self-consistent (the dashboard
-# tests resolve ROOT relative to the test file and call serve-dashboard.sh).
-if [ -d "scripts" ]; then
-    rm -rf "$WS/scripts"
-    cp -r scripts "$WS/scripts"
-    # Python bytecode cache is runtime-generated, not source — keep the
-    # deployed tree pristine.
-    rm -rf "$WS/scripts/__pycache__"
-fi
+deploy_workspace
 
 echo "--- Step 3: Configuring Permissions ---"
-chmod +x "$WS/deep-brain-kernel.py"
-find "$WS/skills" -name "*.sh" -exec chmod +x {} \;
-find "$WS/core" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
-find "$WS/tests" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+# Permissions are applied inside deploy_workspace (shared with --refresh).
 
 echo "--- Step 3.5: Initializing Per-Skill State ---"
 # Initiative 9: every skill's install.sh (init mode) creates its state files
@@ -414,16 +518,8 @@ else
     echo "All daemon tools found on PATH — no manual service-file edit needed."
 fi
 
-# ── systemd --user availability ─────────────────────────────────────────────
-# A live user manager is present iff the private socket exists under
-# $XDG_RUNTIME_DIR. Containers, WSL, and not-yet-logged-in sessions lack it;
-# there the deploy still completes and the user enables the service later.
-systemd_available() {
-    command -v systemctl >/dev/null 2>&1 || return 1
-    [ -n "${XDG_RUNTIME_DIR:-}" ] || return 1
-    [ -S "$XDG_RUNTIME_DIR/systemd/private" ] || return 1
-    return 0
-}
+# systemd_available() is defined near the top of the script (the --refresh
+# branch and the install path below both use it).
 
 if systemd_available; then
     SYSTEMD_OK=1

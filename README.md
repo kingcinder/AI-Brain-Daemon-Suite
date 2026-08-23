@@ -207,6 +207,7 @@ cd AI_BRAIN_SUITE_COMPLETE
 chmod +x install.sh
 ./install.sh            # fully automated; pauses only if a daemon tool is missing
 ./install.sh --yes      # fully unattended (CI / scripts / containers)
+./install.sh --refresh  # already installed? re-deploy repo changes + restart the daemon
 ```
 
 A single `./install.sh` run:
@@ -228,6 +229,14 @@ are backed up before deploy and restored automatically if anything fails
 mid-install (backup at `~/.hermes/workspace.bak-aibrain-install` — `rm -rf`
 it once you're happy). The only interactive pause fires when a daemon tool
 is genuinely missing from PATH, and never in `--yes`/noninteractive mode.
+
+**Already installed?** After pulling new repo code (e.g. a new daemon job like
+`neuromod_update`), one `./install.sh --refresh` re-deploys the five shipped
+targets into `~/.hermes/workspace/` and restarts `aibrain.service` — no Hermes
+config change, no unit-file re-patch, no re-enable. Same flock + backup/rollback
+as install: the previous workspace is preserved at
+`~/.hermes/workspace.bak-aibrain-install` and restored if the refresh's
+pre-flight `--check` fails.
 
 Remove the suite later with `./uninstall.sh` (add `--yes` for unattended
 removal) — see [Maintenance](#maintenance).
