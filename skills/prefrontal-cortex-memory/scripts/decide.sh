@@ -53,6 +53,7 @@ ENERGY=$(read_field "$WORKSPACE/memory/emotional-state.json" '.dimensions.energy
 CONFLICT_LOAD=$(read_field "$WORKSPACE/memory/conflict-state.json" '.conflictLoad' "0.0")
 ERROR_PATTERNS=$(read_field "$WORKSPACE/memory/acc-state.json" '(.activePatterns | length)' "0")
 HABIT_STATE_PATH="$WORKSPACE/memory/habit-state.json"
+SEMANTIC_STATE_PATH="$WORKSPACE/memory/semantic-state.json"
 HABIT_STRENGTH=$(read_field "$HABIT_STATE_PATH" '([.habits[].strength] | if length > 0 then (add / length) else 0 end)' "0.0")
 CALIBRATION=$(read_field "$WORKSPACE/memory/cerebellum-state.json" '.globalCalibration' "0.5")
 OPEN_LOOPS=$(read_field "$WORKSPACE/memory/social-state.json" '([.relationships[].openLoops[]?] | length)' "0")
@@ -104,6 +105,7 @@ if [ "${PFC_SEMANTIC_MATCHING:-auto}" != "off" ] && [ -x "$SCRIPT_DIR/semantic-m
 fi
 
 cp "$HABIT_STATE_PATH" /tmp/pfc_habit_state.$$ 2>/dev/null || echo '{"habits":[]}' > /tmp/pfc_habit_state.$$
+cp "$SEMANTIC_STATE_PATH" /tmp/pfc_semantic_state.$$ 2>/dev/null || echo '{"patterns":{"themes":[],"strategies":[],"antipatterns":[]}}' > /tmp/pfc_semantic_state.$$
 echo "$OPTIONS_JSON" > /tmp/pfc_options.$$
 echo "$GOALS" > /tmp/pfc_goals.$$
 echo "$INHIBITIONS" > /tmp/pfc_inhibitions.$$
@@ -113,6 +115,7 @@ echo "$SEMANTIC_INHIBITION_MATCHES" > /tmp/pfc_semantic_inhibitions.$$
 RESULT=$(CALIBRATION="$CALIBRATION" COGNITIVE_LOAD="$COGNITIVE_LOAD" CONFLICT_LOAD="$CONFLICT_LOAD" CONTEXT="$CONTEXT" DRIVE="$DRIVE" ENERGY="$ENERGY" ERROR_PATTERNS="$ERROR_PATTERNS" GUT_SIGNAL="$GUT_SIGNAL" HABIT_STRENGTH="$HABIT_STRENGTH" NEURO_CORT="$NEURO_CORT" NEURO_DA="$NEURO_DA" OPEN_LOOPS="$OPEN_LOOPS" SATURATION="$SATURATION" SEEKING="$SEEKING" SEMANTIC_METHOD="$SEMANTIC_METHOD" VALENCE="$VALENCE" \
   OPTIONS_FILE="/tmp/pfc_options.$$" GOALS_FILE="/tmp/pfc_goals.$$" INHIBITIONS_FILE="/tmp/pfc_inhibitions.$$" \
   HABIT_STATE_FILE="/tmp/pfc_habit_state.$$" \
+  SEMANTIC_STATE_FILE="/tmp/pfc_semantic_state.$$" \
   SEMANTIC_GOALS_FILE="/tmp/pfc_semantic_goals.$$" SEMANTIC_INHIBITIONS_FILE="/tmp/pfc_semantic_inhibitions.$$" \
   python3 << 'PYTHON'
 import os
@@ -275,6 +278,30 @@ for opt in options:
             score *= (1.0 - 0.2 * cortisol)
             notes.append(f"stress (cortisol={cortisol:.2f}) dampens uncertain option {oid}")
 
+    # ── Semantic knowledge boost (Initiative 7) ─────────────────────────
+    # Options whose label overlaps an extracted theme or strategy from
+    # the episodic store get a light nudge — the brain has "learned"
+    # that this kind of thing works.
+    semantic_file = os.environ.get('SEMANTIC_STATE_FILE', '')
+    if semantic_file:
+        try:
+            sem_state = json.load(open(semantic_file))
+            patterns = sem_state.get('patterns', {})
+            semantic_labels = []
+            for t in patterns.get('themes', []):
+                semantic_labels.append(t.get('label', ''))
+            for s in patterns.get('strategies', []):
+                summary = s.get('summary', '')
+                if summary:
+                    semantic_labels.append(summary)
+            for sl in semantic_labels:
+                if sl and (overlaps(sl, label) or overlaps(sl, oid)):
+                    score *= 1.08  # +8% boost for semantic match
+                    notes.append(f"semantic match '{sl[:40]}' boosts {oid}")
+                    break
+        except Exception:
+            pass
+
     scores[oid] = round(score, 3)
 
 if not scores:
@@ -290,7 +317,7 @@ PYTHON
 )
 
 echo "$RESULT"
-rm -f /tmp/pfc_options.$$ /tmp/pfc_goals.$$ /tmp/pfc_inhibitions.$$ /tmp/pfc_habits.$$ /tmp/pfc_habit_state.$$ /tmp/pfc_semantic_goals.$$ /tmp/pfc_semantic_inhibitions.$$
+rm -f /tmp/pfc_options.$$ /tmp/pfc_goals.$$ /tmp/pfc_inhibitions.$$ /tmp/pfc_habits.$$ /tmp/pfc_habit_state.$$ /tmp/pfc_semantic_state.$$ /tmp/pfc_semantic_goals.$$ /tmp/pfc_semantic_inhibitions.$$
 
 # Log the decision (best-effort, never block the caller on this).
 # flock-guarded via safe-write.sh: this file is written on every decide.sh

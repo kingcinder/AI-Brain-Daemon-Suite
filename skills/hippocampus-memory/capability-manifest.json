@@ -32,6 +32,11 @@
       "name": "event_log",
       "type": "log_entry",
       "target": "memory/hippocampus-events.jsonl"
+    },
+    {
+      "name": "semantic_state",
+      "type": "state_write",
+      "target": "memory/semantic-state.json"
     }
   ],
   "side_effects": [
