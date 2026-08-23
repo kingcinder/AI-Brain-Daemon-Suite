@@ -1,4 +1,20 @@
 #!/bin/bash
+# ── Standardized lifecycle contract (Initiative 9) ──────────────────────────
+#   install.sh              → initialize state files (defaults)
+#   install.sh --uninstall  → remove exactly the state files this skill's
+#                             manifest declares (delegates to skill-cleanup.sh)
+if [ "${1:-}" = "--uninstall" ]; then
+    THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
+    WS_UN="${WORKSPACE:-$HOME/.hermes/workspace}"
+    for CAND in "$THIS_DIR/../../core/skill-init/skill-cleanup.sh" \
+                "$THIS_DIR/../../../core/skill-init/skill-cleanup.sh"; do
+        if [ -x "$CAND" ]; then
+            exec "$CAND" --skill "$THIS_DIR" --workspace "$WS_UN" "${2:-}"
+        fi
+    done
+    echo "uninstall: skill-cleanup.sh not found — nothing removed." >&2
+    exit 1
+fi
 # install.sh — Set up cerebellum-memory for Hermes Agent
 # Usage: ./install.sh [--with-cron]
 set -e

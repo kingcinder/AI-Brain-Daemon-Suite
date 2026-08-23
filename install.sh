@@ -42,6 +42,9 @@ Deploys deep-brain-kernel.py, skills/, core/ and tests/ into
 the skills with Hermes (Option B), and enables the systemd --user service.
 The previous install is preserved at ~/.hermes/workspace.bak-aibrain-install
 and restored automatically if the install fails.
+
+Remove the suite later with ./uninstall.sh (restores the pre-install
+.bak-aibrain-install backups where they exist).
 EOF
         exit 0 ;;
     *)
@@ -155,6 +158,16 @@ chmod +x "$WS/deep-brain-kernel.py"
 find "$WS/skills" -name "*.sh" -exec chmod +x {} \;
 find "$WS/core" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
 find "$WS/tests" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+
+echo "--- Step 3.5: Initializing Per-Skill State ---"
+# Initiative 9: every skill's install.sh (init mode) creates its state files
+# with defaults. Runs against the deployed workspace, non-interactive.
+if [ -x "$WS/core/skill-init/init-all-skills.sh" ]; then
+    WORKSPACE="$WS" bash "$WS/core/skill-init/init-all-skills.sh" --workspace "$WS" --yes || \
+        echo "  WARN: per-skill init reported failures (state files can be re-seeded later)."
+else
+    echo "  WARN: core/skill-init/init-all-skills.sh not deployed — skipping per-skill init."
+fi
 
 echo "--- Step 4: Host Prerequisites (see SETUP_COMMANDS.md for detail) ---"
 echo "Checking PSI (pressure-based deferral)..."
