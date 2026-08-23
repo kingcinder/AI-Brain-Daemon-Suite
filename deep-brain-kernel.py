@@ -2177,6 +2177,14 @@ def main() -> None:
                               "auto_mode, 1 = steward_mode (alert-worthy). Read-only.")
     parser.add_argument("--vram-limit", type=float, default=80.0,
                          help="Defer spawn jobs when GPU VRAM usage is at or above this percent (default 80)")
+    parser.add_argument("--no-systemd", action="store_true",
+                         help="Initiative 12: run without systemd (macOS, containers, WSL). "
+                              "The daemon starts and runs jobs directly; systemd integration "
+                              "(service enable/start/status) is skipped.")
+    parser.add_argument("--no-cgroups", action="store_true",
+                         help="Initiative 12: disable cgroup delegation (non-Linux hosts). "
+                              "PSI pressure checks and CPU throttling become passive no-ops. "
+                              "Everything else runs normally.")
     parser.add_argument("--tick-seconds", type=int, default=30,
                          help="Circadian scheduler wake interval in seconds (default 30)")
     parser.add_argument("--psi-threshold", type=float, default=10.0,
