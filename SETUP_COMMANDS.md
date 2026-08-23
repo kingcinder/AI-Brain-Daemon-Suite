@@ -119,7 +119,7 @@ one.
 
 ```bash
 python3 ~/.hermes/workspace/deep-brain-kernel.py --check
-# expect: all 29 jobs listed, zero minute collisions, hermes found
+# expect: all 30 jobs listed, zero minute collisions, hermes found
 
 journalctl --user -u aibrain.service -f
 # watch for clean "completed" lines as scheduled jobs fire; let it run at

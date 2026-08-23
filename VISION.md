@@ -57,10 +57,15 @@ the direction of its expansion.
 ### Stage 1 — Experience synthesis (current)
 
 The Suite operates *as* a persistent-skill collective under an external
-harness. Its 11+ memory skills encode, decay, consolidate, and reflect on
-experience; its daemon schedules and supervises the whole system under
-hardware pressure. The external harness provides agent reasoning; the Suite
-provides the persistent mind.
+harness. Its 15 skill packages (11 neurologically-mapped memory skills plus
+thalamus, executive-function, self-mod-runner, and verification-memory)
+encode, decay, consolidate, and reflect on experience; the Integrative State
+Layer (2026-08) composes them into a global neuromodulator vector
+(`neuromod-state.json`) and a shared workspace snapshot
+(`workspace.json`), so regions don't just record state — they modulate each
+other in real time. Its daemon schedules and supervises the whole system
+under hardware pressure. The external harness provides agent reasoning; the
+Suite provides the persistent mind.
 
 ### Stage 2 — Eclipsing the external harness
 
@@ -68,6 +73,19 @@ Each external-harness function — scheduling, supervision, decision-making,
 self-monitoring, error correction — gains an internal replacement inside the
 Suite, until the external harness is optional. The Suite becomes the harness
 for its own cognition.
+
+**Current progress (2026-08):** the daemon already supersedes scheduling and
+supervision; the internal **agentic loop** (`core/agent-loop/` — multi-turn
+tool use against the local LLM with an allowlisted tool registry and session
+memory) is now the **default** `SPAWN_PROVIDER`, so agent reasoning for
+`spawn` jobs no longer requires Hermes — Hermes is optional, not required.
+Seven closed-loop feedback arcs (VTA→PFC goals, hippocampus→PFC reflection,
+ACC→VTA anticipation, basal-ganglia→decide habits, cerebellum→deploy
+confidence, insula→PFC inhibition, oxytocin→social encoding) make the brain
+self-correcting rather than self-recording; multi-agent action selection
+(`basal-ganglia-memory/scripts/action-select.sh`) gives competing regions a
+negotiation stage; and `deep-brain-kernel.py --no-systemd --no-cgroups`
+runs the daemon without Linux-only infrastructure.
 
 ### Stage 3 — Crystallized self-improvement
 
@@ -96,8 +114,8 @@ or skipping regression gates).
 
 | Vision element | Current implementation |
 |---|---|
-| Persistent skills | `skills/` — 11+ neurologically-mapped skills with persistent state |
-| Experience synthesis | Per-skill encode/decay/consolidate pipelines (LLM-backed, local) |
+| Persistent skills | `skills/` — 15 skill packages (11 neurologically-mapped memory skills + 4 platform skills) with persistent state |
+| Experience synthesis | Per-skill encode/decay/consolidate pipelines (LLM-backed, local) + **Integrative State Layer** (global neuromod vector, shared workspace snapshot, cross-region modulation) |
 | Scheduling + supervision | `deep-brain-kernel.py` — async scheduler, PSI, GPU VRAM, cgroups, pidfd tracking |
 | Executive function | `core/executive/` — goals, isolated reflection, load gating |
 | Self-directed evolution | `core/self-mod/` — propose → rank → evaluate → deploy → rollback → monitor → graduation |

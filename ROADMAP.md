@@ -29,9 +29,9 @@ suite's own daemon, running under an external harness (Hermes).
 
 | What exists | Where | Notes |
 |---|---|---|
-| 11+ persistent memory skills | `skills/` | encode/decay/consolidate pipelines, LLM-backed via local `llm-call.sh` |
+| 15 skill packages (11 memory skills + 4 platform skills) | `skills/` | encode/decay/consolidate pipelines, LLM-backed via local `llm-call.sh` |
 | Unified scheduler + supervisor | `deep-brain-kernel.py` | PSI, GPU VRAM, cgroups v2, pidfd tracking, per-job timeouts, `--check`/`--status` |
-| 29-job schedule, collision-free minutes | `JOBS` table in `deep-brain-kernel.py` | documented in `BRAIN_DAEMON_SCHEDULE.md` |
+| 30-job schedule, collision-free minutes | `JOBS` table in `deep-brain-kernel.py` | documented in `BRAIN_DAEMON_SCHEDULE.md` |
 | Executive function cycle | `core/executive/run-executive-cycle.sh` → `isolated-reflect.sh` → `propose-goals.sh` | scheduled as `executive_goal_cycle` (direct job, minutes 28) |
 | Post-deploy self-mod monitoring | `self_mod_monitor` job → `skills/self-mod-runner/scripts/monitor-tick.sh` | scheduled (direct job, minutes 32) |
 | Regression + CI | `tests/` + `.github/workflows/ci.yml` (phase harnesses; same cadence as `verification.yml` — push/PR, nightly, weekly deep-verify, on demand) |
@@ -45,26 +45,36 @@ GPU VRAM parsing) are built to spec but not exercised on a real target host.
    via `systemctl --user show -p DelegateControllers aibrain.service`.
 3. `--status` shows real success counts with zero unhealthy jobs after 24h.
 
-**Status: `IN PROGRESS` (2026-08-08).** Checkable checklist with recorded
-results in `SETUP_COMMANDS.md` §5 (sub-checks 2a–2c there split criterion 2
-into its machinery parts). This host so far — criterion 1 ✅ (all 29 jobs
-`ok` via `--check`); criterion 2's **machinery** verified/armed: PSI
-poll-mode fallback active (`/proc/pressure/*` readable), rootless cgroup
-delegation confirmed (`DelegateControllers=cpu cpuset io memory pids`),
-and GPU VRAM resolved via the **Vulkan memory-budget path** —
-`_parse_vulkaninfo_text()` now matches this Vulkan-Tools version's
-per-heap plain-text schema: `size =`/`budget =` lines summed only over
-`MEMORY_HEAP_DEVICE_LOCAL_BIT` heaps, `percent = (size − budget) / size
-× 100` (Vulkan's `budget` = remaining allocatable for this process, so it
-is used; `usage` is deliberately ignored — it's only vulkaninfo's own
-allocation). Previously it fell back to amdgpu sysfs because the build
-emits no `heapBudget`; corrected 2026-08-08 and the daemon restarted
-onto it, covered by `tests/test_vulkaninfo_parse.sh`. Live-verified at
-~89.7% with `llama-server` holding ~7.16 GiB (matches sysfs
-`mem_info_vram_used`). **Deferral firing observed 2026-08-08 11:00:29
-PDT** — `hippocampus_encoding` was deferred on the VRAM gate (89.7% >
-80% limit, protecting active inference). Still pending: the 24h
-`--status` clean-run window.
+**Status: `IN PROGRESS` (last check-in 2026-08-22).** Checkable checklist with
+recorded results in `SETUP_COMMANDS.md` §5 (sub-checks 2a–2c there split
+criterion 2 into its machinery parts). This host so far — criterion 1 ✅
+(all 30 jobs `ok` via `--check`); criterion 2's **machinery**
+verified/armed: PSI poll-mode fallback active (`/proc/pressure/*`
+readable), rootless cgroup delegation confirmed
+(`DelegateControllers=cpu cpuset io memory pids`), and GPU VRAM resolved
+via the **Vulkan memory-budget path** — `_parse_vulkaninfo_text()` now
+matches this Vulkan-Tools version's per-heap plain-text schema: `size
+=`/`budget =` lines summed only over `MEMORY_HEAP_DEVICE_LOCAL_BIT`
+heaps, `percent = (size − budget) / size × 100` (Vulkan's `budget` =
+remaining allocatable for this process, so it is used; `usage` is
+deliberately ignored — it's only vulkaninfo's own allocation). Previously
+it fell back to amdgpu sysfs because the build emits no `heapBudget`;
+corrected 2026-08-08 and the daemon restarted onto it, covered by
+`tests/test_vulkaninfo_parse.sh`. Live-verified at ~89.7% with
+`llama-server` holding ~7.16 GiB (matches sysfs `mem_info_vram_used`).
+**Deferral firing observed 2026-08-08 11:00:29 PDT** —
+`hippocampus_encoding` was deferred on the VRAM gate (89.7% > 80% limit,
+protecting active inference). Still pending: the 24h `--status` clean-run
+window.
+
+> **2026-08-22 parallel work:** the `docs/2026-08-22-comprehensive-improvement-plan.md`
+> 12-initiative plan completed alongside M0 — shell hardening (`set -euo
+> pipefail` on all scripts), per-skill unit tests (30 passing), 7 closed-loop
+> feedback arcs (VTA→PFC, hippocampus→PFC, ACC→VTA, basal-ganglia→decide,
+> cerebellum→deploy, insula→PFC, oxytocin→social), semantic knowledge
+> extraction, install/uninstall isolation, multi-agent action selection, M6
+> new-module creation, and `--no-systemd --no-cgroups` portability. See the
+> plan doc's progress log for commit hashes.
 
 ---
 
@@ -77,6 +87,10 @@ until the Suite *is* the harness. Two external functions are named today:
 
 ### M1 — Scheduled self-mod cycle (the suite proposes its own changes, unsupervised)
 
+- **Status: LANDED.** `self_mod_proposal_cycle` (direct job, Sunday minute
+  46) invokes `run-pipeline.sh --generate-llm` on the weekly schedule;
+  `review_mode` from `graduation-tracker.sh` gates deploys (M2). Covered by
+  `tests/run_phase3_harness.sh` and `tests/run_phase4_harness.sh`.
 - **Exists:** `core/self-mod/run-pipeline.sh` orchestrates
   generate → store → rank → evaluate → deploy → monitor, and
   `generate-proposals-llm.sh` already produces LLM-authored proposals. But
@@ -95,6 +109,12 @@ until the Suite *is* the harness. Two external functions are named today:
 
 ### M2 — Autonomy ladder (review frequency becomes a real control)
 
+- **Status: LANDED.** `run-pipeline.sh --autonomy-gate` reads
+  `graduation-tracker.sh review-frequency` output (and, under M8, the
+  persisted autonomy mode) and defers/auto-deploys accordingly; every
+  autonomy change is logged to provenance. Covered by
+  `tests/run_phase8_harness.sh` (relaxed auto-deploys, full_review does
+  not) and `tests/run_phase9_harness.sh` (four-path matrix).
 - **Exists:** `graduation-tracker.sh` already computes
   `review_mode ∈ {full_review, relaxed_review}` from a 20-clean streak and
   `thresholds.json` defines acceptance bands. **But nothing consumes
@@ -134,6 +154,12 @@ until the Suite *is* the harness. Two external functions are named today:
 
 ### M4 — Closed goal-execution loop (goals become actions become lessons)
 
+- **Status: LANDED.** `core/executive/record-goal-outcome.sh` records
+  success/failure/deadline-missed outcomes, and the VTA→PFC closed loop
+  (`vta-memory/scripts/encode-pipeline.sh`) closes accomplishment rewards
+  onto matching active goals (wired 2026-08-22, covered by
+  `tests/test_closed_loops.sh`). Outcomes feed ACC error state via the
+  encode pipeline for the next proposal cycle.
 - **Exists:** `propose-goals.sh` promotes goals into `pfc-state.json` under
   caps (max active, min confidence, load gate). Goals are **static** — no
   code consumes them to act, complete, or learn.
@@ -155,6 +181,11 @@ direction and safety, not operators.
 
 ### M5 — Outcome-driven proposal generation (the suite learns *what* to improve)
 
+- **Status: LANDED.** `health-context.sh` feeds verification-sweep
+  failures, daemon failure streaks, and ACC lessons into
+  `generate-proposals-llm.sh`'s prompts; a fixture with a known failing
+  module produces a proposal whose target is that module's script. Covered
+  by `tests/test_m5_proposal_linkage.sh` (signal → proposal → target).
 - **Exists:** proposals today come from `generate-proposals-llm.sh` prompts;
   monitoring data (`live-metrics.json`) drives auto-rollback only.
 - **Change:** enrich proposal generation inputs with the suite's own
@@ -167,6 +198,12 @@ direction and safety, not operators.
 
 ### M6 — Self-directed expansion (the suite grows new modules)
 
+- **Status: LANDED.** `core/self-mod/create-module.sh` generates a complete
+  new skill directory (manifest + `SKILL.md` + install.sh with the standard
+  lifecycle contract) from a proposal's `new_module` field; `check-target.sh`
+  validates multi-file `target_paths` and `apply-patch.sh` applies per-file
+  `files` content atomically under the same evaluate/deploy/monitor gates.
+  Added 2026-08-22 (Initiative 11).
 - **Exists:** `core/capability-registry.schema.json` +
   `validate-manifest.sh` define what a new capability must declare;
   `check-target.sh` gates mutation to manifest-carrying modules.

@@ -65,7 +65,7 @@
       divergence + monitor; harness proves both paths; any failure resets
       the streak to 0.
 
-**Last checked:** 2026-08-08. **Next check-in:** when M0 host-hardening lands.
+**Last checked:** 2026-08-22. **Next check-in:** when M0 host-hardening lands.
 
 ---
 
@@ -119,7 +119,7 @@
       session accumulation, unknown-tool rejection, honest failure, daemon
       dispatch via the shim).
 
-**Last checked:** 2026-08-08. **Next check-in:** when M0 host-hardening lands.
+**Last checked:** 2026-08-22. **Next check-in:** when M0 host-hardening lands.
 
 ---
 
@@ -163,7 +163,7 @@
       next proposal cycle; a harness test proves the full
       goal → action → outcome → learn round trip.
 
-**Last checked:** 2026-08-08. **Next check-in:** when M0 host-hardening lands.
+**Last checked:** 2026-08-22. **Next check-in:** when M0 host-hardening lands.
 
 ---
 
@@ -211,9 +211,9 @@ weekly cycle defers with a visible alert instead of churning). The Gap-2
 `core/agent-loop/` gives spawn jobs internal tool use + session memory via
 `SPAWN_PROVIDER=agentloop`, so the daemon no longer needs hermes even for
 its agent turns. The remaining open item is Stage-1 hardening on a real
-host — **M0 is now `IN PROGRESS`** (2026-08-08): the checkable checklist
-lives in `SETUP_COMMANDS.md` §5. On this host, criterion 1 (all 29 jobs
-`ok` via `--check`) is **verified**, and criterion 2's machinery is
+host — **M0 is now `IN PROGRESS`** (last check-in 2026-08-22): the
+checkable checklist lives in `SETUP_COMMANDS.md` §5. On this host,
+criterion 1 (all 30 jobs `ok` via `--check`) is **verified**, and criterion 2's machinery is
 verified/armed across all three sub-checks: PSI poll-mode fallback active
 (`/proc/pressure/*` readable), rootless cgroup delegation confirmed
 (`DelegateControllers=cpu cpuset io memory pids`), and GPU VRAM resolved
@@ -229,6 +229,16 @@ GiB (matches sysfs `mem_info_vram_used`). **Deferral firing observed
 deferred on the VRAM gate at 89.7% (> 80% limit, protecting active
 inference). Of the two observation-based checks, only the 24h clean
 `--status` window remains pending.
+
+**2026-08-22 update:** the `docs/2026-08-22-comprehensive-improvement-plan.md`
+12-initiative plan completed in parallel with M0 — shell hardening,
+per-skill unit tests (30 passing), 7 closed-loop feedback arcs, semantic
+knowledge extraction, install/uninstall isolation, multi-agent action
+selection, M6 new-module creation, and `--no-systemd --no-cgroups`
+portability. M1/M2/M4/M5/M6 are all marked LANDED in ROADMAP.md; the
+full-suite assertion count is now 49 across the unit + closed-loop +
+action-selection + semantic + M5 test suites. See the plan doc's progress
+log for commit hashes.
 
 ---
 

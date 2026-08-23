@@ -20,6 +20,8 @@ navigable document set rather than six disconnected files:
 | [`HERMES_COMPATIBILITY.md`](HERMES_COMPATIBILITY.md) | How does the suite interoperate with the Hermes Agent harness? |
 | [`BRAIN_DAEMON_SCHEDULE.md`](BRAIN_DAEMON_SCHEDULE.md) | What jobs does the daemon run, on what schedule, and why? |
 | [`docs/V4_STATUS.md`](docs/V4_STATUS.md) | The V4.0 implementation ledger (plumbing vs live-exercised). |
+| [`docs/2026-08-22-comprehensive-improvement-plan.md`](docs/2026-08-22-comprehensive-improvement-plan.md) | The 12-initiative improvement plan — audit findings + per-initiative status (all ✅ COMPLETE). |
+| [`docs/2026-08-08-integrative-state-layer-design.md`](docs/2026-08-08-integrative-state-layer-design.md) | The Integrative State Layer (A) design spec — global neuromodulation + workspace composition. |
 
 ## CI
 
@@ -63,6 +65,15 @@ daemon engine itself, which has moved from a bash implementation to a more
 capable Python one (`deep-brain-kernel.py` + `aibrain.service`). The bash
 version is retained, working and unmodified, under `legacy-IGNORE/` for
 rollback only — see `legacy-IGNORE/README.md`.
+
+As of 2026-08-22 the suite also carries the **Integrative State Layer**
+(global neuromodulator vector + shared workspace snapshot, with
+cross-region feedback hooks in the gate/decide/encode pipelines) and the
+completed **12-initiative improvement plan** — shell hardening, per-skill
+unit tests, 7 closed-loop feedback arcs, semantic knowledge extraction,
+install/uninstall isolation, multi-agent action selection, M6 new-module
+creation, and `--no-systemd --no-cgroups` portability (49/49 test
+assertions green). See the docs linked from the index above.
 
 ## Contents
 
@@ -207,7 +218,7 @@ dependency — consistent with the rest of the suite. State writes go through
    4. **Checks host prerequisites** — PSI availability, cgroup v2, GPU
       tooling — printing a warning (not a hard failure) for anything
       missing, since the engine degrades gracefully either way.
-   5. **Runs `--check`** — validates all 29 jobs (21 direct + 8 spawn): the 21 direct jobs' script paths, and minute + day-of-week
+   5. **Runs `--check`** — validates all 30 jobs (22 direct + 8 spawn): the direct jobs' script paths, and minute + day-of-week
       uniqueness across all. Stops here if anything's actually broken.
    6. **Auto-patches `aibrain.service`** — resolves the dirs of
       `hermes`/`jq`/`curl`/`python3`/`vulkaninfo` (plus `nvidia-smi`/`rocm-smi`
