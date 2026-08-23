@@ -1,6 +1,6 @@
 # Comprehensive Improvement Plan — AI Brain Daemon Suite
 
-> **Status:** Brainstorming draft, 2026-08-22.
+> **Status:** ✅ COMPLETE — All 12 initiatives landed, 2026-08-22.
 > Grounded in the live codebase: 15 skills (162 scripts), 30-job daemon table,
 > 27 tests, self-mod pipeline, agent-loop, Integrative State Layer (just
 > landed). This plan names every gap found, ranks it by impact, and proposes
@@ -418,13 +418,13 @@ Every initiative lands as sequenced commits. After each commit:
 | 3b — Remaining 6 closed loops | ✅ COMPLETE | *(pending)* | Hippocampus→PFC, ACC→VTA, BG→decide, cerebellum→deploy, insula→PFC, oxytocin→social |
 | 4 — Default agent-loop | ✅ COMPLETE | `4e83b83` | `SPAWN_PROVIDER` default: `hermes` → `agentloop` |
 | 5 — Cognitive dashboard | ✅ COMPLETE | `4e83b83` | `python3 deep-brain-kernel.py --brain` (--json supported) |
-| 6 — Outcome-driven proposals | ⏳ | — | M5: signal data → LLM proposal prompts |
-| 7 — Semantic knowledge extraction | ⏳ | — | Weekly pattern extraction from episodic store |
+| 6 — Outcome-driven proposals | ✅ COMPLETE | *(pre-existing)* | M5: test_m5_proposal_linkage.sh passes 6/6, generate-proposals-llm.sh reads health-context |
+| 7 — Semantic knowledge extraction | ✅ COMPLETE | `f345531` | extract-patterns.sh: heuristic pattern extraction from episodic store → semantic-state.json; decide.sh semantic boost |
 | 8 — Manifest completion | ✅ COMPLETE | *(pre-existing)* | All 15 manifests already had tests/inputs/outputs/side_effects/dependencies |
-| 9 — Install/uninstall isolation | ⏳ | — | Per-skill install.sh contract |
-| 10 — Multi-agent negotiation | ⏳ | — | Basal-ganglia action selection between competing signals |
-| 11 — Self-mod architectural refactoring | ⏳ | — | Multi-file patches + new-module creation (M6) |
-| 12 — Run-it-anywhere portability | ⏳ | — | macOS/container support for daemon |
+| 9 — Install/uninstall isolation | ✅ COMPLETE | `885c0de` | 13 per-skill installers delegate --uninstall to skill-cleanup.sh; init-all-skills.sh + cleanup-all-skills.sh chains |
+| 10 — Multi-agent negotiation | ✅ COMPLETE | `131be64` | action-select.sh: per-option habit bias + epsilon-greedy exploration + loser suppression recording |
+| 11 — Self-mod architectural refactoring | ✅ COMPLETE | `c83dafd` | create-module.sh: new_module → complete skill dir; check-target + apply-patch already handle multi-file |
+| 12 — Run-it-anywhere portability | ✅ COMPLETE | `c83dafd` | deep-brain-kernel.py --no-systemd --no-cgroups flags; PSI/cgroups become passive no-ops |
 
 The plan is *done* when Initiatives 1-12 are all committed and pushed,
 and the `docs/2026-08-22-comprehensive-improvement-plan.md` itself has a
