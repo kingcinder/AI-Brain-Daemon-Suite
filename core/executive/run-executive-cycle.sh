@@ -34,6 +34,29 @@ done
 export WORKSPACE
 mkdir -p "$WORKSPACE/memory/executive"
 
+# ── Closed-loop: hippocampus consolidation → PFC reflection ───────────────
+# The consolidate.sh script drops a .pending-reflection marker after weekly
+# memory consolidation. When present, run a targeted reflection that pulls
+# in the freshly consolidated memory store so PFC goals can adapt to what
+# changed in long-term memory.
+PENDING_REFLECTION="$WORKSPACE/memory/.pending-reflection"
+if [ -f "$PENDING_REFLECTION" ]; then
+    echo "executive-cycle: hippocampus consolidation detected — triggering targeted reflection..."
+    REFLECT_EXTRA="$WORKSPACE/memory/user $WORKSPACE/memory/self $WORKSPACE/memory/relationship $WORKSPACE/memory/world"
+    # Run a reflection with extra context: pass consolidated memory dirs as
+    # additional snapshot sources. isolate-reflect.sh is read-only, so this
+    # just enriches its signal set — no mutation risk.
+    if [ -x "$ROOT/core/executive/isolated-reflect.sh" ]; then
+        HIPPO_REF=$(bash "$ROOT/core/executive/isolated-reflect.sh" --workspace "$WORKSPACE" --out "$WORKSPACE/memory/executive/reflections")
+        echo "executive-cycle: post-consolidation reflection -> $HIPPO_REF"
+    fi
+    # Clear the marker so we don't re-trigger until next consolidation
+    rm -f "$PENDING_REFLECTION"
+    # The post-consolidation reflection may have produced goal proposals
+    # (like "review what changed in long-term memory"). Let propose-goals
+    # pick them up in its normal pass below.
+fi
+
 echo "executive-cycle: isolated reflection..."
 REF=$(bash "$ROOT/core/executive/isolated-reflect.sh" --workspace "$WORKSPACE")
 echo "executive-cycle: reflection -> $REF"

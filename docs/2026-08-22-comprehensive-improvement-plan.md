@@ -415,11 +415,12 @@ Every initiative lands as sequenced commits. After each commit:
 | 1 — Shell hardening | ✅ COMPLETE | `8194561` | 116 scripts → `set -euo pipefail`; 4 unbound-$1 bugs fixed |
 | 2 — Per-skill unit tests | ⏳ | — | All skills have test files; manifest declarations pending |
 | 3 — VTA→PFC goal loop | ✅ COMPLETE | `4e83b83` | `vta/encode-pipeline.sh` calls `record-goal-outcome.sh` on accomplishment overlap |
+| 3b — Remaining 6 closed loops | ✅ COMPLETE | *(pending)* | Hippocampus→PFC, ACC→VTA, BG→decide, cerebellum→deploy, insula→PFC, oxytocin→social |
 | 4 — Default agent-loop | ✅ COMPLETE | `4e83b83` | `SPAWN_PROVIDER` default: `hermes` → `agentloop` |
 | 5 — Cognitive dashboard | ✅ COMPLETE | `4e83b83` | `python3 deep-brain-kernel.py --brain` (--json supported) |
 | 6 — Outcome-driven proposals | ⏳ | — | M5: signal data → LLM proposal prompts |
 | 7 — Semantic knowledge extraction | ⏳ | — | Weekly pattern extraction from episodic store |
-| 8 — Manifest completion | ⏳ | — | Most manifests already comprehensive |
+| 8 — Manifest completion | ✅ COMPLETE | *(pre-existing)* | All 15 manifests already had tests/inputs/outputs/side_effects/dependencies |
 | 9 — Install/uninstall isolation | ⏳ | — | Per-skill install.sh contract |
 | 10 — Multi-agent negotiation | ⏳ | — | Basal-ganglia action selection between competing signals |
 | 11 — Self-mod architectural refactoring | ⏳ | — | Multi-file patches + new-module creation (M6) |

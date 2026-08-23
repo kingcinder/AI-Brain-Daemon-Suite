@@ -184,6 +184,23 @@ else
   echo "$UPDATED" > "$STATE_FILE"
 fi
 
+# ── Closed-loop: uncertainty zones → VTA anticipation ─────────────────────
+# When the ACC detects uncertainty (ambiguity in the world, unknown topics),
+# flag those topics for the VTA's anticipatory reward system so the brain
+# learns to seek resolution of what it doesn't understand.
+if [ "$ZONE_COUNT" -gt 0 ]; then
+    ANTICIPATE_SCRIPT="$SKILL_DIR/../vta-memory/scripts/anticipate.sh"
+    if [ -x "$ANTICIPATE_SCRIPT" ]; then
+        while IFS= read -r zone; do
+            [ -z "$zone" ] && continue
+            TOPIC=$(echo "$zone" | jq -r '.topic // empty' 2>/dev/null)
+            [ -z "$TOPIC" ] && continue
+            REASON=$(echo "$zone" | jq -r '.reason // "ACC-flagged uncertainty"' 2>/dev/null)
+            "$ANTICIPATE_SCRIPT" --topic "$TOPIC" --reason "$REASON" --source "acc_encode" 2>/dev/null || true
+        done < <(echo "$ZONES" | jq -c '.[]')
+    fi
+fi
+
 # ── Log event ─────────────────────────────────────────────────────────────────
 "$SKILL_DIR/scripts/log-event.sh" \
   encoding \

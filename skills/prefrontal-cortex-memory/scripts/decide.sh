@@ -52,7 +52,8 @@ VALENCE=$(read_field "$WORKSPACE/memory/emotional-state.json" '.dimensions.valen
 ENERGY=$(read_field "$WORKSPACE/memory/emotional-state.json" '.dimensions.energy' "0.5")
 CONFLICT_LOAD=$(read_field "$WORKSPACE/memory/conflict-state.json" '.conflictLoad' "0.0")
 ERROR_PATTERNS=$(read_field "$WORKSPACE/memory/acc-state.json" '(.activePatterns | length)' "0")
-HABIT_STRENGTH=$(read_field "$WORKSPACE/memory/habit-state.json" '([.habits[].strength] | if length > 0 then (add / length) else 0 end)' "0.0")
+HABIT_STATE_PATH="$WORKSPACE/memory/habit-state.json"
+HABIT_STRENGTH=$(read_field "$HABIT_STATE_PATH" '([.habits[].strength] | if length > 0 then (add / length) else 0 end)' "0.0")
 CALIBRATION=$(read_field "$WORKSPACE/memory/cerebellum-state.json" '.globalCalibration' "0.5")
 OPEN_LOOPS=$(read_field "$WORKSPACE/memory/social-state.json" '([.relationships[].openLoops[]?] | length)' "0")
 
@@ -102,6 +103,7 @@ if [ "${PFC_SEMANTIC_MATCHING:-auto}" != "off" ] && [ -x "$SCRIPT_DIR/semantic-m
   rm -f /tmp/pfc_semantic_err.$$
 fi
 
+cp "$HABIT_STATE_PATH" /tmp/pfc_habit_state.$$ 2>/dev/null || echo '{"habits":[]}' > /tmp/pfc_habit_state.$$
 echo "$OPTIONS_JSON" > /tmp/pfc_options.$$
 echo "$GOALS" > /tmp/pfc_goals.$$
 echo "$INHIBITIONS" > /tmp/pfc_inhibitions.$$
@@ -110,6 +112,7 @@ echo "$SEMANTIC_INHIBITION_MATCHES" > /tmp/pfc_semantic_inhibitions.$$
 
 RESULT=$(CALIBRATION="$CALIBRATION" COGNITIVE_LOAD="$COGNITIVE_LOAD" CONFLICT_LOAD="$CONFLICT_LOAD" CONTEXT="$CONTEXT" DRIVE="$DRIVE" ENERGY="$ENERGY" ERROR_PATTERNS="$ERROR_PATTERNS" GUT_SIGNAL="$GUT_SIGNAL" HABIT_STRENGTH="$HABIT_STRENGTH" NEURO_CORT="$NEURO_CORT" NEURO_DA="$NEURO_DA" OPEN_LOOPS="$OPEN_LOOPS" SATURATION="$SATURATION" SEEKING="$SEEKING" SEMANTIC_METHOD="$SEMANTIC_METHOD" VALENCE="$VALENCE" \
   OPTIONS_FILE="/tmp/pfc_options.$$" GOALS_FILE="/tmp/pfc_goals.$$" INHIBITIONS_FILE="/tmp/pfc_inhibitions.$$" \
+  HABIT_STATE_FILE="/tmp/pfc_habit_state.$$" \
   SEMANTIC_GOALS_FILE="/tmp/pfc_semantic_goals.$$" SEMANTIC_INHIBITIONS_FILE="/tmp/pfc_semantic_inhibitions.$$" \
   python3 << 'PYTHON'
 import os
@@ -214,9 +217,27 @@ for opt in options:
                 score *= max(0.0, 1.0 - inh.get('strength', 0.8))
                 notes.append(f"inhibition '{inh.get('pattern')}' suppresses {oid} (heuristic match)")
 
-    # Habitual pull: options with above-average habit strength get a light nudge
-    # (well-worn grooves are cheap to act on) — kept small since this is a
-    # coarse suite-wide average, not a per-option lookup.
+    # ── Per-option habit pull (Closed-loop: basal-ganglia → PFC decide) ──
+    # Read the full habit state and match by option label overlap — gives
+    # well-rehearsed behaviors their real pull instead of a coarse global
+    # average that treats all options the same.
+    habit_state_file = os.environ.get('HABIT_STATE_FILE', '')
+    if habit_state_file:
+        try:
+            habit_state = json.load(open(habit_state_file))
+            habit_entries = habit_state.get('habits', [])
+            for he in habit_entries:
+                h_label = (he.get('label') or he.get('description') or '').lower()
+                if h_label and (overlaps(h_label, label) or overlaps(h_label, oid)):
+                    h_strength = float(he.get('strength', 0.5))
+                    # Per-option habit pull: well-worn grooves are cheap to act on
+                    score *= (0.9 + 0.2 * h_strength)
+                    notes.append(f"habit '{he.get('label','')[:40]}' pull {h_strength:.2f} on {oid}")
+                    break
+        except Exception:
+            pass
+
+    # Legacy global habit pull (fallback when no per-option match above)
     if habit_strength > 0.6 and high_effort:
         score *= 1.1
 
@@ -232,6 +253,19 @@ for opt in options:
     if open_loops > 0 and oid == 'social_interaction':
         score *= (1.0 + min(open_loops, 5) * 0.08)
         notes.append(f'{open_loops} open loop(s) favor social_interaction')
+
+    # ── Insula gutSignal → PFC inhibition (Closed-loop) ───────────────────
+    # High gut signal (somatic "bad feeling") applies inhibition strength to
+    # options whose label overlaps any active inhibition pattern — the body's
+    # alarm system gates executive decisions.
+    if gut_signal > 0.5:
+        for inh in inhibitions:
+            pat = inh.get('pattern') or ''
+            if pat and (overlaps(pat, label) or overlaps(pat, oid)):
+                # Gut signal amplifies the inhibition: stronger body alarm = stronger block
+                inh_power = inh.get('strength', 0.6) * (0.7 + 0.3 * gut_signal)
+                score *= max(0.05, 1.0 - inh_power)
+                notes.append(f"gutSignal={gut_signal:.2f} amplifies inhibition '{pat[:30]}' on {oid}")
 
     # Somatic bias: under acute stress (cortisol > 0.6), options that look
     # uncertain/novel get dampened — prefer the known over the unknown.
@@ -256,7 +290,7 @@ PYTHON
 )
 
 echo "$RESULT"
-rm -f /tmp/pfc_options.$$ /tmp/pfc_goals.$$ /tmp/pfc_inhibitions.$$ /tmp/pfc_semantic_goals.$$ /tmp/pfc_semantic_inhibitions.$$
+rm -f /tmp/pfc_options.$$ /tmp/pfc_goals.$$ /tmp/pfc_inhibitions.$$ /tmp/pfc_habits.$$ /tmp/pfc_habit_state.$$ /tmp/pfc_semantic_goals.$$ /tmp/pfc_semantic_inhibitions.$$
 
 # Log the decision (best-effort, never block the caller on this).
 # flock-guarded via safe-write.sh: this file is written on every decide.sh

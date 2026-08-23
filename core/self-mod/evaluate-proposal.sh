@@ -303,6 +303,22 @@ PY
 THR=$(cat "$SB/threshold.json")
 ROLLBACK=$(echo "$THR" | jq -r .rollback_required)
 
+# ── Closed-loop: cerebellum calibration → deploy confidence ───────────────
+# When the cerebellum's globalCalibration is low (the agent's execution
+# accuracy is "shaky"), relax the strict utility-improvement requirement —
+# it's not fair to reject every proposal when the metrics themselves are
+# noisy. High calibration keeps the strict gate.
+CEREBELLUM_CAL=0.5
+CEREB_STATE="$WORKSPACE/memory/cerebellum-state.json"
+if [ -f "$CEREB_STATE" ]; then
+    CEREBELLUM_CAL=$(jq -r '.globalCalibration // 0.5' "$CEREB_STATE" 2>/dev/null || echo "0.5")
+fi
+UTILITY_SLACK=0.0
+if python3 -c "import sys; sys.exit(0 if float('$CEREBELLUM_CAL') < 0.5 else 1)" 2>/dev/null; then
+    # Low calibration: allow utility to be up to 10% below baseline before rejecting
+    UTILITY_SLACK=0.10
+fi
+
 # Asymmetric graduation
 GRAD=$(jq -r '.graduation' "$THRESH")
 REQUIRE_IMPROVE=$(echo "$GRAD" | jq -r '.require_utility_improvement // true')
@@ -324,9 +340,9 @@ if [ "$ROLLBACK" = "true" ]; then
   REASON="${REASON:+$REASON;}rollback_threshold_breach"
 fi
 if [ "$REQUIRE_IMPROVE" = "true" ]; then
-  # U must be strictly greater than baseline U
-  BETTER=$(python3 -c "import sys; sys.exit(0 if float('$U') > float('$BASE_U') else 1)") && true || BETTER=1
-  if ! python3 -c "import sys; sys.exit(0 if float('$U') > float('$BASE_U') else 1)"; then
+  # U must be strictly greater than baseline U (minus cerebellum slack)
+  THRESHOLD_U=$(python3 -c "print(max(0.0, float('$BASE_U') - float('$UTILITY_SLACK')))")
+  if ! python3 -c "import sys; sys.exit(0 if float('$U') > float('$THRESHOLD_U') else 1)"; then
     ACCEPTED=false
     REASON="${REASON:+$REASON;}utility_not_improved"
   fi

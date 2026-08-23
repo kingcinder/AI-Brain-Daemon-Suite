@@ -5,8 +5,13 @@
 # Environment:
 #   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
 
+set -euo pipefail
+
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 MEMORY_DIR="$WORKSPACE/memory"
+
+# ── Closed-loop: after consolidation, signal PFC to reflect on what changed ──
+PENDING_REFLECTION="$WORKSPACE/memory/.pending-reflection"
 
 echo "🧠 Memory Consolidation"
 echo "======================="
@@ -39,3 +44,10 @@ echo "  - $MEMORY_DIR/user/*.md"
 echo "  - $MEMORY_DIR/self/*.md"  
 echo "  - $MEMORY_DIR/relationship/*.md"
 echo "  - $MEMORY_DIR/world/*.md"
+
+# ── Closed-loop: signal PFC that consolidation happened — the next executive
+#    cycle's isolated-reflect.sh will pick up this marker and trigger a
+#    reflection pass over the freshly consolidated memory. ────────────────────
+date -u +"%Y-%m-%dT%H:%M:%SZ" > "$PENDING_REFLECTION"
+# Set marker for the run-cycle.sh wrapper to check
+echo "🧠 Consolidation complete — PFC reflection marker set."
