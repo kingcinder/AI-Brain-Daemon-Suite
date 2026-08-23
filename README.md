@@ -197,45 +197,40 @@ already carries its own copies). No API key, no per-call cost, no cloud
 dependency — consistent with the rest of the suite. State writes go through
 `safe-write.sh`'s lock-guarded pattern rather than an unguarded read/write.
 
-## Installation
+## Quickstart
 
-1. Extract this package.
-2. From inside the extracted directory, run:
+One command does the whole install — deploy, PATH patch, Hermes
+registration, activation, and verification:
 
-   ```bash
-   chmod +x install.sh
-   ./install.sh
-   ```
+```bash
+cd AI_BRAIN_SUITE_COMPLETE
+chmod +x install.sh
+./install.sh            # fully automated; pauses only if a daemon tool is missing
+./install.sh --yes      # fully unattended (CI / scripts / containers)
+```
 
-   `install.sh`:
+A single `./install.sh` run:
 
-   1. **Initializes the workspace** — `~/.hermes/workspace/skills/` and
-      `~/.config/systemd/user/`.
-   2. **Deploys artifacts** — `deep-brain-kernel.py` to the workspace root,
-      `aibrain.service` to the systemd user directory, all 15 skill packages
-      into `~/.hermes/workspace/skills/`.
-   3. **Sets permissions** on the engine and every skill script.
-   4. **Checks host prerequisites** — PSI availability, cgroup v2, GPU
-      tooling — printing a warning (not a hard failure) for anything
-      missing, since the engine degrades gracefully either way.
-   5. **Runs `--check`** — validates all 30 jobs (22 direct + 8 spawn): the direct jobs' script paths, and minute + day-of-week
-      uniqueness across all. Stops here if anything's actually broken.
-   6. **Auto-patches `aibrain.service`** — resolves the dirs of
-      `hermes`/`jq`/`curl`/`python3`/`vulkaninfo` (plus `nvidia-smi`/`rocm-smi`
-      if present) from your PATH and rewrites the deployed unit's
-      `Environment=PATH=` line, so nothing needs a manual service-file edit.
-   7. **Registers the suite with Hermes Agent** — Option B (zero-copy):
-      merges `skills.external_dirs → ~/.hermes/workspace/skills` into
-      `~/.hermes/config.yaml` (idempotent, with a `.bak-aibrain-install`
-      backup on first change), so all 11 brain skills load as `source=local`
-      with no manual config edit. Skipped with a warning if `hermes` isn't
-      installed (the suite still runs via `SPAWN_PROVIDER=local|agentloop`).
-   8. **Pauses only if a daemon tool is missing** from PATH (never in
-      noninteractive/`--yes` mode); otherwise proceeds straight through.
-   9. **Integrates with systemd** (`daemon-reload`) and **activates** the
-      service.
-   10. **Verifies** the service is active, prints status, and checks how many
-      brain skills `hermes skills list` sees.
+| Phase | What it does |
+|---|---|
+| **Deploy** | Wipes and re-copies the five shipped targets into `~/.hermes/workspace/` — `deep-brain-kernel.py`, `skills/`, `core/`, `tests/`, `scripts/` — installs `aibrain.service`, and seeds per-skill state. Runtime state under `memory/` is never touched. |
+| **PATH patch** | Resolves the dirs of `hermes`/`jq`/`curl`/`python3`/`vulkaninfo` (plus `nvidia-smi`/`rocm-smi` if present) and rewrites the deployed unit's `Environment=PATH=` — systemd user services don't inherit your shell PATH. |
+| **Hermes registration** | Option B, zero-copy: merges `skills.external_dirs → ~/.hermes/workspace/skills` into `~/.hermes/config.yaml` so the 11 brain skills load as `source=local` (idempotent; `.bak-aibrain-install` backup on first change). Skipped with a warning if `hermes` isn't installed. |
+| **Activation** | `systemctl --user daemon-reload` + `systemctl --user enable --now aibrain.service`. Skipped gracefully on hosts without a systemd user session (containers/WSL) — enable manually later. |
+| **Verification** | Pre-flight `--check` validates the 30-job table (script paths, minute + day-of-week uniqueness) and stops the install if anything's broken; then confirms the service is active and prints how many brain skills `hermes skills list` sees. |
+
+Before deploying it also runs host prerequisite checks — the PSI, cgroup v2,
+and GPU-tooling probes are warnings only (the engine degrades gracefully
+without them); the one hard stop is a missing `/usr/bin/python3`, which the
+unit's `ExecStart` requires. The whole run is self-healing: the previous
+workspace and unit
+are backed up before deploy and restored automatically if anything fails
+mid-install (backup at `~/.hermes/workspace.bak-aibrain-install` — `rm -rf`
+it once you're happy). The only interactive pause fires when a daemon tool
+is genuinely missing from PATH, and never in `--yes`/noninteractive mode.
+
+Remove the suite later with `./uninstall.sh` (add `--yes` for unattended
+removal) — see [Maintenance](#maintenance).
 
 ## Configuration / Gotchas
 
@@ -275,40 +270,26 @@ This suite runs *under* **Hermes Agent** (Nous Research): `deep-brain-kernel.py`
 is a supervisor that hands the 8 `spawn`-type jobs (the encoding runs that
 need real reasoning) to the harness via
 `hermes chat -q "<task>" --source daemon` (`core/spawn/spawn-provider.sh`).
-Getting the whole integration up is one command:
+The [Quickstart](#quickstart) above covers the whole integration in one
+`./install.sh` run — deploy, PATH patch, Option B skill registration,
+activation, and verification. What's specific to Hermes:
 
-```bash
-cd AI_BRAIN_SUITE_COMPLETE
-./install.sh            # fully automated: deploy + PATH patch + skill registration + enable
-./install.sh --yes      # fully unattended (CI / scripts)
-```
-
-`install.sh` performs the entire Hermes integration for you:
-
-1. **Installs** the suite into `~/.hermes/workspace/` (kernel, 15 skills,
-   `core/`) and enables `aibrain.service` (systemd user unit).
-2. **Registers the skills with Hermes (Option B, zero-copy)** — merges
+1. **Registration is Option B (zero-copy)** — `install.sh` merges
    `skills.external_dirs → ~/.hermes/workspace/skills` into
    `~/.hermes/config.yaml`, so all 11 brain skills load as `source=local`.
    No `hermes skills install` needed (that URL path is scan-gated and flags
    the suite DANGEROUS; local registration sidesteps it).
-3. **Auto-patches `aibrain.service`'s `Environment=PATH=`** with the resolved
-   dirs of `hermes`/`jq`/`curl`/`python3`/`vulkaninfo` — systemd user
+2. **The PATH patch matters here specifically** — `install.sh` rewrites
+   `aibrain.service`'s `Environment=PATH=` with the resolved dirs of
+   `hermes`/`jq`/`curl`/`python3`/`vulkaninfo`, because systemd user
    services don't inherit your shell PATH.
-4. **Verifies** — prints how many brain skills `hermes skills list` sees.
+3. **Verification includes the harness** — after activation, `install.sh`
+   prints how many brain skills `hermes skills list` sees.
 
-Two behaviors worth knowing: on hosts without a systemd user session
-(containers, WSL) Steps 6–7 are skipped gracefully — the deploy, PATH patch,
-and skill registration still complete; enable the service later with
-`systemctl --user daemon-reload && systemctl --user enable --now aibrain.service`.
-And the previous install is preserved at
-`~/.hermes/workspace.bak-aibrain-install`, restored automatically if the
-install fails (remove the backup with `rm -rf` once you're happy).
-
-To remove the suite later: `./uninstall.sh` (add `--yes` for unattended
-removal) — it stops/disables `aibrain.service`, removes the workspace, unit,
-and Hermes skills entry, and restores the pre-install `.bak-aibrain-install`
-backups where they exist.
+On hosts without a systemd user session (containers, WSL) the deploy, PATH
+patch, and skill registration still complete; only activation is skipped
+(enable later with `systemctl --user daemon-reload && systemctl --user
+enable --now aibrain.service`).
 
 ### Verify
 
