@@ -413,9 +413,9 @@ Every initiative lands as sequenced commits. After each commit:
 | Initiative | Status | Commit | Summary |
 |---|---|---|---|
 | 1 — Shell hardening | ✅ COMPLETE | `8194561` | 116 scripts → `set -euo pipefail`; 4 unbound-$1 bugs fixed |
-| 2 — Per-skill unit tests | ⏳ | — | All skills have test files; manifest declarations pending |
+| 2 — Per-skill unit tests | ✅ COMPLETE | *(pre-existing)* | 30/30 tests pass; all 15 manifests declare tests |
 | 3 — VTA→PFC goal loop | ✅ COMPLETE | `4e83b83` | `vta/encode-pipeline.sh` calls `record-goal-outcome.sh` on accomplishment overlap |
-| 3b — Remaining 6 closed loops | ✅ COMPLETE | *(pending)* | Hippocampus→PFC, ACC→VTA, BG→decide, cerebellum→deploy, insula→PFC, oxytocin→social |
+| 3b — Remaining 6 closed loops | ✅ COMPLETE | `4607eee` | Hippocampus→PFC, ACC→VTA, BG→decide, cerebellum→deploy, insula→PFC, oxytocin→social |
 | 4 — Default agent-loop | ✅ COMPLETE | `4e83b83` | `SPAWN_PROVIDER` default: `hermes` → `agentloop` |
 | 5 — Cognitive dashboard | ✅ COMPLETE | `4e83b83` | `python3 deep-brain-kernel.py --brain` (--json supported) |
 | 6 — Outcome-driven proposals | ✅ COMPLETE | *(pre-existing)* | M5: test_m5_proposal_linkage.sh passes 6/6, generate-proposals-llm.sh reads health-context |
