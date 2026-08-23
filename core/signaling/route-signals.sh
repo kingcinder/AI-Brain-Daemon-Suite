@@ -48,6 +48,19 @@ prefrontal-cortex-memory|goal_promoted|thalamus-memory|scripts/gate.sh|--boost-g
 prefrontal-cortex-memory|goal_achieved|vta-memory|scripts/log-reward.sh|--type accomplishment --intensity 0.7 --source "goal achieved: {payload_description}"
 prefrontal-cortex-memory|goal_achieved|amygdala-memory|scripts/update-state.sh|--emotion joy --intensity 0.6 --trigger "goal achieved"
 hippocampus-memory|significant_memory|insula-memory|scripts/update-state.sh|--signal expansion --intensity 0.3 --source "significant memory encoded"
+# ── Learning-signal propagation (the new mechanism fields cross regions) ──
+# VTA RPE → ACC: a notable reward-prediction error means the world is more
+# volatile than expected — the ACC flags that reward domain for attention
+# (Botvinick conflict monitoring; Holroyd & Coles ERN-style surprise).
+vta-memory|rpe_logged|anterior-cingulate-memory|scripts/flag-attention.sh|--add "rpe_{payload_type}" --reason "reward prediction error"
+# Amygdala salience → hippocampus: a high-salience tag (McGaugh memory
+# enhancement) boosts the encoding weight of that domain downstream — the
+# amygdala's computational output is a tag that biases encoding strength.
+amygdala-memory|salience_tag|hippocampus-memory|scripts/note-salience.sh|--emotion {payload_type} --salience {intensity}
+# Insula discrepancy → PFC: a high interoceptive prediction error (Craig's
+# predictive-coding model; Critchley's confidence extension) lowers executive
+# confidence — the body's "something's off" signal damps decision scores.
+insula-memory|interoceptive_discrepancy|prefrontal-cortex-memory|scripts/note-uncertainty.sh|--value {intensity}
 cerebellum-memory|calibration_drift|insula-memory|scripts/update-state.sh|--signal vigilance --intensity 0.4 --source "execution calibration drift detected"
 heartbeat-memory|action_chosen|insula-memory|scripts/update-state.sh|--signal ease --intensity 0.2 --source "autonomous action chosen: {signal}"
 social-memory|trust_shift|amygdala-memory|scripts/update-state.sh|--emotion connection --intensity {intensity} --trigger "relationship trust shift: {signal}"

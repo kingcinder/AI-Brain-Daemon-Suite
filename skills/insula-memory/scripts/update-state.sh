@@ -137,4 +137,20 @@ with open(state_path, 'w') as f:
     json.dump(state, f, indent=2)
 PYTHON
 
+# ── Publish the interoceptive prediction error to the signal bus ───────────
+# (closed loop: insula discrepancy → PFC confidence). The composite
+# interoceptiveDiscrepancy is the anterior-insula output (Craig predictive
+# coding; Critchley confidence). Publish only when it is notable (>= 0.15)
+# so the PFC confidence route isn't spammed by sub-threshold noise.
+DISC=$(jq -r '.composite.interoceptiveDiscrepancy // 0' "$STATE_FILE" 2>/dev/null || echo "0")
+if awk -v d="$DISC" 'BEGIN { exit !(d >= 0.15) }' 2>/dev/null; then
+    PUBLISH_SH="$SCRIPT_DIR/../../../core/signaling/publish.sh"
+    if [ -x "$PUBLISH_SH" ]; then
+        "$PUBLISH_SH" --type interoceptive --source insula-memory \
+            --signal interoceptive_discrepancy --intensity "$DISC" \
+            --payload '{"type":"interoceptive","pattern":"discrepancy"}' \
+            >/dev/null 2>&1 || true
+    fi
+fi
+
 "$SCRIPT_DIR/sync-state.sh" > /dev/null 2>&1 || true

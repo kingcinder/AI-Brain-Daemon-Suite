@@ -52,6 +52,12 @@ VALENCE=$(read_field "$WORKSPACE/memory/emotional-state.json" '.dimensions.valen
 ENERGY=$(read_field "$WORKSPACE/memory/emotional-state.json" '.dimensions.energy' "0.5")
 CONFLICT_LOAD=$(read_field "$WORKSPACE/memory/conflict-state.json" '.conflictLoad' "0.0")
 ERROR_PATTERNS=$(read_field "$WORKSPACE/memory/acc-state.json" '(.activePatterns | length)' "0")
+# Insula interoceptive discrepancy → PFC confidence (Closed-loop): the body's
+# "something's off" prediction error (Craig; Critchley) lowers executive
+# confidence. Written by note-uncertainty.sh when the insula publishes
+# interoceptive_discrepancy; absent → no dampening (decide.sh must work
+# standalone).
+INTERO_DISC=$(read_field "$WORKSPACE/memory/pfc-uncertainty.json" '.interoceptiveDiscrepancy' "0.0")
 HABIT_STATE_PATH="$WORKSPACE/memory/habit-state.json"
 SEMANTIC_STATE_PATH="$WORKSPACE/memory/semantic-state.json"
 HABIT_STRENGTH=$(read_field "$HABIT_STATE_PATH" '([.habits[].strength] | if length > 0 then (add / length) else 0 end)' "0.0")
@@ -112,7 +118,7 @@ echo "$INHIBITIONS" > /tmp/pfc_inhibitions.$$
 echo "$SEMANTIC_GOAL_MATCHES" > /tmp/pfc_semantic_goals.$$
 echo "$SEMANTIC_INHIBITION_MATCHES" > /tmp/pfc_semantic_inhibitions.$$
 
-RESULT=$(CALIBRATION="$CALIBRATION" COGNITIVE_LOAD="$COGNITIVE_LOAD" CONFLICT_LOAD="$CONFLICT_LOAD" CONTEXT="$CONTEXT" DRIVE="$DRIVE" ENERGY="$ENERGY" ERROR_PATTERNS="$ERROR_PATTERNS" GUT_SIGNAL="$GUT_SIGNAL" HABIT_STRENGTH="$HABIT_STRENGTH" NEURO_CORT="$NEURO_CORT" NEURO_DA="$NEURO_DA" OPEN_LOOPS="$OPEN_LOOPS" SATURATION="$SATURATION" SEEKING="$SEEKING" SEMANTIC_METHOD="$SEMANTIC_METHOD" VALENCE="$VALENCE" \
+RESULT=$(CALIBRATION="$CALIBRATION" COGNITIVE_LOAD="$COGNITIVE_LOAD" CONFLICT_LOAD="$CONFLICT_LOAD" CONTEXT="$CONTEXT" DRIVE="$DRIVE" ENERGY="$ENERGY" ERROR_PATTERNS="$ERROR_PATTERNS" GUT_SIGNAL="$GUT_SIGNAL" HABIT_STRENGTH="$HABIT_STRENGTH" INTERO_DISC="$INTERO_DISC" NEURO_CORT="$NEURO_CORT" NEURO_DA="$NEURO_DA" OPEN_LOOPS="$OPEN_LOOPS" SATURATION="$SATURATION" SEEKING="$SEEKING" SEMANTIC_METHOD="$SEMANTIC_METHOD" VALENCE="$VALENCE" \
   OPTIONS_FILE="/tmp/pfc_options.$$" GOALS_FILE="/tmp/pfc_goals.$$" INHIBITIONS_FILE="/tmp/pfc_inhibitions.$$" \
   HABIT_STATE_FILE="/tmp/pfc_habit_state.$$" \
   SEMANTIC_STATE_FILE="/tmp/pfc_semantic_state.$$" \
@@ -141,6 +147,7 @@ error_patterns = int(os.environ['ERROR_PATTERNS'])
 habit_strength = float(os.environ['HABIT_STRENGTH'])
 calibration = float(os.environ['CALIBRATION'])
 open_loops = int(os.environ['OPEN_LOOPS'])
+intero_disc = float(os.environ['INTERO_DISC'])
 dopamine = float(os.environ['NEURO_DA'])
 cortisol = float(os.environ['NEURO_CORT'])
 
@@ -277,6 +284,15 @@ for opt in options:
         if any(m in label for m in UNCERTAINTY_MARKERS):
             score *= (1.0 - 0.2 * cortisol)
             notes.append(f"stress (cortisol={cortisol:.2f}) dampens uncertain option {oid}")
+
+    # ── Insula interoceptive discrepancy → PFC confidence (Closed-loop) ──
+    # High body-level prediction error (Craig's predictive-coding insula;
+    # Critchley's decision-confidence extension) lowers executive confidence:
+    # dampen ALL candidates by up to 30% as the discrepancy approaches 1.0.
+    if intero_disc > 0.3:
+        damp = 1.0 - 0.3 * min(intero_disc, 1.0)
+        score *= damp
+        notes.append(f"interoceptive discrepancy {intero_disc:.2f} dampens all options (confidence {damp:.2f})")
 
     # ── Semantic knowledge boost (Initiative 7) ─────────────────────────
     # Options whose label overlaps an extracted theme or strategy from

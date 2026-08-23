@@ -232,9 +232,11 @@ inference). Of the two observation-based checks, only the 24h clean
 
 **2026-08-22 update:** the `docs/2026-08-22-comprehensive-improvement-plan.md`
 12-initiative plan completed in parallel with M0 — shell hardening,
-per-skill unit tests (30 passing), 7 closed-loop feedback arcs, semantic
-knowledge extraction, install/uninstall isolation, multi-agent action
-selection, M6 new-module creation, and `--no-systemd --no-cgroups`
+per-skill unit tests (30 passing), 10 closed-loop feedback arcs (the original
+seven plus the learning-signal arcs VTA RPE→ACC, amygdala salience→
+hippocampus encoding weight, and insula discrepancy→PFC confidence),
+semantic knowledge extraction, install/uninstall isolation, multi-agent
+action selection, M6 new-module creation, and `--no-systemd --no-cgroups`
 portability. M1/M2/M4/M5/M6 are all marked LANDED in ROADMAP.md; the
 full-suite assertion count is now 49 across the unit + closed-loop +
 action-selection + semantic + M5 test suites. See the plan doc's progress

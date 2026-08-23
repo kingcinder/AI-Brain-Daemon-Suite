@@ -69,9 +69,11 @@ window.
 
 > **2026-08-22 parallel work:** the `docs/2026-08-22-comprehensive-improvement-plan.md`
 > 12-initiative plan completed alongside M0 — shell hardening (`set -euo
-> pipefail` on all scripts), per-skill unit tests (30 passing), 7 closed-loop
+> pipefail` on all scripts), per-skill unit tests (30 passing), 10 closed-loop
 > feedback arcs (VTA→PFC, hippocampus→PFC, ACC→VTA, basal-ganglia→decide,
-> cerebellum→deploy, insula→PFC, oxytocin→social), semantic knowledge
+> cerebellum→deploy, insula→PFC, oxytocin→social, plus the learning-signal
+> arcs VTA RPE→ACC, amygdala salience→hippocampus encoding weight, and insula
+> discrepancy→PFC confidence), semantic knowledge
 > extraction, install/uninstall isolation, multi-agent action selection, M6
 > new-module creation, and `--no-systemd --no-cgroups` portability. See the
 > plan doc's progress log for commit hashes.

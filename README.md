@@ -71,7 +71,7 @@ As of 2026-08-22 the suite also carries the **Integrative State Layer**
 (global neuromodulator vector + shared workspace snapshot, with
 cross-region feedback hooks in the gate/decide/encode pipelines) and the
 completed **12-initiative improvement plan** — shell hardening, per-skill
-unit tests, 7 closed-loop feedback arcs, semantic knowledge extraction,
+unit tests, 10 closed-loop feedback arcs, semantic knowledge extraction,
 install/uninstall isolation, multi-agent action selection, M6 new-module
 creation, and `--no-systemd --no-cgroups` portability (49/49 test
 assertions green). See the docs linked from the index above.

@@ -115,6 +115,24 @@ mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
 LOG_FILE="$WORKSPACE/memory/reward-log.jsonl"
 echo "$REWARD_ENTRY" >> "$LOG_FILE"
 
+# ── Publish the prediction error to the signal bus (closed loop) ───────────
+# The RPE is the VTA's computational output (Schultz; TD-error). Publish it
+# only when it is notable (|rpe| >= 0.15) — a meaningful surprise — so the
+# ACC attention flag route isn't spammed by expectation-meeting rewards.
+# Intensity is the |rpe| itself (0-1 range), clamped; payload type = the
+# reward type so ACC can flag the specific domain.
+RPE_ABS=$(awk -v r="$RPE" 'BEGIN { r=(r<0?-r:r); if (r>1) r=1; print r }')
+if awk -v a="$RPE_ABS" 'BEGIN { exit !(a >= 0.15) }'; then
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PUBLISH_SH="$SCRIPT_DIR/../../../core/signaling/publish.sh"
+    if [ -x "$PUBLISH_SH" ]; then
+        "$PUBLISH_SH" --type reward --source vta-memory --signal rpe_logged \
+            --intensity "$RPE_ABS" \
+            --payload "{\"type\":\"$TYPE\",\"pattern\":\"reward_prediction_error\"}" \
+            >/dev/null 2>&1 || true
+    fi
+fi
+
 echo "⭐ Reward logged!"
 echo "   Type: $TYPE"
 echo "   Source: $SOURCE"

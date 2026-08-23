@@ -121,6 +121,22 @@ if [ -n "$EMOTION" ]; then
   
   # Also log to JSONL
   echo "$ENTRY" >> "$LOG_FILE"
+
+  # ── Publish the salience tag to the signal bus (closed loop) ─────────────
+  # The salience tag is the amygdala's computational output (LeDoux
+  # dual-pathway; McGaugh memory enhancement). Publish it so the hippocampus
+  # route can boost encoding weight for that domain. Only high-salience
+  # events (TAG_JSON != null) publish — a tag that never fired isn't a signal.
+  if [ "$TAG_JSON" != "null" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PUBLISH_SH="$SCRIPT_DIR/../../../core/signaling/publish.sh"
+    if [ -x "$PUBLISH_SH" ]; then
+      "$PUBLISH_SH" --type emotional --source amygdala-memory --signal salience_tag \
+        --intensity "$SALIENCE" \
+        --payload "{\"type\":\"$EMOTION\",\"pattern\":\"salience_tag\"}" \
+        >/dev/null 2>&1 || true
+    fi
+  fi
   
   # Map emotion to dimension changes
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

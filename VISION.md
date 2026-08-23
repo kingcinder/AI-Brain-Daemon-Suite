@@ -80,9 +80,11 @@ supervision; the internal **agentic loop** (`core/agent-loop/` — multi-turn
 tool use against the local LLM with an allowlisted tool registry and session
 memory) is now the **default** `SPAWN_PROVIDER`, so agent reasoning for
 `spawn` jobs no longer requires Hermes — Hermes is optional, not required.
-Seven closed-loop feedback arcs (VTA→PFC goals, hippocampus→PFC reflection,
+Ten closed-loop feedback arcs (VTA→PFC goals, hippocampus→PFC reflection,
 ACC→VTA anticipation, basal-ganglia→decide habits, cerebellum→deploy
-confidence, insula→PFC inhibition, oxytocin→social encoding) make the brain
+confidence, insula→PFC inhibition, oxytocin→social encoding, plus the
+learning-signal arcs VTA RPE→ACC attention, amygdala salience→hippocampus
+encoding weight, and insula discrepancy→PFC confidence) make the brain
 self-correcting rather than self-recording; multi-agent action selection
 (`basal-ganglia-memory/scripts/action-select.sh`) gives competing regions a
 negotiation stage; and `deep-brain-kernel.py --no-systemd --no-cgroups`

@@ -40,6 +40,10 @@
     {
       "path": "tests/test_acc_conflict_state.sh",
       "kind": "unit"
+    },
+    {
+      "path": "tests/test_learning_signal_routes.sh",
+      "kind": "unit"
     }
   ],
   "immutable": false

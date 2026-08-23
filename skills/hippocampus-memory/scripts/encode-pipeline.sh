@@ -64,6 +64,7 @@ WORKSPACE = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'
 SIGNALS_FILE = f"{WORKSPACE}/memory/signals.jsonl"
 INDEX_FILE = f"{WORKSPACE}/memory/index.json"
 PENDING_FILE = f"{WORKSPACE}/memory/pending-memories.json"
+HINTS_FILE = f"{WORKSPACE}/memory/salience-hints.json"
 
 # Load signals
 signals = []
@@ -81,6 +82,26 @@ with open(INDEX_FILE, 'r') as f:
     index = json.load(f)
 
 memories = index.get('memories', [])
+
+# Salience hints (amygdala → hippocampus closed loop): the most recent
+# high-salience tag (McGaugh memory enhancement) boosts encoding weight.
+# The amygdala's note-salience.sh consumer wrote these; a recent hint with
+# salience >= 0.6 raises the score of matching-domain signals by up to 0.15.
+salience_hint_emotion = None
+salience_hint_strength = 0.0
+if os.path.exists(HINTS_FILE):
+    try:
+        with open(HINTS_FILE, 'r') as f:
+            hints = json.load(f)
+        hints_list = hints.get('hints', [])
+        if hints_list:
+            top = hints_list[0]
+            if float(top.get('salience', 0.0)) >= 0.6:
+                salience_hint_emotion = str(top.get('emotion', ''))
+                salience_hint_strength = min(float(top.get('salience', 0.0)), 1.0)
+    except Exception:
+        salience_hint_emotion = None
+        salience_hint_strength = 0.0
 
 # Get next memory ID
 max_id = 0
@@ -185,6 +206,15 @@ for sig in signals:
     sig_id = sig.get('id', '')
     
     score, reason = score_signal(text, role)
+    
+    # Salience-weighted encoding: a recent high-salience amygdala tag raises
+    # the encoding weight of signals mentioning that emotion/domain.
+    if salience_hint_strength >= 0.6 and salience_hint_emotion:
+        text_lower = text.lower()
+        if salience_hint_emotion.lower() in text_lower or \
+           any(w in text_lower for w in salience_hint_emotion.lower().split()):
+            score = min(1.0, score + 0.15 * salience_hint_strength)
+            reason = reason + '+salience'
     
     if score < 0.5:
         skipped += 1
