@@ -81,6 +81,7 @@ rollback only — see `legacy-IGNORE/README.md`.
 | `docs/verification/` | Verification evidence; canonical GREEN pack: `full_cycle_20260720T234945Z/`. |
 | `BRAIN_DAEMON_SCHEDULE.md` | Migration reference: exact old-cron schedules and the collisions consolidation found. |
 | `install.sh` | Automates workspace setup, deployment, host prerequisite checks, pre-flight validation, and service activation. |
+| `uninstall.sh` | Inverse of `install.sh`: stops/disables the service, removes the workspace, unit, and Hermes skills entry, restoring the pre-install `.bak-aibrain-install` backups where they exist. Same flock + rollback discipline. |
 | `legacy-IGNORE/` | Prior bash daemon (`brain-daemon.sh`) — **not live**; live engine is `deep-brain-kernel.py`, fully working, kept for rollback only. Not used by `install.sh`. |
 | `tests/pfc_decide_harness.sh` | Closed-loop verification that `prefrontal-cortex-memory/scripts/decide.sh` actually changes its output based on sibling state (not just documented to) — synthetic sibling state files, 7 pass/fail assertions, no LLM or real siblings required. Run: `bash tests/pfc_decide_harness.sh`. |
 | `skills/verification-memory/` | **Verification region (the suite's proprioception):** runs every test each module declares in its `capability-manifest.json` `tests` array (manifest-driven, zero per-region wiring), publishes `tests_passed`/`test_failure` signals into the brain's routing table, is scheduled daily as `verification_pass` in `deep-brain-kernel.py`, and is the self-mod pre-deploy regression gate (`core/self-mod/evaluate-proposal.sh` runs the sweep + `deep-brain-kernel.py --check` in its sandbox; phase1 fallback). Long-term health: `query-history.sh` computes per-module pass-rate history over the report ledger, with a sparkline + healthiest/unhealthiest region in the dashboard tab. It also gates CI: `.github/workflows/verification.yml` runs manifest validation + the daemon job-table check (`deep-brain-kernel.py --check`) + the unit suite + this sweep on every pull request, nightly on the default branch, and on demand from the Actions tab. Run: `bash skills/verification-memory/scripts/run-declared-tests.sh`. On a fresh workspace, `backfill-history.sh` seeds the report ledger with historical runs (derived from the real sweep result, `source=backfill`) so the 🩺 sparkline shows a trend immediately instead of a single bar. |
@@ -293,6 +294,11 @@ And the previous install is preserved at
 `~/.hermes/workspace.bak-aibrain-install`, restored automatically if the
 install fails (remove the backup with `rm -rf` once you're happy).
 
+To remove the suite later: `./uninstall.sh` (add `--yes` for unattended
+removal) — it stops/disables `aibrain.service`, removes the workspace, unit,
+and Hermes skills entry, and restores the pre-install `.bak-aibrain-install`
+backups where they exist.
+
 ### Verify
 
 ```bash
@@ -408,6 +414,15 @@ job gets a chance to fire and succeed), remove the old per-skill cron
 entries it replaces — see `BRAIN_DAEMON_SCHEDULE.md` for the full mapping.
 
 ## Maintenance
+
+Remove the suite with the inverse installer:
+
+```bash
+./uninstall.sh             # interactive confirmation (restores .bak-aibrain-install backups)
+./uninstall.sh --yes       # fully unattended
+```
+
+Or manually, if you prefer to keep the workspace and just stop the service:
 
 ```bash
 systemctl --user stop aibrain.service
