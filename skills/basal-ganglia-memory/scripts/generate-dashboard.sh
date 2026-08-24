@@ -16,6 +16,7 @@ SUPPRESSION_COUNT=$(jq '.suppressions // [] | length' "$STATE_FILE")
 HABIT_BARS=$(jq -c '[.habits // [] | sort_by(-.strength) | .[:8] | .[] | {cue: .cue, strength: .strength}]' "$STATE_FILE")
 PROCS=$(jq -c '[.procedures // [] | .[:8] | .[] | {name: .name, steps: (.steps // [])}]' "$STATE_FILE")
 SUPPS=$(jq -c '[.suppressions // [] | .[] | (.pattern // tostring)]' "$STATE_FILE")
+GATED=$(jq -c '[.gatedSelections // [] | .[-6:] | .[] | {at, best, threshold, candidates}]' "$STATE_FILE")
 
 HTML=$(cat << 'HTMLEOF'
         <div class="card"><div class="stats-4">
@@ -27,6 +28,7 @@ HTML=$(cat << 'HTMLEOF'
         <div class="card"><div class="card-title">Habits by Strength</div><div id="habitBars"></div></div>
         <div class="card"><div class="card-title">Procedures</div><div id="procList"></div></div>
         <div class="card"><div class="card-title">Suppressions</div><div id="suppList" class="tags"></div></div>
+        <div class="card"><div class="card-title">Gated Selections (no-go)</div><div id="gatedList"></div></div>
 HTMLEOF
 )
 
@@ -50,6 +52,14 @@ SCRIPT=$(cat << 'SCRIPTEOF'
   const sl = document.getElementById('suppList');
   (s.suppressions || []).forEach(x => sl.innerHTML += `<span class="tag">${x}</span>`);
   if (!(s.suppressions || []).length) sl.innerHTML = '<div class="empty">Nothing suppressed.</div>';
+  const gl = document.getElementById('gatedList');
+  if (s.gatedSelections && s.gatedSelections.length) {
+    s.gatedSelections.slice().reverse().forEach(g => {
+      gl.innerHTML += `<div class="flag-item">🚦 <strong>Held</strong> — best candidate ${g.best.toFixed(2)} below threshold ${g.threshold.toFixed(2)} (${g.candidates} candidates, no release)</div>`;
+    });
+  } else {
+    gl.innerHTML = '<div class="empty">No candidate held by the no-go gate.</div>';
+  }
 })();
 SCRIPTEOF
 )
@@ -57,9 +67,9 @@ SCRIPTEOF
 LAST_UPDATED=$(jq -r '.lastUpdated // "never"' "$STATE_FILE"); LAST_CONSULTED=$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")
 DATA_JSON=$(jq -n --argjson chunkedCount "$CHUNKED_COUNT" --argjson habitCount "$HABIT_COUNT" \
   --argjson procedureCount "$PROCEDURE_COUNT" --argjson suppressionCount "$SUPPRESSION_COUNT" \
-  --argjson habitBars "$HABIT_BARS" --argjson procedures "$PROCS" --argjson suppressions "$SUPPS" \
+  --argjson habitBars "$HABIT_BARS" --argjson procedures "$PROCS" --argjson suppressions "$SUPPS" --argjson gatedSelections "$GATED" \
   --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" \
-  '{installed: true, chunkedCount: $chunkedCount, habitCount: $habitCount, procedureCount: $procedureCount, suppressionCount: $suppressionCount, habitBars: $habitBars, procedures: $procedures, suppressions: $suppressions, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
+  '{installed: true, chunkedCount: $chunkedCount, habitCount: $habitCount, procedureCount: $procedureCount, suppressionCount: $suppressionCount, habitBars: $habitBars, procedures: $procedures, suppressions: $suppressions, gatedSelections: $gatedSelections, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
 echo "$HTML" > /tmp/basal_frag_html.$$
 echo "$SCRIPT" > /tmp/basal_frag_script.$$

@@ -7,7 +7,7 @@ metadata:
     tags: ["memory", "attention", "signaling", "ai-brain", "integration"]
   openclaw:
     emoji: "🚦"
-    version: "1.0.0"
+    version: "1.1.0"
     author: "Brain Suite Core"
     requires:
       os: ["darwin", "linux"]
@@ -58,7 +58,14 @@ Key properties this skill maps:
 - **Arousal modulation** — Adjusting gate sensitivity based on circadian phase (more permissive during active hours, more restrictive during winding-down)
 - **Cross-modal binding** — Routing related signals from different sources to the same target when they co-occur
 
-**Key citations:** Crick (1984) *PNAS*; Sherman & Guillery (2006) *Exploring the Thalamus and Its Role in Cortical Function*; Halassa & Kastner (2017) *Nature Neuroscience*; McAlonan et al. (2008) *Nature Neuroscience*
+### The bidirectional relay (cortico-thalamo-cortical loop)
+
+Since 1.1.0 the gate is a **bidirectional relay**, not a one-way filter. The loop has two legs, mirroring the anatomy:
+
+- **Feedforward (driving) path** — sensory signals score and dispatch to cortical target skills (`--process` / `--stdin`). Every dispatch is tallied in `relay.stats.feedforward` with a `lastLoopAt` timestamp, so the driving path is observable.
+- **Feedback (modulatory) path** — cortical skills issue `--feedback attend <target>` directives that (a) add the target to `attentionFocus` (so the existing in-focus sharpening engages) and (b) record a per-channel gain. A subsequent signal whose source or name matches an attend target is amplified by `(1.0 + 0.5×weight)` — the layer-6 / TRN top-down bias that makes attended channels pass more easily. `--feedback release <target>` stands the loop down, restoring the baseline gain. No active directives → gain is exactly 1.0 → byte-identical to a pre-relay run (neutral-by-default).
+
+This is the attention-searchlight loop proper: cortex modulates the gate, and the gate regulates what cortex receives. **Key citations:** Crick (1984) *PNAS* (searchlight hypothesis); Sherman & Guillery (2006) *Exploring the Thalamus and Its Role in Cortical Function* (layer-6 feedback drives); Halassa & Kastner (2017) *Nature Neuroscience*; McAlonan et al. (2008) *Nature Neuroscience*
 
 ## Quick Start
 
@@ -98,6 +105,26 @@ core/signaling/publish.sh --type "emotional" --source "amygdala-memory" \
                                               │   target skills) │
                                               └─────────────────┘
 ```
+
+## Bidirectional Relay (Cortico-Thalamo-Cortical Loop)
+
+Cortical skills modulate the gate through a dedicated feedback channel (not the sensory signal bus — mirroring the anatomy, where corticothalamic feedback is a direct pathway, not sensory re-entry):
+
+```bash
+# Cortex (e.g. PFC after committing to a goal) tells the gate to amplify
+# everything related to error correction:
+./scripts/gate.sh --feedback attend error_correction --weight 0.8 --from prefrontal-cortex-memory
+
+# The attended channel now scores ×(1.0 + 0.5·0.8) = ×1.4 on matching signals.
+
+# Cortex stands attention down when the task completes:
+./scripts/gate.sh --feedback release error_correction
+
+# Observe the loop (feedforward dispatches + feedback directives):
+./scripts/gate.sh --status
+```
+
+The target may be a source skill name (`amygdala-memory`), a signal name (`positive_state`), or goal text. Matching is literal substring, case-insensitive, consistent with the in-focus check. Weights are clamped to [0,1]; defaults to 0.6. Every directive is recorded with provenance (`from`) and timestamp, and `relay.history` keeps the last 10 directives.
 
 ## Gate Dimensions
 
@@ -144,7 +171,15 @@ The attention gate scores every incoming signal on five dimensions:
     "dispatchedToTargets": 42
   },
   "gateSensitivity": 0.5,
-  "lastGateRun": "2026-08-04T11:30:00Z"
+  "lastGateRun": "2026-08-04T11:30:00Z",
+  "relay": {
+    "feedback": [
+      {"kind": "attend", "target": "error_correction", "weight": 0.8,
+       "from": "prefrontal-cortex-memory", "issuedAt": "2026-08-04T11:35:00Z"}
+    ],
+    "history": [],
+    "stats": {"feedforward": 12, "feedback": 2, "lastLoopAt": "2026-08-04T11:35:00Z"}
+  }
 }
 ```
 
@@ -152,7 +187,7 @@ The attention gate scores every incoming signal on five dimensions:
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/gate.sh` | Main attention gate — scores, filters, and dispatches signals |
+| `scripts/gate.sh` | Main attention gate — scores, filters, dispatches signals, and runs the bidirectional relay (`--feedback attend|release <target> [--weight <0-1>] [--from <skill>]`) |
 | `scripts/attention-filter.sh` | Compute the five-dimensional relevance score for a signal |
 | `scripts/sync-state.sh` | Regenerate THALAMUS_STATE.md and dashboard fragment |
 | `scripts/decay.sh` | Release suppressed signals that have aged past their retry window |

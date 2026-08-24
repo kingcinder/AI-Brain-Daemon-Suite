@@ -8,7 +8,7 @@ WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"
 OUTPUT_FILE="$WORKSPACE/VTA_STATE.md"
 
-if [ "$1" = "--output" ]; then
+if [ "${1:-}" = "--output" ]; then
   OUTPUT_FILE="$2"
 fi
 
@@ -31,6 +31,7 @@ drive = state.get('drive', 0.5)
 seeking = state.get('seeking', [])
 anticipating = state.get('anticipating', [])
 recent_rewards = state.get('recentRewards', [])
+recent_rpe = state.get('recentRPE', [])
 last_updated = state.get('lastUpdated', 'unknown')
 history = state.get('rewardHistory', {})
 
@@ -76,6 +77,22 @@ if recent_rewards:
 else:
     rewards_text = '### Recent wins:\\n\\nNone recently — could use a win to build momentum.\\n'
 
+latest_rpe = recent_rpe[0].get('rpe', 0) if recent_rpe else 0
+
+# Reward prediction errors (Schultz / TD) narrative
+rpe_text = ''
+if recent_rpe:
+    rpe_text = '### Reward prediction errors (dopamine):\\n\\n'
+    for e in recent_rpe[-5:]:
+        rtype = e.get('type', 'unknown')
+        rpe = e.get('rpe', 0)
+        exp_before = e.get('expectedBefore', 0.5)
+        exp_after = e.get('expectedAfter', 0.5)
+        rpe_text += f'- **{rtype}**: RPE {rpe:+.2f} (expected {exp_before:.2f} → {exp_after:.2f})\\n'
+    rpe_text += '\\nA positive RPE means the reward exceeded what I predicted — that is the phasic dopamine signal.\\n'
+else:
+    rpe_text = '### Reward prediction errors (dopamine):\\n\\nNone logged yet — rewards so far met expectation or none recorded.\\n'
+
 # Behavioral implications
 implications = []
 if drive >= 0.7:
@@ -111,6 +128,7 @@ output = f'''# ⭐ How Motivated I'm Feeling
 
 {rewards_text}
 
+{rpe_text}
 ## How This Affects My Behavior
 
 {impl_text}
@@ -121,6 +139,7 @@ output = f'''# ⭐ How Motivated I'm Feeling
 |--------|-------|
 | Drive | {drive:.2f} |
 | Total rewards | {history.get('totalRewards', 0)} |
+| Latest RPE | {latest_rpe:+.2f} |
 
 ---
 *Synced: {last_updated}*

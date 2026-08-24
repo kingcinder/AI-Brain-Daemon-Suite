@@ -10,13 +10,14 @@ mkdir -p "$FRAGMENTS_DIR"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No cerebellum state found"; exit 1; }
 
 GLOBAL=$(jq -r '.globalCalibration' "$STATE_FILE")
-SKILLS=$(jq -c '[.skills | to_entries | sort_by(-.value.precision) | .[:8] | .[] | {name: .key, precision: .value.precision, smoothness: .value.smoothness, reps: .value.reps}]' "$STATE_FILE")
+SKILLS=$(jq -c '[.skills | to_entries | sort_by(-.value.precision) | .[:8] | .[] | {name: .key, precision: .value.precision, smoothness: .value.smoothness, reps: .value.reps, predictionError: .value.predictionError}]' "$STATE_FILE")
 
 HTML=$(cat << 'HTMLEOF'
         <div class="card">
             <div class="dim"><span class="dim-icon">🎚️</span><span class="dim-name">Global Calibration</span><div class="dim-bar"><div class="dim-fill" id="globalFill" style="width:0%;background:#06b6d4"></div></div><span class="dim-val" id="globalVal">0.00</span></div>
         </div>
         <div class="card"><div class="card-title">Tracked Skills</div><div id="skillList"></div></div>
+        <div class="card"><div class="card-title">Forward-Model Prediction Errors</div><div id="predErrList"></div></div>
 HTMLEOF
 )
 
@@ -34,6 +35,19 @@ SCRIPT=$(cat << 'SCRIPTEOF'
     });
   } else {
     el.innerHTML = '<div class="empty">No skills tracked yet. Run log-execution.sh</div>';
+  }
+  const pe = document.getElementById('predErrList');
+  if (s.skills && s.skills.length) {
+    const withPE = s.skills.filter(sk => typeof sk.predictionError === 'number');
+    if (withPE.length) {
+      withPE.forEach(sk => {
+        pe.innerHTML += `<div class="dim"><span class="dim-name">${sk.name}<span class="dim-sub">prediction error (EMA)</span></span><div class="dim-bar"><div class="dim-fill" style="width:${Math.min(100, Math.round(sk.predictionError*100))}%;background:#ec4899"></div></div><span class="dim-val">${sk.predictionError.toFixed(3)}</span></div>`;
+      });
+    } else {
+      pe.innerHTML = '<div class="empty">No predictions made yet. Run log-execution.sh --predicted</div>';
+    }
+  } else {
+    pe.innerHTML = '<div class="empty">No skills tracked yet.</div>';
   }
 })();
 SCRIPTEOF

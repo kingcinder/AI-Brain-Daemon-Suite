@@ -44,6 +44,16 @@ if recent:
     for sig in reversed(recent):
         lines.append(f"  {sig.get('label','?')} ({sig.get('intensity',0):.1f}) — {sig.get('source','')[:80]}")
 
+# Interoceptive prediction errors (Craig's predictive coding; Critchley)
+disc = state.get('recentDiscrepancies', [])
+composite = state.get('composite', {}).get('interoceptiveDiscrepancy')
+if disc or composite is not None:
+    lines.append("\nInteroceptive prediction errors (|actual − predicted|):")
+    if composite is not None:
+        lines.append(f"  Composite: {composite:.3f}")
+    for d in reversed(disc[-5:]):
+        lines.append(f"  {d.get('channel','?')}: predicted {d.get('predicted',0):.2f} → actual {d.get('actual',0):.2f} (err {d.get('error',0):.3f})")
+
 Path(sys.argv[2]).write_text('\n'.join(lines) + '\n')
 print("✅ INSULA_STATE.md updated")
 PYTHON

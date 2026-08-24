@@ -11,6 +11,7 @@ mkdir -p "$FRAGMENTS_DIR"
 
 TOP_RELATIONSHIPS=$(jq -c '[.relationships | to_entries | sort_by(.value.lastContact) | reverse | .[:6] | .[] | {id: .key, name: .value.name, type: .value.type, trust: .value.trust, affinity: .value.affinity}]' "$STATE_FILE")
 OPEN_LOOPS=$(jq -c '[.relationships | to_entries[] | .value.name as $name | .value.openLoops[] | select(.status=="open") | {name: $name, description}] | .[:8]' "$STATE_FILE")
+SPE=$(jq -c '[.recentSPE // [] | .[-6:] | .[] | {id, expected, outcome, spe}]' "$STATE_FILE")
 
 HTML=$(cat << 'HTMLEOF'
         <div class="card">
@@ -22,6 +23,7 @@ HTML=$(cat << 'HTMLEOF'
         </div>
         <div class="card"><div class="card-title">Recent Contacts</div><div id="relList"></div></div>
         <div class="card"><div class="card-title">Open Loops</div><div id="loopList"></div></div>
+        <div class="card"><div class="card-title">Social Prediction Errors (SPE)</div><div id="speList"></div></div>
 HTMLEOF
 )
 
@@ -47,13 +49,23 @@ SCRIPT=$(cat << 'SCRIPTEOF'
   } else {
     loopEl.innerHTML = '<div class="empty">Nothing pending</div>';
   }
+  const sp = document.getElementById('speList');
+  if (s.recentSPE && s.recentSPE.length) {
+    s.recentSPE.slice().reverse().forEach(e => {
+      const cls = e.spe >= 0 ? 'badge-chunked' : 'badge-critical';
+      const sign = e.spe >= 0 ? '+' : '';
+      sp.innerHTML += `<div class="list-item"><div class="badge ${cls}">SPE ${sign}${e.spe.toFixed(2)}</div><div class="list-text">${e.id}</div><div class="list-sub">expected ${e.expected.toFixed(2)} → outcome ${e.outcome.toFixed(2)}</div></div>`;
+    });
+  } else {
+    sp.innerHTML = '<div class="empty">No social prediction errors — interactions matched expectations.</div>';
+  }
 })();
 SCRIPTEOF
 )
 
-DATA_JSON=$(jq -n --argjson relationships "$TOP_RELATIONSHIPS" --argjson openLoops "$OPEN_LOOPS" \
+DATA_JSON=$(jq -n --argjson relationships "$TOP_RELATIONSHIPS" --argjson openLoops "$OPEN_LOOPS" --argjson recentSPE "$SPE" \
   --arg lastUpdated "$(jq -r '.lastUpdated // "never"' "$STATE_FILE")" --arg lastConsultedAt "$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")" \
-  '{installed: true, relationships: $relationships, openLoops: $openLoops, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
+  '{installed: true, relationships: $relationships, openLoops: $openLoops, recentSPE: $recentSPE, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
 echo "$HTML" > /tmp/social_frag_html.$$
 echo "$SCRIPT" > /tmp/social_frag_script.$$

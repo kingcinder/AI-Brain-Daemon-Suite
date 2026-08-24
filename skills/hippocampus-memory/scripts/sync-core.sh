@@ -70,6 +70,25 @@ for domain in domain_order:
             lines.append(f"- **[{m['importance']:.2f}]** {m['content']}")
         lines.append("")
 
+# CLS replay consolidation: cortical theme weights (memory/cortical.json) —
+# episodic traces replayed into slowly-strengthening cortical themes.
+cortical_path = os.path.join(os.path.dirname(INDEX_PATH), 'cortical.json')
+try:
+    with open(cortical_path) as f:
+        cortical = json.load(f)
+    themes = cortical.get('themes', {})
+    if themes:
+        lines.append("## Cortical Themes (replay consolidation)")
+        lines.append("")
+        for name, t in sorted(themes.items(), key=lambda kv: -kv[1].get('weight', 0))[:8]:
+            lines.append(
+                f"- **{name}**: weight {t.get('weight', 0):.3f} "
+                f"({t.get('traceCount', 0)} traces replayed)"
+            )
+        lines.append("")
+except Exception:
+    pass
+
 # Write output
 with open(OUTPUT_PATH, 'w') as f:
     f.write('\n'.join(lines))

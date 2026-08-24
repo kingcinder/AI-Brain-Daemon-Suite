@@ -11,6 +11,20 @@
 #   gate.sh --stdin                # Read a single signal envelope from stdin
 #   gate.sh --status               # Print current attention state
 #   gate.sh --boost-goal "<desc>"  # Boost attention weight for a specific goal
+#   gate.sh --feedback attend <target> [--weight <0-1>] [--from <skill>]
+#                                 # Cortico-thalamic feedback: cortex tells the
+#                                 # gate to amplify <target> (a source, signal
+#                                 # name, or goal text) — top-down attention.
+#   gate.sh --feedback release <target> [--from <skill>]
+#                                 # Cortico-thalamic feedback: cortex stands
+#                                 # attention down from <target>.
+#
+# The relay is bidirectional, modeled on cortico-thalamo-cortical loops:
+#   feedforward: signals score + dispatch to cortex (the --process/--stdin legs)
+#   feedback:    cortical attend/release directives modulate attention focus
+#                and per-channel gain (the layer-6 / TRN top-down path).
+#                Every dispatch and directive is tallied in .relay.stats so
+#                the loop is observable, not just implicit.
 
 set -euo pipefail
 
@@ -41,6 +55,9 @@ while [[ $# -gt 0 ]]; do
         --stdin)      MODE="stdin"; shift ;;
         --status)     MODE="status"; shift ;;
         --boost-goal) MODE="boost"; BOOST_GOAL="$2"; shift 2 ;;
+        --feedback)   MODE="feedback"; FEEDBACK_KIND="$2"; FEEDBACK_TARGET="$3"; shift 3 ;;
+        --weight)     FEEDBACK_WEIGHT="$2"; shift 2 ;;
+        --from)       FEEDBACK_FROM="$2"; shift 2 ;;
         *) shift ;;
     esac
 done
@@ -63,10 +80,25 @@ _init_state() {
     "dispatchedToTargets": 0
   },
   "gateSensitivity": 0.5,
-  "lastGateRun": ""
+  "lastGateRun": "",
+  "relay": {
+    "feedback": [],
+    "history": [],
+    "stats": {"feedforward": 0, "feedback": 0, "lastLoopAt": ""}
+  }
 }
 EOF
     fi
+}
+
+# ── Seed the relay block into a pre-relay state file ────────────────────
+_ensure_relay() {
+    # A state file written before the relay existed lacks .relay; the jq
+    # below auto-vivifies keys on path assignment anyway, but a clean seed
+    # keeps the schema explicit and idempotent on every later run.
+    local tmp="$STATE_FILE.tmp.$$"
+    jq 'if has("relay") then . else . + {relay: {feedback: [], history: [], stats: {feedforward: 0, feedback: 0, lastLoopAt: ""}}} end' \
+       "$STATE_FILE" > "$tmp" 2>/dev/null && mv "$tmp" "$STATE_FILE" || true
 }
 
 # ── Read current PFC goals for relevance matching ───────────────────────
@@ -218,6 +250,33 @@ _score_signal() {
         score=$(echo "scale=6; $score * (1.0 - 0.25 * $NEURO_CORT)" | bc 2>/dev/null || echo "$score")
     fi
 
+    # ── Cortico-thalamic feedback gain (the feedback leg of the relay) ──
+    # A signal whose source or signal name matches an active attend directive
+    # is amplified by (1.0 + 0.5×weight) — the layer-6 / TRN top-down bias
+    # that makes attended channels pass (or amplify) more easily. No attend
+    # directives → gain is exactly 1.0 → byte-identical to a run without the
+    # relay (neutral-by-default, protecting the regression lock).
+    local relay_gain=0
+    local targets
+    targets=$(jq -r '[.relay.feedback[]? | select(.kind == "attend") | .target] | .[]' "$STATE_FILE" 2>/dev/null || true)
+    if [[ -n "$targets" ]]; then
+        local combined_lc
+        combined_lc=$(printf '%s' "$source $signal_name" | tr '[:upper:]' '[:lower:]')
+        while IFS= read -r tgt; do
+            [[ -z "$tgt" ]] && continue
+            # Literal substring match (quoted RHS glob), case-insensitive —
+            # consistent with the attentionFocus in-focus check above.
+            if [[ "$combined_lc" == *"$(printf '%s' "$tgt" | tr '[:upper:]' '[:lower:]')"* ]]; then
+                local w
+                w=$(jq -r --arg tgt "$tgt" '[.relay.feedback[]? | select(.kind == "attend" and .target == $tgt) | .weight // 0.6] | max' "$STATE_FILE" 2>/dev/null || echo "0.6")
+                relay_gain=$(echo "scale=4; if ($w > $relay_gain) $w else $relay_gain" | bc 2>/dev/null || echo "$relay_gain")
+            fi
+        done <<< "$targets"
+    fi
+    if (( $(echo "$relay_gain > 0" | bc -l 2>/dev/null) )); then
+        score=$(echo "scale=6; $score * (1.0 + 0.5 * $relay_gain)" | bc 2>/dev/null || echo "$score")
+    fi
+
     # Determine action
     local action
     if (( $(echo "$score >= 0.70" | bc -l 2>/dev/null) )); then
@@ -269,7 +328,9 @@ _update_stats() {
      .stats.passed += (if $action == "pass" then 1 else 0 end) |
      .stats.attenuated += (if $action == "attenuate" then 1 else 0 end) |
      .stats.suppressed += (if $action == "suppress" then 1 else 0 end) |
-     .stats.dispatchedToTargets += (if $action != "suppress" then 1 else 0 end)' \
+     .stats.dispatchedToTargets += (if $action != "suppress" then 1 else 0 end) |
+     .relay.stats.feedforward = ((.relay.stats.feedforward // 0) + 1) |
+     .relay.stats.lastLoopAt = $now' \
     "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
 }
 
@@ -357,6 +418,7 @@ _dispatch() {
 # ── Process pending signals ─────────────────────────────────────────────
 _process() {
     _init_state
+    _ensure_relay
 
     local start_line=0
     [[ -f "$GATE_CHECKPOINT" ]] && start_line=$(head -1 "$GATE_CHECKPOINT" 2>/dev/null || echo 0)
@@ -398,6 +460,7 @@ _process() {
 # ── Process single signal from stdin ────────────────────────────────────
 _stdin_process() {
     _init_state
+    _ensure_relay
     local raw_signal
     raw_signal=$(cat)
     [[ -z "$raw_signal" ]] && return 0
@@ -443,6 +506,10 @@ _status() {
         echo "  📤 Dispatched: $disp"
         echo ""
         echo "Attention focus: $focus"
+        echo "Relay loop: $(jq -r '.relay.stats.feedforward // 0' "$STATE_FILE") feedforward · $(jq -r '.relay.stats.feedback // 0' "$STATE_FILE") feedback"
+        local attends
+        attends=$(jq -r '[.relay.feedback[]? | select(.kind == "attend") | .target] | if length > 0 then join(", ") else "none" end' "$STATE_FILE" 2>/dev/null || echo "none")
+        echo "Attending (cortical feedback): $attends"
         echo "Gate sensitivity: $(jq -r '.gateSensitivity // 0.5' "$STATE_FILE")"
         echo "Circadian gain: $(_get_circadian_gain)×"
         echo "Last gate run: $last_run"
@@ -453,6 +520,61 @@ _status() {
     else
         echo "No state file yet — run --process first"
     fi
+}
+
+# ── Cortico-thalamic feedback directive (feedback leg of the relay) ────
+_feedback() {
+    _init_state
+    if [[ -z "${FEEDBACK_TARGET:-}" ]]; then
+        echo "gate.sh --feedback <attend|release> <target> [--weight <0-1>] [--from <skill>]" >&2
+        echo "  target required (a source skill name, signal name, or goal text)" >&2
+        exit 1
+    fi
+    if [[ -n "${FEEDBACK_WEIGHT:-}" ]] && ! [[ "$FEEDBACK_WEIGHT" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+        echo "gate.sh: --weight must be a number (got '$FEEDBACK_WEIGHT')" >&2
+        exit 1
+    fi
+    _ensure_relay
+
+    local weight="${FEEDBACK_WEIGHT:-0.6}"
+    # Clamp weight to [0,1] — beyond 1.0 would overdrive the gain; negative
+    # weights are "release", not attend.
+    weight=$(echo "scale=4; if ($weight > 1.0) 1.0 else if ($weight < 0.0) 0.0 else $weight" | bc 2>/dev/null || echo "0.6")
+    local from="${FEEDBACK_FROM:-cortex}"
+    local now
+    now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local tmp="$STATE_FILE.tmp.$$"
+
+    case "$FEEDBACK_KIND" in
+        attend)
+            jq --arg tgt "$FEEDBACK_TARGET" --arg w "$weight" --arg from "$from" --arg now "$now" \
+            '.attentionFocus = ([$tgt] + [.attentionFocus[]? | select(. != $tgt)] | .[0:10])
+             | .relay.feedback = ([{kind:"attend", target:$tgt, weight:($w | tonumber), from:$from, issuedAt:$now}] + [.relay.feedback[]? | select(.target != $tgt)])[0:20]
+             | .relay.history = ([{kind:"attend", target:$tgt, weight:($w | tonumber), from:$from, issuedAt:$now}] + (.relay.history // []))[0:10]
+             | .relay.stats.feedback = ((.relay.stats.feedback // 0) + 1)
+             | .relay.stats.lastLoopAt = $now
+             | .lastUpdated = $now' \
+            "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+            local gain
+            gain=$(echo "scale=2; 1.0 + 0.5 * $weight" | bc 2>/dev/null || echo "1.3")
+            echo "🚦 Thalamus relay: cortex now attending '$FEEDBACK_TARGET' (gain ×$gain)"
+            ;;
+        release)
+            jq --arg tgt "$FEEDBACK_TARGET" --arg from "$from" --arg now "$now" \
+            '.attentionFocus = [.attentionFocus[]? | select(. != $tgt)]
+             | .relay.feedback = [.relay.feedback[]? | select(.target != $tgt)]
+             | .relay.history = ([{kind:"release", target:$tgt, from:$from, issuedAt:$now}] + (.relay.history // []))[0:10]
+             | .relay.stats.feedback = ((.relay.stats.feedback // 0) + 1)
+             | .relay.stats.lastLoopAt = $now
+             | .lastUpdated = $now' \
+            "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+            echo "🚦 Thalamus relay: attention released from '$FEEDBACK_TARGET'"
+            ;;
+        *)
+            echo "gate.sh: unknown feedback kind '$FEEDBACK_KIND' (expected attend|release)" >&2
+            exit 1
+            ;;
+    esac
 }
 
 # ── Boost a goal's attention weight ─────────────────────────────────────
@@ -471,6 +593,7 @@ case "$MODE" in
     stdin)   _stdin_process ;;
     status)  _status ;;
     boost)   _boost ;;
+    feedback) _feedback ;;
     *)       echo "Unknown mode: $MODE" >&2; exit 1 ;;
 esac
 

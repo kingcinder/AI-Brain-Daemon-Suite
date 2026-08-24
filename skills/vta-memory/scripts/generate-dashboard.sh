@@ -13,12 +13,14 @@ DRIVE=$(jq -r '.drive // 0.5' "$STATE_FILE")
 SEEKING=$(jq -c '.seeking // []' "$STATE_FILE")
 ANTICIPATING=$(jq -c '.anticipating // []' "$STATE_FILE")
 REWARDS=$(jq -c '[.recentRewards[-5:] // [] | .[] | {type, source, intensity}]' "$STATE_FILE")
+RPE=$(jq -c '[.recentRPE[-5:] // [] | .[] | {type, rpe, expectedBefore, expectedAfter}]' "$STATE_FILE")
 
 HTML=$(cat << 'HTMLEOF'
         <div class="card"><div class="drive-meter"><div class="drive-val" id="driveVal">0%</div><div class="drive-label">Drive Level</div><div class="drive-bar"><div class="drive-fill" id="driveFill" style="width:0%"></div></div></div></div>
         <div class="card"><div class="card-title">Seeking</div><div id="vtaSeeking" class="tags"></div></div>
         <div class="card"><div class="card-title">Looking Forward To</div><div id="vtaAnticipating" class="tags"></div></div>
         <div class="card"><div class="card-title">Recent Rewards</div><div id="recentRewards"></div></div>
+        <div class="card"><div class="card-title">Reward Prediction Errors (RPE)</div><div id="recentRPE"></div></div>
 HTMLEOF
 )
 
@@ -42,14 +44,24 @@ SCRIPT=$(cat << 'SCRIPTEOF'
   } else {
     rw.innerHTML = '<div class="empty">No recent rewards</div>';
   }
+  const rp = document.getElementById('recentRPE');
+  if (s.recentRPE && s.recentRPE.length) {
+    s.recentRPE.slice().reverse().forEach(e => {
+      const cls = e.rpe >= 0 ? 'badge-chunked' : 'badge-critical';
+      const sign = e.rpe >= 0 ? '+' : '';
+      rp.innerHTML += `<div class="list-item"><div class="badge ${cls}">RPE ${sign}${e.rpe.toFixed(2)}</div><div class="list-text">${e.type}</div><div class="list-sub">expected ${e.expectedBefore.toFixed(2)} → ${e.expectedAfter.toFixed(2)}</div></div>`;
+    });
+  } else {
+    rp.innerHTML = '<div class="empty">No prediction errors yet — rewards met expectation or none logged.</div>';
+  }
 })();
 SCRIPTEOF
 )
 
 LAST_UPDATED=$(jq -r '.lastUpdated // "never"' "$STATE_FILE"); LAST_CONSULTED=$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")
-DATA_JSON=$(jq -n --argjson drive "$DRIVE" --argjson seeking "$SEEKING" --argjson anticipating "$ANTICIPATING" --argjson recentRewards "$REWARDS" \
+DATA_JSON=$(jq -n --argjson drive "$DRIVE" --argjson seeking "$SEEKING" --argjson anticipating "$ANTICIPATING" --argjson recentRewards "$REWARDS" --argjson recentRPE "$RPE" \
   --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" \
-  '{installed: true, drive: $drive, seeking: $seeking, anticipating: $anticipating, recentRewards: $recentRewards, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
+  '{installed: true, drive: $drive, seeking: $seeking, anticipating: $anticipating, recentRewards: $recentRewards, recentRPE: $recentRPE, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
 echo "$HTML" > /tmp/vta_frag_html.$$
 echo "$SCRIPT" > /tmp/vta_frag_script.$$

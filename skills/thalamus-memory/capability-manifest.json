@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "module": "thalamus-memory",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "capabilities": [
     "attentional_gating",
     "signal_routing",
@@ -9,7 +9,9 @@
     "relevance_scoring",
     "circadian_gain_modulation",
     "global_neuromodulation",
-    "global_workspace_broadcast"
+    "global_workspace_broadcast",
+    "bidirectional_relay",
+    "cortico_thalamic_feedback"
   ],
   "inputs": [
     {
@@ -61,6 +63,10 @@
   "tests": [
     {
       "path": "tests/test_thalamus_gate.sh",
+      "kind": "unit"
+    },
+    {
+      "path": "tests/test_thalamus_relay.sh",
       "kind": "unit"
     },
     {

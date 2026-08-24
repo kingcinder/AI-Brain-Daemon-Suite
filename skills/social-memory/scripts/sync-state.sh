@@ -27,6 +27,12 @@ if rels:
     lines.append('## Relationships')
     for rid, r in sorted(rels.items(), key=lambda kv: kv[1].get('lastContact') or '', reverse=True)[:10]:
         lines.append(f\"- {r['name']} ({r['type']}) — trust {r.get('trust',0.5):.2f}, affinity {r.get('affinity',0.5):.2f}\")
+spe = state.get('recentSPE', [])
+if spe:
+    lines.append('')
+    lines.append('## Social Prediction Errors (Behrens social-value learning)')
+    for e in reversed(spe[-5:]):
+        lines.append(f\"- {e.get('id','?')}: expected {e.get('expected',0):.2f} → outcome {e.get('outcome',0):.2f}, SPE {e.get('spe',0):+.3f}\")
 with open(os.environ['OUTPUT_FILE'], 'w') as f:
     f.write('\n'.join(lines) + '\n')
 print('✅ Synced to ' + os.environ['OUTPUT_FILE'])

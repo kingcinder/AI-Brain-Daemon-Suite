@@ -12,6 +12,13 @@ mkdir -p "$FRAGMENTS_DIR"
 MEM_COUNT=$(jq '.memories | length' "$STATE_FILE")
 CORE_COUNT=$(jq '[.memories[] | select((.importance // 0) >= 0.7)] | length' "$STATE_FILE")
 TOP=$(jq -c '[.memories | sort_by(-(.importance // 0)) | .[:6] | .[] | {text: ((.content // "...")[:80] + "..."), importance: (.importance // 0)}]' "$STATE_FILE")
+# CLS replay consolidation writes a SEPARATE file (memory/cortical.json):
+# episodic traces replayed into slowly-strengthening cortical theme weights.
+CORTICAL_FILE="$WORKSPACE/memory/cortical.json"
+THEMES="[]"
+if [ -f "$CORTICAL_FILE" ]; then
+    THEMES=$(jq -c '[.themes | to_entries | sort_by(-.value.weight) | .[:8] | .[] | {theme: .key, weight: .value.weight, traceCount: .value.traceCount}]' "$CORTICAL_FILE" 2>/dev/null || echo "[]")
+fi
 
 HTML=$(cat << 'HTMLEOF'
         <div class="card"><div class="stats">
@@ -19,6 +26,7 @@ HTML=$(cat << 'HTMLEOF'
           <div class="stat"><div class="stat-val" id="coreCount">0</div><div class="stat-label">Core (>=0.7)</div></div>
         </div></div>
         <div class="card"><div class="card-title">Top Memories</div><div id="topMemories"></div></div>
+        <div class="card"><div class="card-title">Cortical Themes (replay)</div><div id="corticalThemes"></div></div>
 HTMLEOF
 )
 
@@ -35,14 +43,22 @@ SCRIPT=$(cat << 'SCRIPTEOF'
   } else {
     el.innerHTML = '<div class="empty">No memories yet.</div>';
   }
+  const ct = document.getElementById('corticalThemes');
+  if (s.corticalThemes && s.corticalThemes.length) {
+    s.corticalThemes.forEach(t => {
+      ct.innerHTML += `<div class="dim"><span class="dim-name">${t.theme}<span class="dim-sub">${t.traceCount} traces replayed</span></span><div class="dim-bar"><div class="dim-fill" style="width:${Math.min(100, Math.round(t.weight*100))}%;background:#a855f7"></div></div><span class="dim-val">${t.weight.toFixed(2)}</span></div>`;
+    });
+  } else {
+    ct.innerHTML = '<div class="empty">No cortical themes yet — consolidation has not replayed episodic traces.</div>';
+  }
 })();
 SCRIPTEOF
 )
 
 LAST_UPDATED=$(jq -r '.lastUpdated // "never"' "$STATE_FILE"); LAST_CONSULTED=$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")
-DATA_JSON=$(jq -n --argjson memoryCount "$MEM_COUNT" --argjson coreCount "$CORE_COUNT" --argjson topMemories "$TOP" \
+DATA_JSON=$(jq -n --argjson memoryCount "$MEM_COUNT" --argjson coreCount "$CORE_COUNT" --argjson topMemories "$TOP" --argjson corticalThemes "$THEMES" \
   --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" \
-  '{installed: true, memoryCount: $memoryCount, coreCount: $coreCount, topMemories: $topMemories, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
+  '{installed: true, memoryCount: $memoryCount, coreCount: $coreCount, topMemories: $topMemories, corticalThemes: $corticalThemes, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
 echo "$HTML" > /tmp/hippo_frag_html.$$
 echo "$SCRIPT" > /tmp/hippo_frag_script.$$

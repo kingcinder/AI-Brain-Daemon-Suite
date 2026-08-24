@@ -103,6 +103,17 @@ if active_supps:
                       f"*(strength {s.get('strength', 0):.2f})*")
     lines.append("")
 
+gated = state.get('gatedSelections', [])
+if gated:
+    lines.append("## 🚦 Gated Selections (no-go threshold)")
+    lines.append("")
+    for g in gated[-5:]:
+        lines.append(
+            f"- {g.get('at', '?')}: best candidate {g.get('best', 0):.2f} below threshold "
+            f"{g.get('threshold', 0):.2f} — held ({g.get('candidates', 0)} candidates, no release)"
+        )
+    lines.append("")
+
 if not (chunked or active or active_procs or active_supps):
     lines.append("_No established habits yet. Every approach is still fresh/deliberate._")
     lines.append("")

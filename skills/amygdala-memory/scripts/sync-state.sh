@@ -8,7 +8,7 @@ WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"
 OUTPUT_FILE="$WORKSPACE/AMYGDALA_STATE.md"
 
-if [ "$1" = "--output" ]; then
+if [ "${1:-}" = "--output" ]; then
   OUTPUT_FILE="$2"
 fi
 
@@ -98,6 +98,16 @@ if recent:
         intensity = emo.get('intensity', 0.5)
         recent_lines += f'- **{label}** ({intensity:.1f}): {trigger}\\n'
 
+# Salience tags (LeDoux/McGaugh): high-arousal events tagged for downstream encoding
+salience_tags = state.get('salienceTags', [])
+salience_lines = ''
+if salience_tags:
+    salience_lines = '### Salience tags (what stood out):\\n\\n'
+    for t in salience_tags[-5:]:
+        emotion = t.get('emotion', 'unknown')
+        sal = t.get('salience', 0)
+        salience_lines += f'- **{emotion}** (salience {sal:.2f})\\n'
+
 # Behavioral implications
 implications = []
 if valence < 0.4:
@@ -135,7 +145,7 @@ I'm feeling **{mood_word}** right now (valence: {valence:.2f}). Overall mood is 
 
 I'm {arousal_desc} (arousal: {arousal:.2f}).
 
-{recent_lines}
+{recent_lines}{salience_lines}
 ## How This Affects My Responses Today
 
 {impl_text}

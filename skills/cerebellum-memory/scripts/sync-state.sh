@@ -16,7 +16,9 @@ skills = state.get('skills', {})
 if skills:
     lines.append('## Tracked Skills')
     for name, s in sorted(skills.items(), key=lambda kv: -kv[1].get('precision', 0)):
-        lines.append(f\"- {name}: precision {s.get('precision',0.5):.2f}, smoothness {s.get('smoothness',0.5):.2f} ({s.get('reps',0)} reps)\")
+        pe = s.get('predictionError')
+        pe_str = f\", prediction error {pe:.3f}\" if isinstance(pe, (int, float)) else ''
+        lines.append(f\"- {name}: precision {s.get('precision',0.5):.2f}, smoothness {s.get('smoothness',0.5):.2f} ({s.get('reps',0)} reps){pe_str}\")
 with open(os.environ['OUTPUT_FILE'], 'w') as f:
     f.write('\n'.join(lines) + '\n')
 print('✅ Synced to ' + os.environ['OUTPUT_FILE'])

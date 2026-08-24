@@ -11,6 +11,8 @@ mkdir -p "$FRAGMENTS_DIR"
 
 DIMS=$(jq -c '.dimensions // {}' "$STATE_FILE")
 RECENT=$(jq -c '[.recentEmotions // [] | .[-6:] | .[] | {label: (.label // .emotion // "feeling"), intensity: (.intensity // 0)}]' "$STATE_FILE")
+SALIENCE=$(jq -c '[.salienceTags // [] | .[-6:] | .[] | {emotion, salience, trigger: (.trigger // "")}]' "$STATE_FILE")
+LAST_SALIENCE=$(jq -c '.lastSalience // null' "$STATE_FILE")
 
 HTML=$(cat << 'HTMLEOF'
         <div class="card"><div class="card-title">Dimensions</div><div id="dimensions"></div></div>
@@ -23,6 +25,7 @@ HTML=$(cat << 'HTMLEOF'
           </div>
         </div>
         <div class="card"><div class="card-title">Recent Feelings</div><div id="recentEmotions"></div></div>
+        <div class="card"><div class="card-title">Salience Tags (threat/importance)</div><div id="salienceList"></div></div>
 HTMLEOF
 )
 
@@ -47,14 +50,22 @@ SCRIPT=$(cat << 'SCRIPTEOF'
   } else {
     re.innerHTML = '<div class="empty">No recent emotions logged.</div>';
   }
+  const sl = document.getElementById('salienceList');
+  if (s.salienceTags && s.salienceTags.length) {
+    s.salienceTags.slice().reverse().forEach(t => {
+      sl.innerHTML += `<div class="list-item"><div class="badge badge-critical">${t.salience.toFixed(2)}</div><div class="list-text">${t.emotion}</div><div class="list-sub">${t.trigger || 'salience-tagged event'}</div></div>`;
+    });
+  } else {
+    sl.innerHTML = '<div class="empty">No high-salience events tagged yet.</div>';
+  }
 })();
 SCRIPTEOF
 )
 
 LAST_UPDATED=$(jq -r '.lastUpdated // "never"' "$STATE_FILE"); LAST_CONSULTED=$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")
-DATA_JSON=$(jq -n --argjson dimensions "$DIMS" --argjson recentEmotions "$RECENT" \
+DATA_JSON=$(jq -n --argjson dimensions "$DIMS" --argjson recentEmotions "$RECENT" --argjson salienceTags "$SALIENCE" --argjson lastSalience "$LAST_SALIENCE" \
   --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" \
-  '{installed: true, dimensions: $dimensions, recentEmotions: $recentEmotions, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
+  '{installed: true, dimensions: $dimensions, recentEmotions: $recentEmotions, salienceTags: $salienceTags, lastSalience: $lastSalience, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
 echo "$HTML" > /tmp/amy_frag_html.$$
 echo "$SCRIPT" > /tmp/amy_frag_script.$$
