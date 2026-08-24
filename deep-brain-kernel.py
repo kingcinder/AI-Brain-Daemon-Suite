@@ -104,12 +104,12 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
-# ── Logging: stdout, systemd/journald captures it directly (Type=simple) ────
+# ── Logging: stderr (JSON on stdout reserved for callers) ────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s] [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%SZ",
-    stream=sys.stdout,
+    stream=sys.stderr,
 )
 logging.Formatter.converter = time.gmtime
 log = logging.getLogger("deep-brain-kernel")
@@ -1259,9 +1259,11 @@ def check_schedule_table() -> int:
         # problem count is untouched by something --check can't fix here.
         print("hermes: NOT FOUND — downgraded to a warning "
               "(DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1); spawn-type jobs will be "
-              "skipped with a warning on the real host until hermes is installed")
+              "skipped with a warning on the real host until hermes is installed",
+              file=sys.stderr)
     else:
-        print("hermes: NOT FOUND — spawn-type jobs will be skipped with a warning until this is fixed")
+        print("hermes: NOT FOUND — spawn-type jobs will be skipped with a warning until this is fixed",
+              file=sys.stderr)
         problems += 1
     return problems
 
@@ -1989,7 +1991,8 @@ def print_status() -> int:
         print("No jobs currently at or above the unhealthy consecutive-failure threshold "
               f"({DaemonState.UNHEALTHY_STREAK}).")
     print("\nNote: deferrals (VRAM limit, PSI pressure, missing hermes/script) are NOT counted "
-          "as failures here — only jobs that actually ran and then errored or timed out.")
+          "as failures here — only jobs that actually ran and then errored or timed out.",
+          file=sys.stderr)
     return unhealthy
 
 
