@@ -222,10 +222,15 @@ agent_tool_run() {
       fi
       # Confidence: high when conflict low, load moderate, errors rare
       local confidence
-      confidence=$(printf 'scale=3; 1.0 - (%s * 0.3) - (%s * 0.2) - ((%s / (if (%s > 0) then %s else 1 end)) * 0.5)' \
-        "$conflict_load" "$exec_e" "$recent_errors" "$recent_total" "$recent_total" 2>/dev/null || echo "0.5")
-      # Clamp 0-1
-      confidence=$(printf '%s' "$confidence" | awk '{if ($1 > 1) print 1; else if ($1 < 0) print 0; else print $1}' 2>/dev/null || echo "0.5")
+      confidence=$(python3 -c "
+import sys
+cl = float('$conflict_load')
+el = float('$exec_e')
+er = float('$recent_errors')
+et = float('$recent_total') if float('$recent_total') > 0 else 1.0
+raw = 1.0 - (cl * 0.3) - (el * 0.2) - ((er / et) * 0.5)
+print(max(0.0, min(1.0, round(raw, 3))))
+" 2>/dev/null || echo "0.5")
       printf '{"confidence":%s,"conflictLoad":%s,"executiveLoad":%s,"recentErrors":%s,"note":"synthesized from ACC conflict + PFC load + error history"}' \
         "$confidence" "$conflict_load" "$exec_e" "$recent_errors"
       ;;
