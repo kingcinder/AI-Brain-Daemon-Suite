@@ -95,6 +95,73 @@ PY
   SCORE_JSON=$(bash "$SCORE" --task-success "$TS" --resource-cost "$RC" --error-rate "$ER" --regression-penalty "$RP")
   U=$(echo "$SCORE_JSON" | jq -r .U)
 
+  # Phase 3: verification-history boost — proposals targeting modules with
+  # recent verification failures get a ranking boost (the suite should fix
+  # what it has already measured as broken, not just what is convenient).
+  PROPID=$(jq -r .proposal_id "$f")
+  TARGET_MOD=$(jq -r '.module // empty' "$f")
+  VERIFY_BOOST=0
+  if [ -n "$TARGET_MOD" ] && [ -f "$WORKSPACE/memory/verification-sweep.json" ]; then
+    VERIFY_BOOST=$(python3 - "$TARGET_MOD" "$WORKSPACE/memory/verification-sweep.json" <<'PYV'
+import json, sys
+mod = sys.argv[1]
+try:
+    data = json.loads(open(sys.argv[2]).read())
+except Exception:
+    print(0); sys.exit(0)
+failures = data.get("failures", [])
+# Boost proportional to number of failures for this module (max +0.15)
+matches = sum(1 for f in failures if f.get("module") == mod or mod in f.get("test", ""))
+print(min(0.15, matches * 0.05))
+PYV
+  )
+  fi
+
+  # Phase 3: ACC error-lesson boost — proposals whose description mentions
+  # a known error pattern get a small boost (the suite should learn from
+  # its own confirmed error history).
+  ACC_BOOST=0
+  if [ -f "$WORKSPACE/memory/acc-lessons.json" ]; then
+    DESC=$(jq -r '.description // empty' "$f")
+    if [ -n "$DESC" ]; then
+      ACC_BOOST=$(python3 - "$DESC" "$WORKSPACE/memory/acc-lessons.json" <<'PYA'
+import json, sys, re
+desc = sys.argv[1].lower()
+try:
+    lessons = json.loads(open(sys.argv[2]).read())
+except Exception:
+    print(0); sys.exit(0)
+patterns = [l.get("name", "").lower() for l in lessons if isinstance(l, dict)]
+matches = sum(1 for p in patterns if p and re.search(re.escape(p[:8]), desc))
+print(min(0.10, matches * 0.03))
+PYA
+    )
+    fi
+  fi
+
+  # Phase 3: cerebellum calibration signal — proposals targeting modules with
+  # low calibration get a small boost (prioritize fixing imprecise modules).
+  CAL_BOOST=0
+  if [ -n "$TARGET_MOD" ] && [ -f "$WORKSPACE/memory/cerebellum-state.json" ]; then
+    CAL_BOOST=$(python3 - "$TARGET_MOD" "$WORKSPACE/memory/cerebellum-state.json" <<'PYC'
+import json, sys
+mod = sys.argv[1]
+try:
+    data = json.loads(open(sys.argv[2]).read())
+except Exception:
+    print(0); sys.exit(0)
+per_skill = data.get("per_skill", {})
+prec = per_skill.get(mod, {}).get("precision", 0.5)
+# Low precision (< 0.3) → small boost to fix imprecise modules
+print(0.08 if prec < 0.3 else (0.04 if prec < 0.5 else 0))
+PYC
+  )
+  fi
+
+  # Apply boosts to U (clamped at 1.0)
+  BOOST=$(python3 -c "print(min(1.0, float('$U') + $VERIFY_BOOST + $ACC_BOOST + $CAL_BOOST))")
+  U="$BOOST"
+
   # Persist pre scores (silent — stdout must remain JSON-only for the ranker)
   python3 - "$f" "$SCORE_JSON" <<'PY'
 import json,sys
