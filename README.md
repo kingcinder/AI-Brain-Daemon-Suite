@@ -23,6 +23,7 @@ navigable document set rather than eight disconnected files:
 | [`docs/V4_STATUS.md`](docs/V4_STATUS.md) | The V4.0 implementation ledger (plumbing vs live-exercised). |
 | [`docs/2026-08-22-comprehensive-improvement-plan.md`](docs/2026-08-22-comprehensive-improvement-plan.md) | The 12-initiative improvement plan — audit findings + per-initiative status (all ✅ COMPLETE). |
 | [`docs/2026-08-08-integrative-state-layer-design.md`](docs/2026-08-08-integrative-state-layer-design.md) | The Integrative State Layer (A) design spec — global neuromodulation + workspace composition. |
+| [`docs/RUNTHROUGH_20260824.md`](docs/RUNTHROUGH_20260824.md) | Full live run-through with Carnice Qwen3.6 MoE 35B-A3B — exact test parameters, CI gate results, encoding spawn smoke tests, all subsystem verification. |
 
 ## CI
 
@@ -232,15 +233,55 @@ it once you're happy). The only interactive pause fires when a daemon tool
 is genuinely missing from PATH, and never in `--yes`/noninteractive mode.
 
 **Already installed?** After pulling new repo code (e.g. a new daemon job like
-`neuromod_update`), one `./install.sh --refresh` re-deploys the five shipped
-targets into `~/.hermes/workspace/` and restarts `aibrain.service` — no Hermes
-config change, no unit-file re-patch, no re-enable. Same flock + backup/rollback
-as install: the previous workspace is preserved at
-`~/.hermes/workspace.bak-aibrain-install` and restored if the refresh's
-pre-flight `--check` fails.
+`neuromod_update`), one `./install.sh --refresh` re-deploys the repo into the
+live workspace and restarts the daemon — see
+[Deploying Updates](#deploying-updates) for the full refresh → `--check` →
+`--status` ops loop and the rollback path.
 
 Remove the suite later with `./uninstall.sh` (add `--yes` for unattended
 removal) — see [Maintenance](#maintenance).
+
+## Deploying Updates
+
+The ops loop is three commands — refresh the live workspace from the repo,
+validate the job table, then check live job health:
+
+```bash
+cd AI_BRAIN_SUITE_COMPLETE
+./install.sh --refresh                                      # 1. re-deploy repo → ~/.hermes/workspace + restart the daemon
+python3 ~/.hermes/workspace/deep-brain-kernel.py --check    # 2. job table valid (script paths, minute uniqueness)
+python3 ~/.hermes/workspace/deep-brain-kernel.py --status   # 3. live job health (exit code = # unhealthy jobs)
+```
+
+`./install.sh --refresh` re-deploys the five shipped targets
+(`deep-brain-kernel.py`, `skills/`, `core/`, `tests/`, `scripts/`) into the
+existing `~/.hermes/workspace/` and restarts `aibrain.service` — no Hermes
+config merge, no unit-file copy/PATH patch, no re-enable. It holds the same
+single-instance flock as install, and the refresh is **gated on `--check`**: if
+the pre-flight check reports problems, the script rolls itself back
+automatically and exits non-zero, leaving the previous workspace in place.
+Runtime state under `~/.hermes/workspace/memory/` is never touched, so your
+accumulated brain state survives every refresh.
+
+**Rollback.** Before refreshing, the script copies the current workspace to
+`~/.hermes/workspace.bak-aibrain-install`. If a landed refresh looks wrong
+(e.g. `--status` shows new failures), the previous workspace is one sequence
+away:
+
+```bash
+systemctl --user stop aibrain.service
+rm -rf ~/.hermes/workspace
+mv ~/.hermes/workspace.bak-aibrain-install ~/.hermes/workspace
+systemctl --user start aibrain.service
+```
+
+That `mv` is exactly what `install.sh`'s own `rollback()` does on a failed
+deploy, so the manual path matches the automatic one. Note that the `rm -rf`
+also discards any runtime `memory/` state written *since* the refresh — the
+same trade-off the automatic rollback makes, since the backup only captures
+the pre-refresh workspace. Once you're happy with the new deploy, free the
+backup with `rm -rf ~/.hermes/workspace.bak-aibrain-install` — the next
+refresh makes a fresh copy anyway.
 
 ## Configuration / Gotchas
 
