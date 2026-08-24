@@ -175,6 +175,32 @@ if [ -x "$SELF_DIR/rollback-learning.sh" ]; then
   ROLLBACK_LESSONS=$(WORKSPACE="$WORKSPACE" bash "$SELF_DIR/rollback-learning.sh" --json --limit 5 2>/dev/null || true)
 fi
 
+# Phase 5 (post-production): rejection-reason feedback — collect recent
+# human rejection reasons from the proposal store so the LLM learns what
+# the human keeps having to correct.  Missing data degrades to null.
+REJECTION_REASONS=""
+if [ -d "$WORKSPACE/memory/self-mod/proposals" ]; then
+  REJECTION_REASONS=$(python3 - "$WORKSPACE/memory/self-mod/proposals" <<'PYREJECT'
+import json, sys
+from pathlib import Path
+proposals_dir = Path(sys.argv[1])
+rejections = []
+for f in sorted(proposals_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:20]:
+    try:
+        p = json.loads(f.read_text())
+        if p.get("status") == "rejected" and p.get("reject_reason"):
+            rejections.append({
+                "module": p.get("module", "unknown"),
+                "description": (p.get("description") or "")[:100],
+                "reason": p["reject_reason"]
+            })
+    except Exception:
+        continue
+print(json.dumps(rejections[:10]) if rejections else "null")
+PYREJECT
+  )
+fi
+
 # Line-numbered excerpt (first 40 lines) for insert-based patch schema — shorter, reliable for local MoE.
 NUMBERED=$(python3 - <<PY
 from pathlib import Path
@@ -228,6 +254,9 @@ ${HEALTH_CTX:-null}
 ROLLBACK LESSONS (JSON — learn from past failures, do NOT repeat these patterns):
 ${ROLLBACK_LESSONS:-null}
 
+HUMAN REJECTION REASONS (JSON — proposals the human rejected; avoid these patterns):
+${REJECTION_REASONS:-null}
+
 NUMBERED FILE EXCERPT (${TARGET_REL}):
 ${NUMBERED}
 EOF
@@ -266,6 +295,9 @@ ${HEALTH_CTX:-null}
 
 ROLLBACK LESSONS (JSON — learn from past failures, do NOT repeat these patterns):
 ${ROLLBACK_LESSONS:-null}
+
+HUMAN REJECTION REASONS (JSON — proposals the human rejected; avoid these patterns):
+${REJECTION_REASONS:-null}
 
 NUMBERED FILE EXCERPT (${TARGET_REL}):
 ${NUMBERED}

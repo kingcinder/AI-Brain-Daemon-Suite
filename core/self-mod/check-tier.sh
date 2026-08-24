@@ -19,9 +19,15 @@ STATE_FILE="$WORKSPACE/memory/self-mod/autonomy-tiers-state.json"
 GRAD_FILE="$WORKSPACE/memory/self-mod/graduation-streak.json"
 AUTO_STATE="$WORKSPACE/memory/self-mod/autonomy-state.json"
 
+PROMOTE=0
+DEMOTE=0
+REASON=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --workspace) WORKSPACE="$2"; STATE_FILE="$WORKSPACE/memory/self-mod/autonomy-tiers-state.json"; GRAD_FILE="$WORKSPACE/memory/self-mod/graduation-streak.json"; AUTO_STATE="$WORKSPACE/memory/self-mod/autonomy-state.json"; shift 2 ;;
+    --promote) PROMOTE=1; shift ;;
+    --demote) DEMOTE=1; shift ;;
+    --reason) REASON="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
@@ -164,3 +170,44 @@ result = {
 
 print(json.dumps(result, indent=2))
 PYEOF
+
+# ── Tier change audit trail ────────────────────────────────────────────────
+# When --promote or --demote is passed, update the tier state and write a
+# provenance event so the live tier history becomes an auditable record.
+PROVENANCE_SH="$SELF_DIR/../provenance/log-provenance.sh"
+if [ "$PROMOTE" -eq 1 ] || [ "$DEMOTE" -eq 1 ]; then
+  CURRENT=$(jq -r '.current_tier' "$STATE_FILE" 2>/dev/null || echo 0)
+  if [ "$PROMOTE" -eq 1 ]; then
+    NEW_TIER=$((CURRENT + 1))
+    ACTION="promote"
+  else
+    NEW_TIER=$((CURRENT - 1))
+    [ "$NEW_TIER" -lt 0 ] && NEW_TIER=0
+    ACTION="demote"
+  fi
+
+  # Validate new tier exists in autonomy-tiers.json
+  TIER_NAME=$(jq -r ".tiers[\"$NEW_TIER\"].name // empty" "$TIERS_FILE" 2>/dev/null)
+  if [ -z "$TIER_NAME" ]; then
+    echo "check-tier: cannot $ACTION to tier $NEW_TIER — not defined in autonomy-tiers.json" >&2
+    exit 1
+  fi
+
+  # Update state file
+  NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  jq --argjson tier "$NEW_TIER" --arg ts "$NOW" \
+    '.current_tier = $tier | .tier_achieved_at = $ts | .graduation_evaluated_at = $ts' \
+    "$STATE_FILE" > "${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
+
+  # Write provenance event if log-provenance.sh is available
+  if [ -x "$PROVENANCE_SH" ]; then
+    NOTE="Tier $CURRENT ($ACTION to $NEW_TIER): ${REASON:-no reason specified}"
+    WORKSPACE="$WORKSPACE" bash "$PROVENANCE_SH" \
+      --event "autonomy.tier.$ACTION" \
+      --detail "$NOTE" \
+      --source "check-tier.sh" \
+      2>/dev/null || true
+  fi
+
+  echo "Tier $ACTION: $CURRENT → $NEW_TIER ($TIER_NAME)"
+fi

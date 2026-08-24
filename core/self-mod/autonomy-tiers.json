@@ -79,10 +79,12 @@
         "sandbox_evaluation",
         "auto_rollback",
         "auto_deploy_production",
-        "immutable_core_modification",
         "new_module_creation"
       ],
-      "blocked_actions": [],
+      "blocked_actions": [
+        "immutable_core_modification"
+      ],
+      "blocked_actions_note": "Immutable-core modification is ALWAYS blocked regardless of tier — enforced unconditionally by check-target.sh's immutable-paths.list. This entry exists to make the block explicit and prevent misreading; the actual enforcement is in check-target.sh, not here.",
       "graduation_criteria": {
         "consecutive_clean_proposals": 50,
         "zero_rollbacks_in_days": 90,
@@ -93,6 +95,15 @@
         "note": "50 consecutive clean proposals with no rollbacks in 90 days. Full trust earned through sustained, measurable performance."
       }
     }
+  },
+  "deploy_scope": {
+    "description": "Phase 6: restrict which skills are eligible for auto-deploy at each tier. When a skill is not in the allowed list, proposals targeting it still rank and evaluate but require human approval for deployment regardless of tier.",
+    "tier_2_initial_scope": [
+      "heartbeat-memory",
+      "cerebellum-memory"
+    ],
+    "tier_2_full_scope": "all mutable skills (remove restrictions after proven track record)",
+    "tier_3_scope": "all mutable skills including new_module_creation"
   },
   "current_state_tracking": {
     "state_file": "memory/self-mod/autonomy-tiers-state.json",
