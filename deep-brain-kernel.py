@@ -1023,6 +1023,12 @@ class Job:
     days: str = "*"  # "*" or comma-separated weekday ints, Python convention:
                       # 0=Monday .. 6=Sunday (datetime.weekday()). "*" = every day,
                       # matching every job's behavior before this field existed.
+    spawn_max_steps: int = 8   # per-job override for agent-loop MAX_STEPS
+                                # (thinking models need more reasoning budget
+                                # before producing tool calls)
+    thinking_model: bool = False  # when True, auto-appends a no-reasoning
+                                   # prompt suffix so the model skips chain-of-
+                                   # thought and produces tool calls directly
     last_fired_key: Optional[str] = field(default=None, repr=False)
 
 
@@ -1038,7 +1044,8 @@ JOBS: list[Job] = [
         "Run hippocampus encoding with LLM summarization: 1. Run the encoding pipeline: "
         "encode-pipeline.sh --no-spawn 2. Check pending memories 3. If pending exist, "
         "summarize each to ~100 chars 4. Update index.json 5. Delete pending-memories.json "
-        "6. Sync core 7. Report results"),
+        "6. Sync core 7. Report results",
+        spawn_max_steps=12, thinking_model=True),
     # NEW: weekly consolidation and self-reflection. consolidate.sh, reflect.sh, and
     # their prompt files (prompts/consolidation-guide.md, prompts/self-reflect.md,
     # prompts/weekly-reflection-event.md) already existed and were designed for
@@ -1069,18 +1076,21 @@ JOBS: list[Job] = [
     Job("amygdala_encoding", "spawn", "0,3,6,9,12,15,18,21", "10",
         "Run amygdala emotional encoding: 1) Run preprocess-emotions.sh 2) Read "
         "encode-emotions.md 3) Update state for significant emotions 4) Update "
-        "watermark 5) Sync state"),
+        "watermark 5) Sync state",
+        spawn_max_steps=12, thinking_model=True),
     Job("vta_decay", "direct", "4,12,20", "8", "vta-memory/scripts/decay-drive.sh"),
     Job("vta_encoding", "spawn", "0,3,6,9,12,15,18,21", "20",
         "Run VTA reward encoding: 1) Run preprocess-rewards.sh 2) Read encode-rewards.md "
         "3) Log rewards found 4) Resolve fulfilled anticipations 5) Sync state "
-        "6) Update watermark"),
+        "6) Update watermark",
+        spawn_max_steps=12, thinking_model=True),
     Job("basal_ganglia_decay", "direct", "4", "12", "basal-ganglia-memory/scripts/decay-habits.sh"),
     Job("basal_ganglia_encoding", "spawn", "0,3,6,9,12,15,18,21", "30",
         "Run basal-ganglia encoding pipeline: 1. Run encode-pipeline.sh --no-spawn "
         "2. Check pending habits 3. Classify per prompts/encode-habits.md: new habit, "
         "reinforce existing, or new suppression 4. Update habit-state.json "
-        "5. Delete pending-habits.json 6. Sync state 7. Report results"),
+        "5. Delete pending-habits.json 6. Sync state 7. Report results",
+        spawn_max_steps=12, thinking_model=True),
     Job("insula_encoding", "direct", "0,3,6,9,12,15,18,21", "40", "insula-memory/scripts/encode-pipeline.sh"),
     Job("insula_decay", "direct", "0,4,8,12,16,20", "14", "insula-memory/scripts/decay-sense.sh"),
     Job("acc_conflict_encoding", "direct", "0,3,6,9,12,15,18,21", "50", "anterior-cingulate-memory/scripts/encode-pipeline.sh"),
@@ -1091,7 +1101,8 @@ JOBS: list[Job] = [
     Job("social_decay", "direct", "0", "24", "social-memory/scripts/decay.sh"),
     Job("social_encoding", "spawn", "0,3,6,9,12,15,18,21", "52",
         "Run social-memory encoding: 1) Run encode-pipeline.sh 2) Detect relationship "
-        "signals 3) Update relationships 4) Update watermark 5) Sync state"),
+        "signals 3) Update relationships 4) Update watermark 5) Sync state",
+        spawn_max_steps=12, thinking_model=True),
     Job("cerebellum_refine", "direct", "0,8,16", "26", "cerebellum-memory/scripts/refine.sh"),
     # V4.0 Phase 2: isolated reflection + goal proposal cycle (direct / non-inference).
     # Minute 28 is unique in this table. Runs 3× daily; promote path gates on E < 0.75.
@@ -1470,6 +1481,15 @@ async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
         # a daemon-level feature, not just a direct-invocation one.
         if SPAWN_PROVIDER == "agentloop":
             env["AGENT_SESSION_ID"] = job.name
+            # Per-job step budget: thinking models need more reasoning
+            # budget before producing tool calls (Carnice 35B uses ~3-4
+            # steps on reasoning alone). Non-spawn jobs keep the default.
+            env["AGENT_MAX_STEPS"] = str(job.spawn_max_steps)
+            # Thinking-model flag: when set, spawn-provider.sh appends a
+            # no-reasoning suffix to the task text so the model skips
+            # chain-of-thought and produces tool calls directly.
+            if job.thinking_model:
+                env["AGENT_THINKING_MODEL"] = "1"
         cmd = ["bash", str(SPAWN_PROVIDER_SHIM), "--task", task_text]
         if enable_yolo:
             cmd.append("--yolo")

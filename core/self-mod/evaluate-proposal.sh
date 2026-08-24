@@ -194,6 +194,50 @@ END=$(date +%s%N)
 ELAPSED_NS=$((END - START))
 ELAPSED_SEC=$(python3 -c "print(round($ELAPSED_NS/1e9, 4))")
 
+# Phase 3.4: Cross-skill regression — when a proposal targets a specific
+# skill, also run the tests of skills that import or source from that skill
+# (detected via cross-references in scripts). This catches cascading
+# breakage that a single-module sweep would miss.
+CROSS_REF_SKILLS=()
+for target_t in $(jq -r '(.target_paths // .targets // [])[]?' "$PROPOSAL" 2>/dev/null); do
+  skill_name=$(echo "$target_t" | sed -n 's|^skills/\([^/]*\)/.*|\1|p')
+  [ -z "$skill_name" ] && continue
+  # Find other skills that reference this skill's scripts (use word-boundary
+  # matching to avoid false positives — e.g. "social" shouldn't match "unsocial")
+  while IFS= read -r ref_file; do
+    ref_skill=$(echo "$ref_file" | sed -n 's|.*/skills/\([^/]*\)/.*|\1|p')
+    if [ -n "$ref_skill" ] && [ "$ref_skill" != "$skill_name" ]; then
+      CROSS_REF_SKILLS+=("$ref_skill")
+    fi
+  done < <(grep -rl "${skill_name}-memory\|${skill_name}/" "$SB/suite/skills/" --include='*.sh' 2>/dev/null | head -10)
+done
+# Deduplicate
+declare -A CR_SEEN
+clean_cross=()
+for cs in "${CROSS_REF_SKILLS[@]}"; do
+  if [ -z "${CR_SEEN[$cs]:-}" ]; then
+    CR_SEEN[$cs]=1
+    clean_cross+=("$cs")
+  fi
+done
+if [ ${#clean_cross[@]} -gt 0 ]; then
+  echo "evaluate-proposal: cross-skill regression check for: ${clean_cross[*]}" >&2
+  for cs in "${clean_cross[@]}"; do
+    cs_test=$(find "$SB/suite/skills/$cs" -name 'test_*.sh' -o -name 'run_*.sh' 2>/dev/null | head -1)
+    if [ -n "$cs_test" ] && [ -f "$cs_test" ]; then
+      set +e
+      CROSS_OUT=$(cd "$SB/suite" && bash "$cs_test" 2>&1)
+      CROSS_RC=$?
+      set -e
+      if [ "$CROSS_RC" -ne 0 ]; then
+        REG_RC=$CROSS_RC
+        REG_OUT="$REG_OUT\nCROSS-SKILL FAILURE ($cs): $CROSS_OUT"
+        echo "evaluate-proposal: cross-skill regression FAILED for $cs (rc=$CROSS_RC)" >&2
+      fi
+    fi
+  done
+fi
+
 # Job-table gate: run deep-brain-kernel.py --check against the PATCHED sandbox
 # suite (kernel + skills copies) so a proposal that breaks a daemon job target
 # — deletes a script a job references (MISSING), or truncates it to empty

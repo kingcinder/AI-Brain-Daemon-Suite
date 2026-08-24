@@ -163,6 +163,13 @@ CURRENT=$(cat "$SUITE_ROOT/$TARGET_REL")
 CURRENT_CLIP=$(printf '%s' "$CURRENT" | head -c 8000)
 COMMENT_LINE="# V4-llm-gen: model-proposed annotation ($(date -u +%Y-%m-%d))"
 
+# ROADMAP M6: rollback learning — inject past failure patterns into the
+# prompt so the model learns from what was rolled back before.
+ROLLBACK_LESSONS=""
+if [ -x "$SELF_DIR/rollback-learning.sh" ]; then
+  ROLLBACK_LESSONS=$(WORKSPACE="$WORKSPACE" bash "$SELF_DIR/rollback-learning.sh" --json --limit 5 2>/dev/null || true)
+fi
+
 # Line-numbered excerpt (first 40 lines) for insert-based patch schema — shorter, reliable for local MoE.
 NUMBERED=$(python3 - <<PY
 from pathlib import Path
@@ -203,6 +210,9 @@ Rules:
 
 CURRENT BRAIN HEALTH CONTEXT (JSON — use it to decide what deserves a fix):
 ${HEALTH_CTX:-null}
+
+ROLLBACK LESSONS (JSON — learn from past failures, do NOT repeat these patterns):
+${ROLLBACK_LESSONS:-null}
 
 NUMBERED FILE EXCERPT (${TARGET_REL}):
 ${NUMBERED}

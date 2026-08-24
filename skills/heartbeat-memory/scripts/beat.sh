@@ -18,7 +18,7 @@ exec 200>"$STATE_FILE.lock"
 flock 200
 PFC_DECIDE="$WORKSPACE/skills/prefrontal-cortex-memory/scripts/decide.sh"
 DRY_RUN=false
-[ "$1" = "--dry-run" ] && DRY_RUN=true
+[ "${1:-}" = "--dry-run" ] && DRY_RUN=true
 
 if [ ! -f "$STATE_FILE" ]; then
     echo "❌ No heartbeat state found at $STATE_FILE"

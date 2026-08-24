@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-AGENT_TOOL_NAMES="get_goals get_lessons get_conflict_state get_heartbeat get_verification_report list_memory_state record_goal_outcome run_suite_script"
+AGENT_TOOL_NAMES="get_goals get_lessons get_conflict_state get_heartbeat get_verification_report list_memory_state record_goal_outcome run_suite_script read_working_memory write_working_memory get_metacognition get_emotional_state get_social_context"
 
 agent_tool_descriptions() {
   cat << 'TOOLS'
@@ -34,6 +34,11 @@ IMPORTANT: There is NO bash, shell, or command-line access. You cannot run arbit
 - list_memory_state        args: {}            List memory/*.json state files with sizes (what exists)
 - record_goal_outcome      args: {"goal":"<desc>","outcome":"success|failure"}  Record a goal outcome to PFC state
 - run_suite_script         args: {"script":"<name>.sh","args":["--flag","value"]}  Run a suite script by NAME (e.g. "encode-pipeline.sh", "sync-state.sh"). The tool auto-discovers the full path under skills/*/scripts/. Just pass the script filename, not the full path.
+- read_working_memory      args: {}            Read the working-memory scratch pad (cross-call reasoning context within a task)
+- write_working_memory     args: {"content":"<text>"}  Write/update the working-memory scratch pad (persists across tool calls within a task)
+- get_metacognition        args: {}            Assess current reasoning confidence based on conflict load, executive load, and recent errors
+- get_emotional_state      args: {}            Read interoceptive state: gut signal, cognitive load, friction, self-coherence from insula
+- get_social_context       args: {}            Read social relationship summaries: trust levels, recent interactions, communication style
 
 Rules: call at most one tool per turn. Never invent tools. Never use "bash" or "shell" — those are not tools. Finish with an {"answer":...} only when the task is done.
 TOOLS
@@ -178,6 +183,72 @@ agent_tool_run() {
         return 0
       }
       printf '{"result":%s}' "$(printf '%s' "$output" | jq -Rs . 2>/dev/null || echo '"output captured"')"
+      ;;
+    read_working_memory)
+      local wm="${WORKSPACE:-}/memory/working-memory.json"
+      if [ -f "$wm" ]; then
+        cat "$wm" 2>/dev/null || echo '{"content":"","note":"read failed"}'
+      else
+        echo '{"content":"","note":"no working memory yet"}'
+      fi
+      ;;
+    write_working_memory)
+      local content
+      content=$(printf '%s' "$args" | jq -r '.content // ""' 2>/dev/null || echo "")
+      if [ -z "$content" ]; then
+        echo '{"error":"write_working_memory requires content field"}'
+        return 0
+      fi
+      local wm="${WORKSPACE:-}/memory/working-memory.json"
+      mkdir -p "$(dirname "$wm")"
+      printf '{"content":%s,"updatedAt":"%s"}' \
+        "$(printf '%s' "$content" | jq -Rs . 2>/dev/null || echo '""')" \
+        "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > "$wm" && echo '{"written":true}' \
+        || echo '{"error":"write failed"}'
+      ;;
+    get_metacognition)
+      # Synthesize reasoning confidence from conflict load, executive load,
+      # and recent error rate — the ACC's conflict-monitoring + PFC load
+      local conflict_load=0 exec_e=0 recent_errors=0 recent_total=0
+      if [ -f "${WORKSPACE:-}/memory/conflict-state.json" ]; then
+        conflict_load=$(jq -r '.conflictLoad // 0' "${WORKSPACE:-}/memory/conflict-state.json" 2>/dev/null || echo 0)
+      fi
+      if [ -f "${WORKSPACE:-}/memory/executive-load.json" ]; then
+        exec_e=$(jq -r '.E // 0' "${WORKSPACE:-}/memory/executive-load.json" 2>/dev/null || echo 0)
+      fi
+      if [ -f "${WORKSPACE:-}/memory/deep-brain-kernel-state.json" ]; then
+        recent_errors=$(jq -r '[.jobStats[]?.consecutive_failures // 0] | add // 0' "${WORKSPACE:-}/memory/deep-brain-kernel-state.json" 2>/dev/null || echo 0)
+        recent_total=$(jq -r '[.jobStats[]? | (.success // 0) + (.failure // 0)] | add // 0' "${WORKSPACE:-}/memory/deep-brain-kernel-state.json" 2>/dev/null || echo 0)
+      fi
+      # Confidence: high when conflict low, load moderate, errors rare
+      local confidence
+      confidence=$(printf 'scale=3; 1.0 - (%s * 0.3) - (%s * 0.2) - ((%s / (if (%s > 0) then %s else 1 end)) * 0.5)' \
+        "$conflict_load" "$exec_e" "$recent_errors" "$recent_total" "$recent_total" 2>/dev/null || echo "0.5")
+      # Clamp 0-1
+      confidence=$(printf '%s' "$confidence" | awk '{if ($1 > 1) print 1; else if ($1 < 0) print 0; else print $1}' 2>/dev/null || echo "0.5")
+      printf '{"confidence":%s,"conflictLoad":%s,"executiveLoad":%s,"recentErrors":%s,"note":"synthesized from ACC conflict + PFC load + error history"}' \
+        "$confidence" "$conflict_load" "$exec_e" "$recent_errors"
+      ;;
+    get_emotional_state)
+      # Read insula interoceptive state — the body-prediction-error signal
+      if [ -f "${WORKSPACE:-}/memory/interoceptive-state.json" ]; then
+        jq -c '{gutSignal: (.gutSignal // 0), cognitiveLoad: (.cognitiveLoad // 0), friction: (.friction // 0), selfCoherence: (.selfCoherence // 0), channels: (.channels // {})}' \
+          "${WORKSPACE:-}/memory/interoceptive-state.json" 2>/dev/null \
+          || echo '{"error":"interoceptive-state unreadable"}'
+      else
+        echo '{"gutSignal":0,"cognitiveLoad":0,"friction":0,"selfCoherence":0,"note":"no interoceptive state yet"}'
+      fi
+      ;;
+    get_social_context)
+      # Read social-memory relationship summaries — trust, interaction recency
+      local soc="${WORKSPACE:-}/memory/social-relationships.json"
+      if [ -f "$soc" ]; then
+        jq -c '{relationships: [.relationships[]? | {name: (.name // .id // "unknown"), trust: (.trust // 0.5), lastInteraction: (.lastInteraction // .lastContactedAt // "never"), frequency: (.interactionFrequency // .frequency // "unknown")}] | .[0:5]}' \
+          "$soc" 2>/dev/null \
+          || echo '{"error":"social-relationships unreadable"}'
+      else
+        echo '{"relationships":[],"note":"no social relationships yet"}'
+      fi
       ;;
     *)
       agent_tool_reject "$name" "unknown tool"

@@ -81,9 +81,19 @@ case "$PROVIDER" in
       echo "spawn-provider: provider=agentloop but core/agent-loop/agent-loop.sh not found" >&2
       exit 6
     fi
+    # Per-job step budget: AGENT_MAX_STEPS overrides the loop's default
+    # (set by deep-brain-kernel.py from job.spawn_max_steps).
+    STEPS="${AGENT_MAX_STEPS:-8}"
+    # Thinking-model suppression: when AGENT_THINKING_MODEL=1, append a
+    # no-reasoning suffix to the task so thinking models (Carnice 35B)
+    # skip chain-of-thought and produce tool calls / answers directly.
+    EFFECTIVE_TASK="$TASK"
+    if [ "${AGENT_THINKING_MODEL:-0}" = "1" ]; then
+      EFFECTIVE_TASK=$(printf '%s\n\nIMPORTANT: Do NOT think step by step or show reasoning. Respond immediately with a tool call (using run_suite_script) or a final answer. Keep your response concise.' "$TASK")
+    fi
     # The loop resolves llm-call.sh itself (its own exit 4 covers a missing
     # local caller) and honors AGENT_STUB_LLM for deterministic tests.
-    exec bash "$LOOP" --task "$TASK"
+    exec bash "$LOOP" --task "$EFFECTIVE_TASK" --max-steps "$STEPS"
     ;;
   *)
     echo "spawn-provider: unknown SPAWN_PROVIDER '$PROVIDER' (expected hermes|local|agentloop)" >&2
