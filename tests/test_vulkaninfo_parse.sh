@@ -1,6 +1,15 @@
 #!/bin/bash
 # Unit: deep-brain-kernel.py vulkaninfo memory-budget parsers (M0 fix, 2nd pass).
 #
+# FIXTURE NOTE: This test uses inline synthetic strings modeled on real
+# vulkaninfo output from an RX 5700 XT / RADV navi10 (8 GiB VRAM heap).
+# No hardware-specific VP_VULKANINFO_*.json file is committed — the
+# fixtures are synthetic analogues of the per-heap text schema, which is
+# portable across Vulkan-Tools versions and GPU vendors.  If a
+# VP_VULKANINFO_*.json fixture is ever added (e.g. for JSON-path testing),
+# it should be anonymized/synthetic rather than a raw hardware capture to
+# avoid leaking driver versions or serial numbers.
+#
 # CORRECTED SEMANTICS (2026-08-08, verified against live vulkaninfo output on
 # this RX 5700 XT / RADV navi10 while llama-server holds ~7.16 GiB VRAM):
 #   percent_used = (size - budget) / size * 100
