@@ -125,6 +125,22 @@ if not no_record and losers:
         })
     # Cap suppressions to 50 entries
     sup_state['suppressions'] = sup_state['suppressions'][-50:]
+    # ── Record gated selections (the no-go pathway, Mink/Frank) ──────────
+    # When the threshold gate HOLDS the action (chosen: null), that is a
+    # distinct basal-ganglia event worth persisting — not a suppression of
+    # losers but a refusal to release any candidate. Stored as
+    # .gatedSelections (capped at 20) so the dashboard/sync-state can show
+    # the no-go pathway firing.
+    if chosen is None and 'gated' in method:
+        best_adj = max(a['adjusted'] for a in adjusted) if adjusted else 0.0
+        sup_state.setdefault('gatedSelections', []).append({
+            'at': now,
+            'best': best_adj,
+            'threshold': threshold,
+            'candidates': len(adjusted),
+            'method': method
+        })
+        sup_state['gatedSelections'] = sup_state['gatedSelections'][-20:]
     tmp = state_file + '.tmp.' + str(os.getpid())
     with open(tmp, 'w') as f:
         json.dump(sup_state, f, indent=2)
