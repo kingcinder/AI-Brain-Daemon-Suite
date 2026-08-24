@@ -79,6 +79,15 @@ if [ ! -f "deep-brain-kernel.py" ] || [ ! -f "aibrain.service" ] || [ ! -d "skil
     exit 1
 fi
 
+# jq is required by the dashboard builder, manifest validation, and daemon
+# job dispatch.  Fail fast here so the user gets one clear message instead of
+# scattered mid-test failures.
+if ! command -v jq >/dev/null 2>&1; then
+    echo "Error: jq is required but not found on PATH."
+    echo "Install it via:  sudo apt install jq   OR   brew install jq"
+    exit 1
+fi
+
 [ -n "${HOME:-}" ] || { echo "Error: HOME is not set." >&2; exit 1; }
 
 # ── Paths / rollback state ──────────────────────────────────────────────────
