@@ -24,7 +24,8 @@ AGENT_TOOL_NAMES="get_goals get_lessons get_conflict_state get_heartbeat get_ver
 
 agent_tool_descriptions() {
   cat << 'TOOLS'
-Available tools (reply with ONE tool call per turn, JSON: {"tool":"<name>","args":{...}}, or finish with {"answer":"<text>"}):
+IMPORTANT: There is NO bash, shell, or command-line access. You cannot run arbitrary commands. Use ONLY these tools:
+
 - get_goals                args: {}            List active PFC goals (description, priority, status)
 - get_lessons              args: {}            Retrieve resolved error-pattern lessons from acc-error memory
 - get_conflict_state       args: {}            Read anterior-cingulate conflict load + active conflicts
@@ -32,8 +33,9 @@ Available tools (reply with ONE tool call per turn, JSON: {"tool":"<name>","args
 - get_verification_report  args: {}            Most recent verification sweep: totals + failing modules
 - list_memory_state        args: {}            List memory/*.json state files with sizes (what exists)
 - record_goal_outcome      args: {"goal":"<desc>","outcome":"success|failure"}  Record a goal outcome to PFC state
-- run_suite_script         args: {"script":"<relative-path>","args":[...]}  Run a suite script (encode-pipeline.sh, preprocess-*.sh, sync-state.sh, sync-core.sh, update-watermark.sh, etc.). Script must be under skills/<skill>/scripts/ in the workspace.
-Rules: call at most one tool per turn. Never invent tools. Finish with an {"answer":...} only when the task is done.
+- run_suite_script         args: {"script":"<name>.sh","args":["--flag","value"]}  Run a suite script by NAME (e.g. "encode-pipeline.sh", "sync-state.sh"). The tool auto-discovers the full path under skills/*/scripts/. Just pass the script filename, not the full path.
+
+Rules: call at most one tool per turn. Never invent tools. Never use "bash" or "shell" — those are not tools. Finish with an {"answer":...} only when the task is done.
 TOOLS
 }
 
@@ -132,7 +134,7 @@ agent_tool_run() {
         resolved="$ws/$script_path"
       else
         # Bare name (e.g. "encode-pipeline.sh") — search skills/*/scripts/
-        resolved=$(find "$ws/skills" -path "*/scripts/$script_path" -type f 2>/dev/null | head -1)
+        resolved=$(find "$ws/skills" -path "*/scripts/$script_path" -type f -print -quit 2>/dev/null)
         if [ -z "$resolved" ]; then
           echo "{\"tool_error\":\"run_suite_script\",\"reason\":\"script '$script_path' not found under skills/*/scripts/\"}"; return 0
         fi
