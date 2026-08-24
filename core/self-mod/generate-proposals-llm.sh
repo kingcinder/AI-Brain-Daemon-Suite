@@ -34,6 +34,11 @@ STORE=1
 EMIT=0
 TIMEOUT="${LLM_PROPOSAL_TIMEOUT:-300}"
 LOCAL_ONLY="${LLM_LOCAL_ONLY:-1}"
+# Phase 2 feature flag: when LLM_FULL_PATCH=1, the prompt asks for actual
+# code patches instead of comment-only annotations. Default OFF — watch it
+# generate a dozen proposals you'd have written yourself before enabling.
+FULL_PATCH="${LLM_FULL_PATCH:-0}"
+AGENTLOOP_DIR=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -49,7 +54,8 @@ while [[ $# -gt 0 ]]; do
     --store) STORE=1; shift ;;
     --emit-target) EMIT=1; STORE=0; shift ;;
     --allow-cloud) LOCAL_ONLY=0; shift ;;
-    -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
+    --full-patch) FULL_PATCH=1; shift ;;
+    -h|--help) sed -n '2,35p' "$0"; exit 0 ;;
     *) shift ;;
   esac
 done
@@ -180,6 +186,54 @@ print(f"... total_lines={len(lines)}")
 PY
 )
 
+if [ "$FULL_PATCH" -eq 1 ]; then
+PROMPT=$(cat <<EOF
+You are a JSON API. Reply with exactly one JSON object and nothing else.
+No markdown fences. No tool calls. No prose before or after the JSON.
+
+You are generating a self-modification proposal for the AI Brain Suite.
+Your task: produce a real code patch (not just comments) that fixes an
+observed failure or improves a measurable weakness in the target file.
+
+Required schema (full-patch mode):
+{
+  "proposal_id": "prop_<8+ alnum chars>",
+  "module": "${TARGET_MODULE}",
+  "target_paths": ["${TARGET_REL}"],
+  "description": "<1-2 sentence description of what this patch does and why>",
+  "content": "<the COMPLETE new file content — not a diff, not insert lines>",
+  "estimated_components": {
+    "task_success": <0.0-1.0 expected improvement>,
+    "resource_cost": <0.0-1.0 CPU/memory cost>,
+    "error_rate": <0.0-1.0 chance of regression>,
+    "regression_penalty": <0.0-1.0 severity if it breaks>
+  }
+}
+
+Rules:
+- module and target_paths MUST be exactly as shown.
+- content: the COMPLETE replacement file content. The entire file will be
+  overwritten with your content. Preserve all existing functionality; only
+  add/fix the specific weakness identified in the health context.
+- Never target decide.sh or core/self-mod, core/locks, core/concurrency,
+  core/sandbox, core/executive-load.
+- Keep changes minimal and focused — one concern per proposal.
+- If health context shows a real failure, the patch must address it.
+- Always preserve set -euo pipefail and the existing shebang.
+- Use insert_after_line + insert_lines instead of content if the change is
+  purely additive (a new function, a new code block at a known location).
+
+CURRENT BRAIN HEALTH CONTEXT (JSON — use it to decide what deserves a fix):
+${HEALTH_CTX:-null}
+
+ROLLBACK LESSONS (JSON — learn from past failures, do NOT repeat these patterns):
+${ROLLBACK_LESSONS:-null}
+
+NUMBERED FILE EXCERPT (${TARGET_REL}):
+${NUMBERED}
+EOF
+)
+else
 PROMPT=$(cat <<EOF
 You are a JSON API. Reply with exactly one JSON object and nothing else.
 No markdown fences. No tool calls. No prose before or after the JSON.
@@ -218,6 +272,7 @@ NUMBERED FILE EXCERPT (${TARGET_REL}):
 ${NUMBERED}
 EOF
 )
+fi
 
 OUT_DIR="$WORKSPACE/memory/self-mod/llm-raw"
 mkdir -p "$OUT_DIR"
@@ -298,6 +353,35 @@ elif [ "$PROVIDER" = "openrouter" ] && [ "$LOCAL_ONLY" != "1" ]; then
     --source self-mod-generate >"$RAW_FILE" 2>&1
   RC=$?
   cp "$RAW_FILE" "$API_FILE"
+elif [ "$PROVIDER" = "agentloop" ]; then
+  # Phase 2: use the internal agentic loop — it gathers context via
+  # allowlisted tools (get_goals, get_lessons, get_verification_report, ...)
+  # then proposes a modification.  The agent-loop.sh handles its own LLM
+  # calls; we just need to pass the task and capture the final answer.
+  AGENTLOOP_SH="$ROOT/core/agent-loop/agent-loop.sh"
+  if [ ! -x "$AGENTLOOP_SH" ]; then
+    echo "generate-proposals-llm: agentloop provider requested but $AGENTLOOP_SH not found" >&2
+    RC=1
+  else
+    AGENT_TASK="You are generating a self-modification proposal for the AI Brain Suite.\n\n"
+    AGENT_TASK+="TARGET MODULE: ${TARGET_MODULE}\n"
+    AGENT_TASK+="TARGET FILE: ${TARGET_REL}\n\n"
+    AGENT_TASK+="Your job:\n"
+    AGENT_TASK+="1. Use get_goals, get_lessons, get_conflict_state, get_verification_report, and get_emotional_state to understand current brain health.\n"
+    AGENT_TASK+="2. Read the target file's content (it will be provided).\n"
+    AGENT_TASK+="3. Produce a JSON proposal matching this schema:\n"
+    AGENT_TASK+='{"proposal_id":"prop_<alnum>","module":"'"${TARGET_MODULE}"'","target_paths":["'"${TARGET_REL}"'"],"description":"...","content":"<complete file>","estimated_components":{"task_success":0.0,"resource_cost":0.0,"error_rate":0.0,"regression_penalty":0.0}}\n'
+    AGENT_TASK+="\nRules: output ONLY the JSON proposal as your final answer. Minimal focused change. Preserve set -euo pipefail."
+    # Inject the file content into working memory so the agent can read it
+    WORKSPACE="$WORKSPACE" AGENT_ROOT="$ROOT" \
+      timeout "$TIMEOUT" bash "$AGENTLOOP_SH" \
+      --task "$AGENT_TASK" \
+      --session-id "self-mod-${TARGET_MODULE}" \
+      --max-steps 8 \
+      >"$RAW_FILE" 2>"$RAW_FILE.err"
+    RC=$?
+    cp "$RAW_FILE" "$API_FILE"
+  fi
 else
   # Hermes path (may fail min-ctx or use tools — still recorded raw)
   HERMES_ARGS=(chat -q "$PROMPT" --source self-mod-generate)
