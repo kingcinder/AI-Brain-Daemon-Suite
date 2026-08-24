@@ -109,8 +109,17 @@ if new_module:
                 NEW_MOD_MANIFEST = cand
 
 def norm(p: str) -> str:
-    p = p.replace("\\", "/").lstrip("./")
-    # reject absolute escapes outside suite
+    p = p.replace("\\", "/")
+    # Strip leading ./ only (not individual . or / characters — lstrip("./")
+    # would turn "../../etc/passwd" into "etc/passwd", bypassing the
+    # outside_suite_root check).
+    if p.startswith("./"):
+        p = p[2:]
+    elif p.startswith("."):
+        p = p[1:]
+    # Strip leading / to make relative
+    if p.startswith("/"):
+        p = p.lstrip("/")
     return p
 
 def is_immutable(rel: str) -> bool:

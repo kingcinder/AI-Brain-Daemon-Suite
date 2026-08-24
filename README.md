@@ -8,9 +8,9 @@
 
 ## Documentation Index
 
-Eight docs carry the suite's story, and they're designed to be read in this
-order — each hands off to the next, so the repository reads as a single
-navigable document set rather than eight disconnected files:
+Thirteen docs carry the suite's story, and they're designed to be read in
+this order — each hands off to the next, so the repository reads as a
+single navigable document set rather than disconnected files:
 
 | Doc | What it answers |
 |---|---|
@@ -18,11 +18,15 @@ navigable document set rather than eight disconnected files:
 | [`ROADMAP.md`](ROADMAP.md) | Which milestones get us to full autonomy, and which have landed (M0–M8)? |
 | [`AUDIT.md`](AUDIT.md) | Which vision gaps are open or closed, and what code proves it? |
 | [`HERMES_COMPATIBILITY.md`](HERMES_COMPATIBILITY.md) | How does the suite interoperate with the Hermes Agent harness? |
+| [`HERMES_DEPS_CHECKLIST.md`](HERMES_DEPS_CHECKLIST.md) | Which Hermes functions have been internalized, and which still require the binary? |
 | [`BRAIN_DAEMON_SCHEDULE.md`](BRAIN_DAEMON_SCHEDULE.md) | What jobs does the daemon run, on what schedule, and why? |
 | [`NEUROSCIENCE_MAPPING.md`](NEUROSCIENCE_MAPPING.md) | Which brain-region skill names are functionally grounded, which are structural or label-only, and why? (honesty audit) |
 | [`docs/V4_STATUS.md`](docs/V4_STATUS.md) | The V4.0 implementation ledger (plumbing vs live-exercised). |
 | [`docs/2026-08-22-comprehensive-improvement-plan.md`](docs/2026-08-22-comprehensive-improvement-plan.md) | The 12-initiative improvement plan — audit findings + per-initiative status (all ✅ COMPLETE). |
 | [`docs/2026-08-08-integrative-state-layer-design.md`](docs/2026-08-08-integrative-state-layer-design.md) | The Integrative State Layer (A) design spec — global neuromodulation + workspace composition. |
+| [`docs/2026-08-08-integrative-state-layer-plan.md`](docs/2026-08-08-integrative-state-layer-plan.md) | The Integrative State Layer implementation plan — 6-task sequencing with code, hook sites, and tests. |
+| [`docs/2026-08-24-live-deployment-runbook.md`](docs/2026-08-24-live-deployment-runbook.md) | Live deployment runbook — operational steps, success criteria, and go/no-go checkpoints for each phase. |
+| [`docs/2026-08-24-stage3-readiness-review.md`](docs/2026-08-24-stage3-readiness-review.md) | Stage 3 readiness review — formal audit against VISION.md §6 definition of success. |
 | [`docs/RUNTHROUGH_20260824.md`](docs/RUNTHROUGH_20260824.md) | Full live run-through with Carnice Qwen3.6 MoE 35B-A3B — exact test parameters, CI gate results, encoding spawn smoke tests, all subsystem verification. |
 
 ## CI
