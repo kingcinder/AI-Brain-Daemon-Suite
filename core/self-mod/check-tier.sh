@@ -44,7 +44,6 @@ fi
 python3 - "$TIERS_FILE" "$STATE_FILE" "$GRAD_FILE" "$AUTO_STATE" <<'PYEOF'
 import json, sys
 from pathlib import Path
-from datetime import datetime, timezone
 
 tiers_file = Path(sys.argv[1])
 state_file = Path(sys.argv[2])

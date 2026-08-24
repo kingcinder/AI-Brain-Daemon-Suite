@@ -38,7 +38,6 @@ LOCAL_ONLY="${LLM_LOCAL_ONLY:-1}"
 # code patches instead of comment-only annotations. Default OFF — watch it
 # generate a dozen proposals you'd have written yourself before enabling.
 FULL_PATCH="${LLM_FULL_PATCH:-0}"
-AGENTLOOP_DIR=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

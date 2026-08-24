@@ -98,7 +98,6 @@ PY
   # Phase 3: verification-history boost — proposals targeting modules with
   # recent verification failures get a ranking boost (the suite should fix
   # what it has already measured as broken, not just what is convenient).
-  PROPID=$(jq -r .proposal_id "$f")
   TARGET_MOD=$(jq -r '.module // empty' "$f")
   VERIFY_BOOST=0
   if [ -n "$TARGET_MOD" ] && [ -f "$WORKSPACE/memory/verification-sweep.json" ]; then
