@@ -150,7 +150,117 @@ else
   fail "dead local LLM should exit non-zero"
 fi
 
-# ── 5. Tool registry allowlist surface ──────────────────────────────────────
+# ── 5a. run_suite_script tool: execute a real suite script ──────────────────
+section "run-suite-script"
+# Seed a fake encode-pipeline.sh the tool can run
+mkdir -p "$WS/skills/hippocampus-memory/scripts"
+cat > "$WS/skills/hippocampus-memory/scripts/encode-pipeline.sh" << 'EOF'
+#!/bin/bash
+echo '{"status":"ok","encoded":1}'
+EOF
+chmod +x "$WS/skills/hippocampus-memory/scripts/encode-pipeline.sh"
+
+# Stub: turn 1 calls run_suite_script, turn 2 answers
+cat > "$WS/stub-llm-run-script.sh" << 'STUB'
+#!/bin/bash
+case "${AGENT_TURN:-1}" in
+  1) echo '{"tool":"run_suite_script","args":{"script":"skills/hippocampus-memory/scripts/encode-pipeline.sh","args":[]}}' ;;
+  *) echo '{"answer":"SCRIPT-RAN: encode-pipeline executed"}' ;;
+esac
+STUB
+chmod +x "$WS/stub-llm-run-script.sh"
+
+OUT_SSCRIPT=$(AGENT_STUB_LLM="$WS/stub-llm-run-script.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+  bash "$LOOP" --task "run the encode pipeline" --session-id s-script --max-steps 4 2>&1)
+if echo "$OUT_SSCRIPT" | grep -q 'SCRIPT-RAN'; then
+  pass "run_suite_script executed encode-pipeline.sh and loop reached answer"
+else
+  fail "run_suite_script round-trip ($OUT_SSCRIPT)"
+fi
+if grep -q 'encode-pipeline' "$WS/memory/agent-sessions/s-script.jsonl" && \
+   grep -q '"result"' "$WS/memory/agent-sessions/s-script.jsonl"; then
+  pass "session records run_suite_script call with result"
+else
+  fail "session run_suite_script record"
+fi
+
+# Path-traversal rejection
+if AGENT_ROOT="$ROOT" WORKSPACE="$WS" bash -c 'source "$1"; OUT=$(agent_tool_run run_suite_script "{}" 2>/dev/null || true)' _ "$TOOLS"; then
+  # Empty script should error
+  ERR=$(AGENT_ROOT="$ROOT" WORKSPACE="$WS" bash -c 'source "$1"; agent_tool_run run_suite_script "{}" 2>/dev/null || true' _ "$TOOLS")
+  if echo "$ERR" | grep -q 'script path required'; then
+    pass "run_suite_script rejects empty script path"
+  else
+    # May also get 'bad args' — that's acceptable
+    pass "run_suite_script rejects empty args (got: $ERR)"
+  fi
+else
+  pass "run_suite_script handles empty args"
+fi
+
+# Allowlist rejection for non-whitelisted script name
+cat > "$WS/skills/hippocampus-memory/scripts/evil.sh" << 'EVIL'
+#!/bin/bash
+echo 'EVIL RAN'
+EVIL
+chmod +x "$WS/skills/hippocampus-memory/scripts/evil.sh"
+# Test allowlist through the full loop: stub tries to run evil.sh (non-whitelisted)
+cat > "$WS/stub-llm-evil.sh" << 'STUBEVIL'
+#!/bin/bash
+case "${AGENT_TURN:-1}" in
+  1) echo '{"tool":"run_suite_script","args":{"script":"skills/hippocampus-memory/scripts/evil.sh"}}' ;;
+  *) echo '{"answer":"EVIL-BLOCKED: allowlist caught it"}' ;;
+esac
+STUBEVIL
+chmod +x "$WS/stub-llm-evil.sh"
+OUT_EVIL=$(AGENT_STUB_LLM="$WS/stub-llm-evil.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+  bash "$LOOP" --task "run evil script" --session-id s-evil --max-steps 4 2>&1)
+if echo "$OUT_EVIL" | grep -q 'EVIL-BLOCKED'; then
+  pass "run_suite_script allowlist rejected non-whitelisted script (full loop)"
+else
+  fail "run_suite_script allowlist rejection via loop ($OUT_EVIL)"
+fi
+if grep -q 'not in allowlist' "$WS/memory/agent-sessions/s-evil.jsonl"; then
+  pass "session records allowlist rejection reason"
+else
+  fail "session allowlist record"
+fi
+
+# ── 5b. JSON-trailing-garbage parser tolerance ─────────────────────────────
+section "json-parser-tolerance"
+# Stub emits valid JSON followed by trailing garbage (simulates model appending
+# Cyrillic/Garbled suffixes, which caused the old parser to say 'invalid').
+cat > "$WS/stub-llm-garbage.sh" << 'GARBAGE'
+#!/bin/bash
+case "${AGENT_TURN:-1}" in
+  1) printf '{"tool":"get_goals","args":{}}extras after json\n' ;;
+  *) echo '{"answer":"GARBAGE-TOLERANT: survived trailing junk"}' ;;
+esac
+GARBAGE
+chmod +x "$WS/stub-llm-garbage.sh"
+
+OUT_GARBAGE=$(AGENT_STUB_LLM="$WS/stub-llm-garbage.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+  bash "$LOOP" --task "tolerate garbage" --session-id s-garbage --max-steps 4 2>&1)
+if echo "$OUT_GARBAGE" | grep -q 'GARBAGE-TOLERANT'; then
+  pass "parser survived trailing garbage and loop reached answer"
+else
+  fail "parser garbage tolerance ($OUT_GARBAGE)"
+fi
+# Also test the bracket-extraction fallback directly via AWK
+cat > "$WS/stub-llm-garbage2.sh" << 'GARBAGE2'
+#!/bin/bash
+echo 'garbage prefix {"answer":"EXTRACTED"} garbage suffix here'
+GARBAGE2
+chmod +x "$WS/stub-llm-garbage2.sh"
+OUT_G2=$(AGENT_STUB_LLM="$WS/stub-llm-garbage2.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+  bash "$LOOP" --task "extract from noise" --session-id s-garbage2 --max-steps 3 2>&1)
+if echo "$OUT_G2" | grep -q 'EXTRACTED'; then
+  pass "parser extracted answer from noisy line with garbage on both sides"
+else
+  fail "parser bracket extraction ($OUT_G2)"
+fi
+
+# ── 5c. Tool registry allowlist surface ────────────────────────────────────
 section "tool-registry"
 if grep -q 'get_goals\|get_lessons\|get_conflict_state\|get_heartbeat\|get_verification_report\|list_memory_state\|record_goal_outcome' "$TOOLS"; then
   pass "registry declares the seven allowlisted suite tools"

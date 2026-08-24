@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-AGENT_TOOL_NAMES="get_goals get_lessons get_conflict_state get_heartbeat get_verification_report list_memory_state record_goal_outcome"
+AGENT_TOOL_NAMES="get_goals get_lessons get_conflict_state get_heartbeat get_verification_report list_memory_state record_goal_outcome run_suite_script"
 
 agent_tool_descriptions() {
   cat << 'TOOLS'
@@ -32,6 +32,7 @@ Available tools (reply with ONE tool call per turn, JSON: {"tool":"<name>","args
 - get_verification_report  args: {}            Most recent verification sweep: totals + failing modules
 - list_memory_state        args: {}            List memory/*.json state files with sizes (what exists)
 - record_goal_outcome      args: {"goal":"<desc>","outcome":"success|failure"}  Record a goal outcome to PFC state
+- run_suite_script         args: {"script":"<relative-path>","args":[...]}  Run a suite script (encode-pipeline.sh, preprocess-*.sh, sync-state.sh, sync-core.sh, update-watermark.sh, etc.). Script must be under skills/<skill>/scripts/ in the workspace.
 Rules: call at most one tool per turn. Never invent tools. Finish with an {"answer":...} only when the task is done.
 TOOLS
 }
@@ -109,6 +110,72 @@ agent_tool_run() {
       else
         echo '{"error":"record-goal-outcome.sh not found"}'
       fi
+      ;;
+    run_suite_script)
+      # args: {"script":"skills/<skill>/scripts/<name>.sh", "args":["--flag","value"]}
+      # Security: only scripts under skills/*/scripts/ with basenames in the allowlist.
+      local script_path script_args
+      script_path=$(printf '%s' "$args" | jq -r '.script // ""' 2>/dev/null || echo "")
+      [ -z "$script_path" ] && { echo '{"tool_error":"run_suite_script","reason":"script path required"}'; return 0; }
+
+      # Reject path traversal
+      case "$script_path" in
+        *..*|*//*) echo '{"tool_error":"run_suite_script","reason":"invalid path"}'; return 0 ;;
+      esac
+
+      # Resolve relative to WORKSPACE if not absolute
+      local resolved ws
+      ws="${WORKSPACE:-$HOME/.hermes/workspace}"
+      if [[ "$script_path" = /* ]]; then
+        resolved="$script_path"
+      elif [[ "$script_path" == */* ]]; then
+        resolved="$ws/$script_path"
+      else
+        # Bare name (e.g. "encode-pipeline.sh") — search skills/*/scripts/
+        resolved=$(find "$ws/skills" -path "*/scripts/$script_path" -type f 2>/dev/null | head -1)
+        if [ -z "$resolved" ]; then
+          echo "{\"tool_error\":\"run_suite_script\",\"reason\":\"script '$script_path' not found under skills/*/scripts/\"}"; return 0
+        fi
+      fi
+
+      # Must live under skills/*/scripts/ (deployed workspace layout)
+      if [[ "$resolved" != */skills/*/scripts/* ]]; then
+        echo '{"tool_error":"run_suite_script","reason":"path must be under skills/<skill>/scripts/"}'; return 0
+      fi
+
+      # Allowlist check on basename
+      local bname
+      bname=$(basename "$resolved")
+      case "$bname" in
+        encode-pipeline.sh|preprocess-*.sh|sync-state.sh|sync-core.sh|update-watermark.sh|update-state.sh|consolidate.sh|reflect.sh|summarize-pending.sh|log-event.sh|load-*.sh|analyze-day.sh|refine.sh) ;;
+        *) echo "{\"tool_error\":\"run_suite_script\",\"reason\":\"script '$bname' not in allowlist\"}"; return 0 ;;
+      esac
+
+      if [ ! -f "$resolved" ]; then
+        echo "{\"tool_error\":\"run_suite_script\",\"reason\":\"script not found: $bname\"}"; return 0
+      fi
+      if [ ! -x "$resolved" ]; then
+        echo "{\"tool_error\":\"run_suite_script\",\"reason\":\"script not executable: $bname\"}"; return 0
+      fi
+
+      # Build args array from JSON (safely: only alphanumeric, dashes, dots, slashes, equals, colons — no shell injection)
+      local -a script_args=()
+      local argval
+      while IFS= read -r argval; do
+        [[ -z "$argval" ]] && continue
+        # Validate: only safe characters (no spaces, no quotes, no shell metacharacters)
+        if [[ "$argval" =~ ^[A-Za-z0-9_./=:-]+$ ]]; then
+          script_args+=("$argval")
+        fi
+      done < <(printf '%s' "$args" | jq -r '.args[]? // empty' 2>/dev/null)
+
+      # Execute: capture output, return as JSON result
+      local output
+      output=$(WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}" bash "$resolved" "${script_args[@]}" 2>&1 | head -c 2000) || {
+        echo "{\"tool_error\":\"run_suite_script\",\"reason\":\"exit code $?\"}"
+        return 0
+      }
+      printf '{"result":%s}' "$(printf '%s' "$output" | jq -Rs . 2>/dev/null || echo '"output captured"')"
       ;;
     *)
       agent_tool_reject "$name" "unknown tool"

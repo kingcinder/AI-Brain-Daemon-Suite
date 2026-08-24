@@ -36,7 +36,7 @@ AGENT_ROOT="${AGENT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 TASK=""
 SESSION_ID=""
-MAX_STEPS=5
+MAX_STEPS=8
 OUT_CAP=1200
 TRANSCRIPT_CAP=8
 
@@ -182,6 +182,36 @@ while [ "$STEP" -lt "$MAX_STEPS" ]; do
   # ── Parse: strip fences, then require exactly one of tool | answer ───────
   CLEANED=$(printf '%s' "$RAW" | sed -e 's/^```json//' -e 's/^```//' -e 's/```$//')
   KIND=$(printf '%s' "$CLEANED" | jq -r 'if has("answer") then "answer" elif has("tool") then "tool" else "invalid" end' 2>/dev/null || echo "invalid")
+
+  # Fallback: if jq failed (e.g. trailing garbage like Cyrillic suffixes from
+  # the model), extract the first complete JSON object by bracket-matching.
+  if [ "$KIND" = "invalid" ]; then
+    # Find the first '{' and extract the balanced object after it.
+    FIRST_OBJ=$(printf '%s' "$CLEANED" | awk '
+      BEGIN { depth=0; in_obj=0; buf="" }
+      {
+        for (i=1; i<=length($0); i++) {
+          c = substr($0, i, 1)
+          if (!in_obj) {
+            if (c == "{") { in_obj=1; depth=1; buf=c }
+            continue
+          }
+          buf = buf c
+          if (c == "{") depth++
+          if (c == "}") {
+            depth--
+            if (depth == 0) { print buf; exit }
+          }
+        }
+      }
+    ')
+    if [ -n "$FIRST_OBJ" ]; then
+      KIND=$(printf '%s' "$FIRST_OBJ" | jq -r 'if has("answer") then "answer" elif has("tool") then "tool" else "invalid" end' 2>/dev/null || echo "invalid")
+      if [ "$KIND" != "invalid" ]; then
+        CLEANED="$FIRST_OBJ"
+      fi
+    fi
+  fi
 
   if [ "$KIND" = "answer" ]; then
     ANSWER=$(printf '%s' "$CLEANED" | jq -r '.answer // ""')

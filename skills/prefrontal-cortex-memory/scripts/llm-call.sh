@@ -34,7 +34,7 @@ set -u
 
 BASE_URL="${LLM_BASE_URL:-http://localhost:1234/v1}"
 MODEL="${LLM_MODEL:-local-model}"
-TIMEOUT="${LLM_TIMEOUT:-10}"
+TIMEOUT="${LLM_TIMEOUT:-30}"
 RETRIES="${LLM_RETRIES:-2}"
 SYSTEM_PROMPT=""
 USER_PROMPT=""
@@ -106,6 +106,12 @@ while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
     CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
     ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty' 2>/dev/null)
 
+    # Thinking models (Qwen, DeepSeek, etc.) may put the actual reply in
+    # reasoning_content and leave content empty — fall back to it.
+    if [ -z "$CONTENT" ]; then
+      CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.reasoning_content // empty' 2>/dev/null)
+    fi
+
     if [ -n "$CONTENT" ]; then
       printf '%s' "$CONTENT"
       rm -f /tmp/llm-call-err.$$
@@ -115,7 +121,7 @@ while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
     if [ -n "$ERROR_MSG" ]; then
       echo "⚠️  llm-call.sh: server returned an error: $ERROR_MSG" >&2
     else
-      echo "⚠️  llm-call.sh: response had no .choices[0].message.content (attempt $ATTEMPT/$MAX_ATTEMPTS)" >&2
+      echo "⚠️  llm-call.sh: response had no .choices[0].message.content or reasoning_content (attempt $ATTEMPT/$MAX_ATTEMPTS)" >&2
     fi
   else
     echo "⚠️  llm-call.sh: curl failed (exit $CURL_STATUS, attempt $ATTEMPT/$MAX_ATTEMPTS): $(cat /tmp/llm-call-err.$$ 2>/dev/null)" >&2
