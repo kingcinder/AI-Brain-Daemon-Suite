@@ -250,7 +250,12 @@ if ! flock -n 9; then
 fi
 
 # Back up the current state so a mid-deploy failure can be rolled back.
-if [ -d "$WS" ]; then
+# Gate on WS_PREEXISTED (captured BEFORE Step 1's mkdir -p below creates the
+# workspace): a fresh install must not back up its own just-created skeleton,
+# or the "previous workspace preserved" note would be a lie and uninstall
+# would later "restore" that skeleton (or a --refresh overwrite of it) as if
+# it were pre-existing state.
+if [ "$WS_PREEXISTED" -eq 1 ]; then
     rm -rf "$BK"
     cp -a "$WS" "$BK"
     BK_CREATED=1

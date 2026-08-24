@@ -198,8 +198,19 @@ if [ -d "$WS" ]; then
     if [ -f "$WS/deep-brain-kernel.py" ]; then
         mv "$WS" "$UN_BK"
         if [ -d "$BK" ]; then
-            mv "$BK" "$WS"
-            echo "  restored pre-install workspace from $BK"
+            if [ -f "$BK/deep-brain-kernel.py" ]; then
+                # The install-time backup is itself a suite deploy (a --refresh
+                # backup, or an older suite version backed up by a reinstall).
+                # Restoring it would leave the suite — or an orphaned older
+                # suite with no unit/Hermes entry — behind after uninstall.
+                # Uninstall means it's gone, so remove it instead of
+                # "restoring" the suite to itself.
+                rm -rf "$BK"
+                echo "  removed workspace (install backup was the suite itself — not restored)"
+            else
+                mv "$BK" "$WS"
+                echo "  restored pre-install workspace from $BK"
+            fi
         else
             echo "  removed workspace (no pre-install workspace to restore)"
         fi
