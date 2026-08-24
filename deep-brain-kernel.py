@@ -2182,6 +2182,12 @@ def main() -> None:
     import argparse
     parser = argparse.ArgumentParser(description="AI Brain Suite unified async scheduler")
     parser.add_argument("--check", action="store_true", help="Validate the job table and exit")
+    parser.add_argument("--check-runtime", action="store_true",
+                         help="Fail loudly if the daemon is using the .aibrain-runtime "
+                              "fallback directory instead of the real /run/user/<uid>/aibrain. "
+                              "Exit 0 when the correct XDG runtime dir is in use; exit 1 when "
+                              "the fallback is active (indicates no active systemd-logind session, "
+                              "which should never happen in a real --user service deployment).")
     parser.add_argument("--status", action="store_true",
                          help="Print per-job success/failure/consecutive-failure history from "
                               "the daemon state file and exit. Read-only — safe to run while the "
@@ -2244,6 +2250,21 @@ def main() -> None:
         else:
             print(f"\n❌ {problems} problem(s) found above.")
             sys.exit(1)
+
+    if args.check_runtime:
+        # RUNTIME_DIR was resolved at import time (lines 141-152).  The
+        # fallback (.aibrain-runtime inside WORKSPACE) activates only when
+        # /run/user/<uid> is missing or unwritable — which should never
+        # happen under a real systemd --user session.
+        fallback = WORKSPACE / ".aibrain-runtime"
+        if RUNTIME_DIR == fallback:
+            print(f"RUNTIME CHECK FAIL: using fallback {RUNTIME_DIR}", file=sys.stderr)
+            print("  The daemon should use /run/user/<uid>/aibrain under systemd --user.", file=sys.stderr)
+            print("  This fallback fires only outside a logind session (sandbox, manual run).", file=sys.stderr)
+            sys.exit(1)
+        else:
+            print(f"RUNTIME CHECK OK: {RUNTIME_DIR}")
+            sys.exit(0)
 
     if args.status:
         sys.exit(print_status())
