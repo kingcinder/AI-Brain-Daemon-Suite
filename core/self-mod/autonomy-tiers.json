@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0",
+  "description": "Phase 5: formalized trust tiers with measurable graduation criteria. Each tier defines what the system may do autonomously and what evidence is required to reach it.",
+  "tiers": {
+    "0": {
+      "name": "supervised",
+      "description": "All self-mod proposals require human approval. No auto-deploy, no sandbox execution.",
+      "allowed_actions": [
+        "proposal_generation",
+        "ranking",
+        "arbitration"
+      ],
+      "blocked_actions": [
+        "sandbox_evaluation",
+        "auto_deploy",
+        "auto_rollback"
+      ],
+      "graduation_criteria": {
+        "daemon_healthy_days": 7,
+        "verification_sweep_pass_rate": 0.9,
+        "zero_critical_rollbacks": true,
+        "note": "System must demonstrate basic health before any autonomous action."
+      }
+    },
+    "1": {
+      "name": "sandbox_explorer",
+      "description": "Auto-deploy to sandbox copy + auto-rollback on regression. Human consulted for production deploy.",
+      "allowed_actions": [
+        "proposal_generation",
+        "ranking",
+        "arbitration",
+        "sandbox_evaluation",
+        "auto_rollback"
+      ],
+      "blocked_actions": [
+        "auto_deploy_production"
+      ],
+      "graduation_criteria": {
+        "consecutive_clean_proposals": 10,
+        "zero_rollbacks_in_days": 14,
+        "verification_sweep_pass_rate": 0.95,
+        "daemon_healthy_days": 30,
+        "unhealthy_jobs_max": 0,
+        "note": "10 consecutive clean proposals with no rollbacks in 14 days."
+      }
+    },
+    "2": {
+      "name": "production_deployer",
+      "description": "Auto-deploy to production for narrowly-scoped skill categories with proven track record. Human consulted for architectural changes.",
+      "allowed_actions": [
+        "proposal_generation",
+        "ranking",
+        "arbitration",
+        "sandbox_evaluation",
+        "auto_rollback",
+        "auto_deploy_production"
+      ],
+      "blocked_actions": [
+        "immutable_core_modification",
+        "new_module_creation"
+      ],
+      "graduation_criteria": {
+        "consecutive_clean_proposals": 20,
+        "zero_rollbacks_in_days": 30,
+        "verification_sweep_pass_rate": 0.98,
+        "daemon_healthy_days": 60,
+        "unhealthy_jobs_max": 0,
+        "auto_rollbacks_in_window": 0,
+        "note": "20 consecutive clean proposals with no rollbacks in 30 days. Production deploy restricted to skills with proven calibration and zero recent failures."
+      }
+    },
+    "3": {
+      "name": "architect",
+      "description": "Full autonomy including architectural changes (new modules, multi-file patches). Reserved for mature, proven systems.",
+      "allowed_actions": [
+        "proposal_generation",
+        "ranking",
+        "arbitration",
+        "sandbox_evaluation",
+        "auto_rollback",
+        "auto_deploy_production",
+        "immutable_core_modification",
+        "new_module_creation"
+      ],
+      "blocked_actions": [],
+      "graduation_criteria": {
+        "consecutive_clean_proposals": 50,
+        "zero_rollbacks_in_days": 90,
+        "verification_sweep_pass_rate": 0.99,
+        "daemon_healthy_days": 180,
+        "unhealthy_jobs_max": 0,
+        "auto_rollbacks_in_window": 0,
+        "note": "50 consecutive clean proposals with no rollbacks in 90 days. Full trust earned through sustained, measurable performance."
+      }
+    }
+  },
+  "current_state_tracking": {
+    "state_file": "memory/self-mod/autonomy-tiers-state.json",
+    "fields": {
+      "current_tier": "integer 0-3",
+      "tier_achieved_at": "ISO timestamp",
+      "consecutive_clean": "integer",
+      "rollbacks_in_window": "integer",
+      "last_rollback_at": "ISO timestamp or null",
+      "verification_pass_rate": "float 0.0-1.0",
+      "daemon_healthy_days": "integer",
+      "graduation_evaluated_at": "ISO timestamp"
+    }
+  }
+}
