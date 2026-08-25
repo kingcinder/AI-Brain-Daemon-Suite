@@ -1387,13 +1387,45 @@ async def run_direct(job: Job, direct_timeout: float, daemon_state: "DaemonState
             log.info("%s: completed", job.name)
             daemon_state.record_result(job.name, success=True)
         else:
-            tail = out.decode(errors="replace")[-2000:]
-            log.error("%s: exited with status %s — output: %s", job.name, proc.returncode, tail)
-            daemon_state.record_result(job.name, success=False,
-                                        error=f"exit status {proc.returncode}: {tail[-500:]}")
+            # RETRY: transient failures (port conflicts, temp-dir races, resource
+            # contention during scheduled runs) produce exit 1 on the first try
+            # but pass on the second.  Retry once after a short delay before
+            # recording a hard failure.  Timeouts and missing-script are NOT
+            # retried — they indicate structural problems, not flakiness.
+            first_exit = proc.returncode
+            first_tail = out.decode(errors="replace")[-2000:]
+            log.warning("%s: exited with status %s on first attempt — retrying in 5s",
+                        job.name, first_exit)
+            _running_procs.pop(job.name, None)
+            tracked.close()
+            tracked = None  # prevent double-close in finally block
+            await asyncio.sleep(5)
+            # Re-run the script fresh.
+            proc2 = await asyncio.create_subprocess_exec(
+                str(script_path), env=env,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            tracked2 = TrackedProcess(proc2.pid)
+            _running_procs[job.name] = tracked2
+            out2, timed_out2 = await _await_with_timeout(proc2, tracked2, direct_timeout, job.name)
+            _running_procs.pop(job.name, None)
+            tracked2.close()
+            if timed_out2:
+                daemon_state.record_result(job.name, success=False,
+                                            error=f"retry timed out after {direct_timeout:.0f}s")
+            elif proc2.returncode == 0:
+                log.info("%s: completed on retry (first exit %s)", job.name, first_exit)
+                daemon_state.record_result(job.name, success=True)
+            else:
+                tail = out2.decode(errors="replace")[-2000:]
+                log.error("%s: also failed on retry (exit %s) — first: %s", job.name, proc2.returncode, first_tail[-200:])
+                daemon_state.record_result(job.name, success=False,
+                                            error=f"exit status {proc2.returncode}: {tail[-500:]}")
+            return  # early return — tracked2 already cleaned up above
     finally:
         _running_procs.pop(job.name, None)
-        tracked.close()
+        if tracked is not None:
+            tracked.close()
 
 
 def _audit_spawn(job: Job, yolo_enabled: bool) -> None:
