@@ -114,9 +114,9 @@ results.
 
 | Job | Kind | Days | Hour | Minute |
 |---|---|---|---|---|
-| `verification_pass` | direct | * | 7 | 56 |
+| `verification_pass` | direct | * | 7 | 39 |
 
-Minute 56 is unique in the table; hour 7 has no other job besides heartbeat's
+Minute 39 is unique in the table; hour 7 has no other job besides heartbeat's
 `:07`/`:37` beats, so the daily full-suite sweep never contends for resources.
 It is `direct` (no spawn lock, no inference). A red suite makes the script
 exit non-zero, which `--status` surfaces exactly like any other failing job —

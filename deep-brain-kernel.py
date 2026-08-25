@@ -1152,10 +1152,10 @@ JOBS: list[Job] = [
     # Verification region (proprioception): runs every test each module
     # declared in its capability-manifest.json (manifest-driven discovery in
     # verification-memory/scripts/run-declared-tests.sh). A red suite exits
-    # non-zero, so --status flags it like any failing job. Minute 56 unique.
-    # Direct / non-inference. Daily at 07:56 UTC — hour 7 has no other job
+    # non-zero, so --status flags it like any failing job. Minute 39 unique — no other job uses minute 39.
+    # Direct / non-inference. Daily at 07:39 UTC — hour 7 has no other job
     # besides heartbeat's :07/:37 beats, so this never contends for resources.
-    Job("verification_pass", "direct", "7", "56",
+    Job("verification_pass", "direct", "7", "39",
         "verification-memory/scripts/run-declared-tests.sh"),
     # Integrative State Layer (A): global neuromodulator vector + workspace of
     # attention, composed from every region's state (VTA drive, amygdala
