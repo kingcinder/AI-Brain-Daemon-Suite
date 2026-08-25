@@ -1965,13 +1965,17 @@ def print_brain_state() -> int:
     return 0
 
 
-def print_status() -> int:
+def print_status(job_detail: bool = False) -> int:
     """FIX #3: read-only health report — doesn't need the daemon running,
     doesn't need the lock, just reads DAEMON_STATE_FILE. Answers "which of
     my jobs have actually been failing" without grepping journalctl for the
     right minute. Returns the count of jobs at or above UNHEALTHY_STREAK
     consecutive failures, so this can double as a monitoring check
-    (`--status; [ $? -eq 0 ] || alert`)."""
+    (`--status; [ $? -eq 0 ] || alert`).
+
+    When *job_detail* is True, an extra column group is appended for spawn
+    jobs showing their per-job MAX_STEPS and thinking-model settings so the
+    operator can verify the budget at a glance."""
     # Deferral alert: the weekly self_mod_proposal_cycle defers (steward_mode
     # + full_review) instead of churning the pipeline — proposal-cycle-tick.sh
     # writes this marker so a steward who expected the cycle to run notices it
@@ -1999,7 +2003,10 @@ def print_status() -> int:
         return 0
 
     print(f"Last scheduler tick: {daemon_state.last_tick_utc}\n")
-    header = f"{'JOB':<24} {'LAST FIRED':<12} {'OK':>5} {'FAIL':>5} {'STREAK':>7}  LAST ERROR"
+    if job_detail:
+        header = f"{'JOB':<24} {'TYPE':<8} {'LAST FIRED':<12} {'OK':>5} {'FAIL':>5} {'STREAK':>7} {'STEPS':>6} {'THINK':>5}  LAST ERROR"
+    else:
+        header = f"{'JOB':<24} {'LAST FIRED':<12} {'OK':>5} {'FAIL':>5} {'STREAK':>7}  LAST ERROR"
     print(header)
     print("-" * len(header))
     unhealthy = 0
@@ -2013,8 +2020,15 @@ def print_status() -> int:
             flag = " ⚠ UNHEALTHY"
             unhealthy += 1
         last_error = (stats.get("last_error") or "")[:60]
-        print(f"{job.name:<24} {daemon_state.job_fired_key(job.name) or '—':<12} "
-              f"{stats.get('success', 0):>5} {stats.get('failure', 0):>5} {streak:>7}{flag}  {last_error}")
+        if job_detail:
+            steps = job.spawn_max_steps if job.kind == "spawn" else "—"
+            think = "yes" if job.thinking_model else "—"
+            print(f"{job.name:<24} {job.kind:<8} {daemon_state.job_fired_key(job.name) or '—':<12} "
+                  f"{stats.get('success', 0):>5} {stats.get('failure', 0):>5} {streak:>7}"
+                  f"{str(steps):>6} {think:>5}{flag}  {last_error}")
+        else:
+            print(f"{job.name:<24} {daemon_state.job_fired_key(job.name) or '—':<12} "
+                  f"{stats.get('success', 0):>5} {stats.get('failure', 0):>5} {streak:>7}{flag}  {last_error}")
     print()
     if unhealthy:
         print(f"⚠ {unhealthy} job(s) at or above {DaemonState.UNHEALTHY_STREAK} consecutive "
@@ -2226,6 +2240,10 @@ def main() -> None:
                               "daemon is active. Exit code is the number of jobs currently at or "
                               "above the unhealthy consecutive-failure threshold, so this can "
                               "double as a monitoring check.")
+    parser.add_argument("--job-detail", action="store_true",
+                         help="With --status, append per-spawn-job budget columns (MAX_STEPS, "
+                              "thinking model) so you can verify the per-job step budget and "
+                              "model-routing at a glance.")
     parser.add_argument("--brain", action="store_true",
                          help="Read-only cognitive dashboard: prints a single-page summary of "
                               "every brain region's current state (attention, goals, neuromod, "
@@ -2299,7 +2317,7 @@ def main() -> None:
             sys.exit(0)
 
     if args.status:
-        sys.exit(print_status())
+        sys.exit(print_status(job_detail=args.job_detail))
 
     if args.brain:
         sys.exit(print_brain_state())
