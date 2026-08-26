@@ -10,7 +10,6 @@
 
 set -euo pipefail
 
-SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 LIMIT=10
 JSON=0
@@ -26,7 +25,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 DEPLOY_DIR="$WORKSPACE/memory/self-mod/deploys"
-LESSONS_FILE="$WORKSPACE/memory/self-mod/rollback-lessons.json"
 
 # Collect rollback records (most recent first)
 ROLLBACKS=()
@@ -93,7 +91,6 @@ MODULE_COUNTS=$(echo "$LESSONS" | jq -c '
 ' 2>/dev/null || echo '[]')
 
 # Build the lessons text for LLM injection
-LESSONS_TEXT=""
 if [ "$JSON" -eq 1 ]; then
   jq -nc \
     --argjson lessons "$LESSONS" \

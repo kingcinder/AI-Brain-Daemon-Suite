@@ -70,10 +70,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies (jq)
+      - name: Install dependencies (jq, shellcheck)
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq
+          sudo apt-get install -y jq shellcheck
 
       - name: Validate capability manifests (schema + registry rules)
         run: bash core/schema/validate-manifest.sh --all
@@ -98,6 +98,25 @@ jobs:
           # writes verification-state.json, the report ledger, and a dashboard.
           WORKSPACE: ${{ runner.temp }}/verification-workspace
         run: bash skills/verification-memory/scripts/run-declared-tests.sh --quiet
+
+      - name: Static analysis — shellcheck on the core surface
+        # Mirrors ci-gate.sh step 5/5. shellcheck is installed in the
+        # dependency step above, so on CI this is a hard gate (unlike the
+        # local gate, which skips gracefully when shellcheck is absent).
+        run: |
+          failures=0
+          while IFS= read -r -d "" f; do
+            out=$(shellcheck -S warning "$f" 2>/dev/null || true)
+            if [ -n "$out" ]; then
+              echo "$out"
+              failures=$((failures + 1))
+            fi
+          done < <(find core scripts -name "*.sh" -print0; find skills -path "*/scripts/*.sh" -print0; printf "%s\0" install.sh uninstall.sh)
+          if [ "$failures" -gt 0 ]; then
+            echo "shellcheck: $failures file(s) with findings" >&2
+            exit 1
+          fi
+          echo "shellcheck: core surface clean"
 
       # Weekly only (the '47 4 * * 1' schedule entry — github.event.schedule
       # carries the cron that fired). Every other trigger skips this step

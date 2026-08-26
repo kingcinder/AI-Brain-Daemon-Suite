@@ -15,7 +15,6 @@
 set -euo pipefail
 
 CORE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REPO_ROOT="$(cd "$CORE_ROOT/.." && pwd)"
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SNAPSHOT_SH="$CORE_ROOT/snapshot/snapshot.sh"
 PROV_SH="$CORE_ROOT/provenance/log-provenance.sh"

@@ -63,7 +63,17 @@ FRAGMENTS_DIR = os.path.join(WORKSPACE, "memory", "dashboard-fragments")
 # Regenerate is a mutation, so it requires a per-server-session token that is
 # injected into the served page. A cross-origin form POST cannot set the
 # X-Dashboard-Token header, which gates the endpoint to the dashboard itself.
+#
+# Defense-in-depth: the token is ALSO set as an HttpOnly + SameSite=Strict
+# cookie on every response. HttpOnly keeps it out of document.cookie (an XSS
+# that can read cookies cannot steal it); SameSite=Strict prevents a
+# cross-site request from carrying it (CSRF). The endpoint accepts the token
+# from the header (the dashboard's own JS, which reads window.__DASH_TOKEN)
+# OR the cookie (any same-origin client, incl. a plain fetch that lets the
+# browser attach the cookie).
 TOKEN = secrets.token_hex(16)
+AUTH_COOKIE_NAME = "aibrain_dash_token"
+AUTH_COOKIE = f"{AUTH_COOKIE_NAME}={TOKEN}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400"
 
 # The dashboard is self-contained (fragments are inlined at build time), so
 # only browser-renderable assets are ever served statically. Everything else
@@ -103,6 +113,28 @@ class Handler(SimpleHTTPRequestHandler):
         sys.stderr.write("[dashboard-server] %s\n" % (fmt % args))
 
     # ── helpers ─────────────────────────────────────────────────────────
+    def _auth_ok(self):
+        """Token present in the X-Dashboard-Token header OR the auth cookie.
+        Both carry the same per-session secret; either channel authorizes.
+
+        OR is correct here (not AND, not cookie-only): each channel is
+        independently CSRF-resistant. A cross-origin request cannot set the
+        custom X-Dashboard-Token header (custom headers trigger CORS
+        preflight, which this loopback server never answers), and the cookie
+        is SameSite=Strict + HttpOnly (a cross-site request won't carry it,
+        and document.cookie can't read it). Requiring both would add nothing
+        and would break non-browser clients (curl) that only have one.
+        Comparisons are timing-safe."""
+        header = self.headers.get("X-Dashboard-Token")
+        if header is not None and secrets.compare_digest(header, TOKEN):
+            return True
+        cookie = self.headers.get("Cookie", "")
+        for part in cookie.split(";"):
+            part = part.strip()
+            if part.startswith(AUTH_COOKIE_NAME + "="):
+                if secrets.compare_digest(part[len(AUTH_COOKIE_NAME) + 1:], TOKEN):
+                    return True
+        return False
     def _dashboard_mtime_ns(self):
         try:
             return os.stat(DASHBOARD).st_mtime_ns
@@ -114,6 +146,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Set-Cookie", AUTH_COOKIE)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -366,6 +399,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
+        self.send_header("Set-Cookie", AUTH_COOKIE)
         self.send_header("Content-Length", str(len(html)))
         self.end_headers()
         self.wfile.write(html)
@@ -394,7 +428,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         path = self.path.split("?")[0].rstrip("/") or "/"
         if path == "/__regenerate":
-            if self.headers.get("X-Dashboard-Token") != TOKEN:
+            if not self._auth_ok():
                 self._send_json({"error": "forbidden — token required"}, status=403)
                 return
             self._send_json(self._regenerate())

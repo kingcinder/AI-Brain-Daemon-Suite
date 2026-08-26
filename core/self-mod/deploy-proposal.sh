@@ -41,10 +41,11 @@ LOCK_DIR="${LOCK_DIR:-$WORKSPACE/memory/locks/self-mod-deploy}"
 # shellcheck source=/dev/null
 source "$ROOT/core/locks/rwlock.sh"
 
-# Target guard
-bash "$SELF_DIR/check-target.sh" --suite-root "$SUITE_ROOT" --proposal "$PROPOSAL" >/tmp/deploy_check_$$.json \
-  || { echo "deploy: target check failed"; cat /tmp/deploy_check_$$.json; rm -f /tmp/deploy_check_$$.json; exit 1; }
-rm -f /tmp/deploy_check_$$.json
+# Target guard — mktemp file (never a predictable /tmp/name.$$ path)
+DEPLOY_CHECK=$(mktemp "${TMPDIR:-/tmp}/aibrain-deploy-check.XXXXXX")
+bash "$SELF_DIR/check-target.sh" --suite-root "$SUITE_ROOT" --proposal "$PROPOSAL" >"$DEPLOY_CHECK" \
+  || { echo "deploy: target check failed"; cat "$DEPLOY_CHECK"; rm -f "$DEPLOY_CHECK"; exit 1; }
+rm -f "$DEPLOY_CHECK"
 
 # Optional re-eval unless skip
 if [ "$SKIP_EVAL" -eq 0 ]; then

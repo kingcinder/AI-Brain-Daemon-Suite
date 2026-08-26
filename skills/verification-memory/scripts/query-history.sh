@@ -28,7 +28,6 @@
 
 set -u
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 REPORT_LOG="$WORKSPACE/memory/verification-report.jsonl"
 

@@ -65,6 +65,7 @@ UN_UNIT="$UNIT_FILE.bak-aibrain-uninstall"              # installed unit, moved 
 HERMES_CONFIG="$HOME/.hermes/config.yaml"
 CFG_BK="$HERMES_CONFIG.bak-aibrain-install"             # pre-merge config (installer)
 UN_CFG="$HERMES_CONFIG.bak-aibrain-uninstall"           # pre-uninstall config, copied aside here
+# shellcheck disable=SC2088  # literal config-entry string; tilde must NOT expand
 EXT_DIR="~/.hermes/workspace/skills"                    # the exact entry install.sh writes
 
 ROLLED_BACK=0

@@ -63,12 +63,14 @@ DATA_JSON=$(jq -n --argjson drive "$DRIVE" --argjson seeking "$SEEKING" --argjso
   --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" \
   '{installed: true, drive: $drive, seeking: $seeking, anticipating: $anticipating, recentRewards: $recentRewards, recentRPE: $recentRPE, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-echo "$HTML" > /tmp/vta_frag_html.$$
-echo "$SCRIPT" > /tmp/vta_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "vta" --argjson order 30 --arg label "Drive" --arg icon "⭐" \
-  --rawfile html /tmp/vta_frag_html.$$ --rawfile script /tmp/vta_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/vta.json"
-rm -f /tmp/vta_frag_html.$$ /tmp/vta_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus vta

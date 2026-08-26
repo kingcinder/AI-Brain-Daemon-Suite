@@ -69,7 +69,8 @@ if [ -z "$USER_PROMPT" ]; then
 fi
 
 REQUEST_FILE=$(mktemp)
-trap 'rm -f "$REQUEST_FILE"' EXIT
+CURL_ERR=$(mktemp "${TMPDIR:-/tmp}/llm-call-err.XXXXXX")
+trap 'rm -f "$REQUEST_FILE" "$CURL_ERR"' EXIT
 
 export LC_SYS="$SYSTEM_PROMPT"
 export LC_USER="$USER_PROMPT"
@@ -99,7 +100,7 @@ while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
   RESPONSE=$(curl -s -S --max-time "$TIMEOUT" \
     -X POST "$BASE_URL/chat/completions" \
     -H "Content-Type: application/json" \
-    -d @"$REQUEST_FILE" 2>/tmp/llm-call-err.$$)
+    -d @"$REQUEST_FILE" 2>"$CURL_ERR")
   CURL_STATUS=$?
 
   if [ "$CURL_STATUS" -eq 0 ] && [ -n "$RESPONSE" ]; then
@@ -114,7 +115,6 @@ while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
 
     if [ -n "$CONTENT" ]; then
       printf '%s' "$CONTENT"
-      rm -f /tmp/llm-call-err.$$
       exit 0
     fi
 
@@ -124,10 +124,9 @@ while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
       echo "⚠️  llm-call.sh: response had no .choices[0].message.content or reasoning_content (attempt $ATTEMPT/$MAX_ATTEMPTS)" >&2
     fi
   else
-    echo "⚠️  llm-call.sh: curl failed (exit $CURL_STATUS, attempt $ATTEMPT/$MAX_ATTEMPTS): $(cat /tmp/llm-call-err.$$ 2>/dev/null)" >&2
+    echo "⚠️  llm-call.sh: curl failed (exit $CURL_STATUS, attempt $ATTEMPT/$MAX_ATTEMPTS): $(cat "$CURL_ERR" 2>/dev/null)" >&2
   fi
 
-  rm -f /tmp/llm-call-err.$$
   [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ] && sleep 1
 done
 

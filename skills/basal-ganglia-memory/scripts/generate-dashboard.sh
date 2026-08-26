@@ -71,12 +71,14 @@ DATA_JSON=$(jq -n --argjson chunkedCount "$CHUNKED_COUNT" --argjson habitCount "
   --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" \
   '{installed: true, chunkedCount: $chunkedCount, habitCount: $habitCount, procedureCount: $procedureCount, suppressionCount: $suppressionCount, habitBars: $habitBars, procedures: $procedures, suppressions: $suppressions, gatedSelections: $gatedSelections, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-echo "$HTML" > /tmp/basal_frag_html.$$
-echo "$SCRIPT" > /tmp/basal_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "basal" --argjson order 40 --arg label "Habits" --arg icon "🎯" \
-  --rawfile html /tmp/basal_frag_html.$$ --rawfile script /tmp/basal_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/basal.json"
-rm -f /tmp/basal_frag_html.$$ /tmp/basal_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus basal

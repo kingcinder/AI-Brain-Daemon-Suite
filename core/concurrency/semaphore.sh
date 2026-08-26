@@ -41,6 +41,18 @@ semaphore_acquire_inference() {
     exec 230>&-
     return 1
   fi
+  # Crash-drift reconciliation: a holder that died without running release
+  # (kill -9, OOM, reboot) leaves contexts.count permanently inflated, so the
+  # budget eventually blocks all inference. We hold the flock now, so if the
+  # recorded previous holder is no longer alive its count is stale — reset it.
+  local prev_holder=""
+  if [ -f "$dir/holder.pid" ]; then
+    prev_holder=$(cat "$dir/holder.pid" 2>/dev/null || true)
+  fi
+  if [ -n "$prev_holder" ] && ! kill -0 "$prev_holder" 2>/dev/null; then
+    echo "semaphore: stale holder pid $prev_holder (crashed?) — resetting contexts.count" >&2
+    rm -f "$dir/contexts.count"
+  fi
   echo $$ > "$dir/holder.pid"
   date +%s > "$dir/holder.since"
   echo "inference" > "$dir/holder.kind"
@@ -52,6 +64,7 @@ semaphore_acquire_inference() {
   contexts=$((contexts + 1))
   if [ "$contexts" -gt "$MAX_TOTAL_CONTEXTS" ]; then
     echo "semaphore: total contexts would exceed $MAX_TOTAL_CONTEXTS" >&2
+    rm -f "$dir/holder.pid" "$dir/holder.since" "$dir/holder.kind"
     exec 230>&-
     return 1
   fi

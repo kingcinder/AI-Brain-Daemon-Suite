@@ -42,7 +42,6 @@ mkdir -p "$WORKSPACE/memory/executive"
 PENDING_REFLECTION="$WORKSPACE/memory/.pending-reflection"
 if [ -f "$PENDING_REFLECTION" ]; then
     echo "executive-cycle: hippocampus consolidation detected — triggering targeted reflection..."
-    REFLECT_EXTRA="$WORKSPACE/memory/user $WORKSPACE/memory/self $WORKSPACE/memory/relationship $WORKSPACE/memory/world"
     # Run a reflection with extra context: pass consolidated memory dirs as
     # additional snapshot sources. isolate-reflect.sh is read-only, so this
     # just enriches its signal set — no mutation risk.

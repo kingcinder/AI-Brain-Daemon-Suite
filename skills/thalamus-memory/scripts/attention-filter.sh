@@ -11,13 +11,9 @@
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Source the scoring function from gate.sh to avoid code duplication
-# Gate.sh's _score_signal() is the canonical implementation
-GATE_SCRIPT="$SCRIPT_DIR/gate.sh"
-
-# Re-implement _score_signal in the same way (keeps this script standalone
+# The scoring semantics mirror gate.sh's _score_signal() (the canonical
+# implementation) — re-implemented here to keep this script standalone
 # while maintaining identical semantics to gate.sh)
 PFC_STATE="$WORKSPACE/memory/pfc-state.json"
 EXEC_LOAD="$WORKSPACE/memory/executive-load.json"

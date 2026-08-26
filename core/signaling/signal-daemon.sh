@@ -25,7 +25,6 @@ DISPATCHER_CHECKPOINT="$CHECKPOINT_DIR/signal-daemon"
 mkdir -p "$CHECKPOINT_DIR"
 
 process_signals() {
-    local subscriber="signal-daemon"
     local thalamus_gate="$WORKSPACE/skills/thalamus-memory/scripts/gate.sh"
 
     # Read new signals since last checkpoint
@@ -54,12 +53,10 @@ process_signals() {
             echo "$line" | "$thalamus_gate" --stdin 2>/dev/null || true
         else
             # Direct dispatch fallback: consult the routing table
-            local source signal_type signal_name intensity payload
+            local source signal_name intensity
             source=$(echo "$line" | jq -r '.source // empty' 2>/dev/null || true)
-            signal_type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null || true)
             signal_name=$(echo "$line" | jq -r '.signal // empty' 2>/dev/null || true)
             intensity=$(echo "$line" | jq -r '.intensity // "0.5"' 2>/dev/null || echo "0.5")
-            payload=$(echo "$line" | jq -r '.payload // {}' 2>/dev/null || echo "{}")
 
             [[ -z "$source" || -z "$signal_name" ]] && continue
 

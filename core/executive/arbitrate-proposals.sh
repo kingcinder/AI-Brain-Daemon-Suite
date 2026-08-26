@@ -17,7 +17,6 @@ set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SELF_DIR/../.." && pwd)"
-SUITE_ROOT="$ROOT"
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 PROP_DIR="$WORKSPACE/memory/self-mod/proposals"
 TOP_K=""
@@ -25,7 +24,7 @@ TOP_K=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --workspace) WORKSPACE="$2"; shift 2 ;;
-    --suite-root) SUITE_ROOT="$2"; shift 2 ;;
+    --suite-root) shift 2 ;;  # accepted for CLI compat; suite root is derived from SELF_DIR
     --proposals-dir) PROP_DIR="$2"; shift 2 ;;
     --top-k) TOP_K="$2"; shift 2 ;;
     *) shift ;;

@@ -78,12 +78,14 @@ DATA_JSON=$(jq -n --argjson total "$TOTAL" --argjson amplified "$AMPLIFIED" --ar
     '{installed: true, total: $total, amplified: $amplified, passed: $passed, attenuated: $attenuated, suppressed: $suppressed, dispatched: $dispatched, pending: $pending, sensitivity: $sensitivity, lastGate: $lastGate, focus: $focus}' \
     2>/dev/null) || DATA_JSON='{"installed": true}'
 
-echo "$HTML" > /tmp/th_frag_html.$$
-echo "$SCRIPT" > /tmp/th_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "thalamus" --argjson order 80 --arg label "Thalamus" --arg icon "🚦" \
-  --rawfile html /tmp/th_frag_html.$$ --rawfile script /tmp/th_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/thalamus.json"
-rm -f /tmp/th_frag_html.$$ /tmp/th_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus thalamus

@@ -59,14 +59,16 @@ mapfile -t PATHS < <(
 RANKED_JSON="[]"
 for f in "${PATHS[@]:-}"; do
   [ -f "$f" ] || continue
-  # Reject illegal targets before ranking expense
-  if ! bash "$CHECK" --suite-root "$SUITE_ROOT" --proposal "$f" >/tmp/check_$$.json 2>/dev/null; then
+  # Reject illegal targets before ranking expense — mktemp file (never a
+  # predictable /tmp/name.$$ path)
+  CK_FILE=$(mktemp "${TMPDIR:-/tmp}/aibrain-rank-check.XXXXXX")
+  if ! bash "$CHECK" --suite-root "$SUITE_ROOT" --proposal "$f" >"$CK_FILE" 2>/dev/null; then
     # mark rejected in store if managed
     pid=$(jq -r .proposal_id "$f")
     if [ -f "$WORKSPACE/memory/self-mod/proposals/${pid}.json" ]; then
       WORKSPACE="$WORKSPACE" bash "$STORE_SH" set-status --id "$pid" --status rejected >/dev/null || true
       # annotate reason
-      python3 - "$f" /tmp/check_$$.json <<'PY'
+      python3 - "$f" "$CK_FILE" <<'PY'
 import json,sys
 from pathlib import Path
 p=Path(sys.argv[1]); c=json.loads(Path(sys.argv[2]).read_text())
@@ -74,10 +76,10 @@ d=json.loads(p.read_text()); d["status"]="rejected"; d["reject_reason"]=c.get("r
 p.write_text(json.dumps(d,indent=2,sort_keys=True)+"\n")
 PY
     fi
-    rm -f /tmp/check_$$.json
+    rm -f "$CK_FILE"
     continue
   fi
-  rm -f /tmp/check_$$.json
+  rm -f "$CK_FILE"
 
   # Estimate components
   read -r TS RC ER RP < <(python3 - "$f" <<'PY'

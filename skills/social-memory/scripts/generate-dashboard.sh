@@ -67,12 +67,14 @@ DATA_JSON=$(jq -n --argjson relationships "$TOP_RELATIONSHIPS" --argjson openLoo
   --arg lastUpdated "$(jq -r '.lastUpdated // "never"' "$STATE_FILE")" --arg lastConsultedAt "$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")" \
   '{installed: true, relationships: $relationships, openLoops: $openLoops, recentSPE: $recentSPE, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-echo "$HTML" > /tmp/social_frag_html.$$
-echo "$SCRIPT" > /tmp/social_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "social" --argjson order 85 --arg label "Social" --arg icon "🫂" \
-  --rawfile html /tmp/social_frag_html.$$ --rawfile script /tmp/social_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/social.json"
-rm -f /tmp/social_frag_html.$$ /tmp/social_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus social

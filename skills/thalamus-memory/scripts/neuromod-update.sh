@@ -117,10 +117,8 @@ pull() {
 REWARD_AGE=$(read_age "$MEM/reward-state.json")
 EMOTION_AGE=$(read_age "$MEM/emotional-state.json")
 CONFLICT_AGE=$(read_age "$MEM/conflict-state.json")
-INS_AGE=$(read_age "$MEM/interoceptive-state.json")
 SOCIAL_AGE=$(read_age "$MEM/social-state.json")
 BEAT_AGE=$(read_age "$MEM/heartbeat-state.json")
-THAL_AGE=$(read_age "$MEM/thalamus-state.json")
 
 [ -n "$REWARD_AGE" ]  && (( $(echo "$REWARD_AGE > 24" | bc -l 2>/dev/null || echo 0) )) && DOPAMINE=$(pull "$DOPAMINE" 0.5)
 [ -n "$EMOTION_AGE" ] && (( $(echo "$EMOTION_AGE > 24" | bc -l 2>/dev/null || echo 0) )) && NORADRENALINE=$(pull "$NORADRENALINE" 0.5) && SEROTONIN=$(pull "$SEROTONIN" 0.5)

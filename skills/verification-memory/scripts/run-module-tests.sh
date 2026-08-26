@@ -20,7 +20,6 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SUITE_ROOT="${SUITE_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
-STATE_FILE="$WORKSPACE/memory/verification-state.json"
 COOLDOWN_FILE="$WORKSPACE/memory/.verification-cooldowns"
 
 MODULE=""

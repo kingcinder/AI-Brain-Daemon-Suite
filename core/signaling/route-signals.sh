@@ -14,7 +14,6 @@
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
-SKILLS_DIR="${WORKSPACE}/skills"
 
 # ── Routing Table ───────────────────────────────────────────────────────
 # Format: source_module | source_signal | target_module | target_script | arg_template

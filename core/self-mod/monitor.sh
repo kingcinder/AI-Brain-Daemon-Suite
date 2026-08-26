@@ -51,7 +51,6 @@ for rec in "$DEPLOY_DIR"/*.json; do
   [ "$MON" = "active" ] || continue
 
   CHECKED=$((CHECKED + 1))
-  PID=$(jq -r .proposal_id "$rec")
 
   BREACH=$(python3 - "$THRESH" "$LIVE" "$rec" <<'PY'
 import json,sys

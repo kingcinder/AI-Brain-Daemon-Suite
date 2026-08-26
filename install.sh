@@ -418,6 +418,7 @@ echo "--- Step 5.6: Registering suite skills with Hermes Agent (Option B) ---"
 # config before the first merge.
 if command -v hermes >/dev/null 2>&1; then
     HERMES_CONFIG="$HOME/.hermes/config.yaml"
+    # shellcheck disable=SC2088  # literal config-entry string; tilde must NOT expand
     EXT_DIR="~/.hermes/workspace/skills"
     if [ -f "$HERMES_CONFIG" ]; then
         # `if RESULT=$(...)` instead of a bare assignment: under set -e a
@@ -536,6 +537,7 @@ fi
 # branch and the install path below both use it).
 
 if systemd_available; then
+    # shellcheck disable=SC2034  # documents the systemd-integration outcome
     SYSTEMD_OK=1
     echo "--- Step 6: Systemd Integration ---"
     systemctl --user daemon-reload

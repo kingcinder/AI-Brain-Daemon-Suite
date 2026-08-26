@@ -34,14 +34,15 @@ for INSTALLER in "$SKILLS_DIR"/*/install.sh; do
   SKILL_NAME=$(basename "$(dirname "$INSTALLER")")
   # Run with the deployed workspace. Each installer is non-interactive in
   # init mode (they only create state files / chmod scripts).
-  if WORKSPACE="$WS" bash "$INSTALLER" >/tmp/skill-init-$$.log 2>&1; then
+  INIT_LOG=$(mktemp "${TMPDIR:-/tmp}/aibrain-skill-init.XXXXXX")
+  if WORKSPACE="$WS" bash "$INSTALLER" >"$INIT_LOG" 2>&1; then
     OK=$((OK+1))
   else
-    echo "  WARN: $SKILL_NAME install.sh failed (see /tmp/skill-init-$$.log)" >&2
+    echo "  WARN: $SKILL_NAME install.sh failed (see $INIT_LOG)" >&2
     FAILED=$((FAILED+1))
   fi
+  rm -f "$INIT_LOG"
 done
 
-rm -f /tmp/skill-init-$$.log
 echo "--- Per-skill init: $OK ok, $FAILED failed, $SKIPPED skipped (no installer) ---"
 [ "$FAILED" -eq 0 ] && exit 0 || exit 1

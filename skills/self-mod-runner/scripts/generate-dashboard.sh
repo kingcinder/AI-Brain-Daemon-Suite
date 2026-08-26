@@ -161,12 +161,14 @@ DATA_JSON=$(jq -n --argjson taskSuccess "$TASK_SUCCESS" --argjson latency "$LATE
     '{installed: true, taskSuccess: $taskSuccess, latency: $latency, kv: $kv, streak: $streak, streakTarget: $streakTarget, lastEvent: $lastEvent, reviewMode: $reviewMode, lastUpdated: $lastUpdated, proposals: $proposals, deploys: $deploys, runs: $runs, provenanceEvents: $provenanceEvents}' \
     2>/dev/null) || DATA_JSON='{"installed": true, "provenanceEvents": []}'
 
-echo "$HTML" > /tmp/sm_frag_html.$$
-echo "$SCRIPT" > /tmp/sm_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "self_mod" --argjson order 55 --arg label "Self-Mod" --arg icon "🛠️" \
-  --rawfile html /tmp/sm_frag_html.$$ --rawfile script /tmp/sm_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/self_mod.json"
-rm -f /tmp/sm_frag_html.$$ /tmp/sm_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus self_mod

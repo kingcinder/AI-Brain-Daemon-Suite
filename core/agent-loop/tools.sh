@@ -20,6 +20,9 @@
 
 set -euo pipefail
 
+# Documented allowlist of tools the agent loop may expose (consumed by
+# callers/evals via this constant; shellcheck can't see the cross-file use).
+# shellcheck disable=SC2034
 AGENT_TOOL_NAMES="get_goals get_lessons get_conflict_state get_heartbeat get_verification_report list_memory_state record_goal_outcome run_suite_script read_working_memory write_working_memory get_metacognition get_emotional_state get_social_context"
 
 agent_tool_descriptions() {

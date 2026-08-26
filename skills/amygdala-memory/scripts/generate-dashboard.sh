@@ -67,12 +67,14 @@ DATA_JSON=$(jq -n --argjson dimensions "$DIMS" --argjson recentEmotions "$RECENT
   --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" \
   '{installed: true, dimensions: $dimensions, recentEmotions: $recentEmotions, salienceTags: $salienceTags, lastSalience: $lastSalience, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-echo "$HTML" > /tmp/amy_frag_html.$$
-echo "$SCRIPT" > /tmp/amy_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "amygdala" --argjson order 20 --arg label "Emotions" --arg icon "🎭" \
-  --rawfile html /tmp/amy_frag_html.$$ --rawfile script /tmp/amy_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/amygdala.json"
-rm -f /tmp/amy_frag_html.$$ /tmp/amy_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus amygdala

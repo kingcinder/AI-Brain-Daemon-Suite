@@ -91,12 +91,14 @@ DATA_JSON=$(jq -n --argjson conflictLoad "$LOAD" --argjson activeCount "$ACTIVE_
   --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" \
   '{installed: true, conflictLoad: $conflictLoad, activeCount: $activeCount, attentionFlags: $attentionFlags, conflicts: $conflicts, calibration: $calibration, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-echo "$HTML" > /tmp/accc_frag_html.$$
-echo "$SCRIPT" > /tmp/accc_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "acc_conflict" --argjson order 60 --arg label "Conflicts" --arg icon "⚡" \
-  --rawfile html /tmp/accc_frag_html.$$ --rawfile script /tmp/accc_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/acc_conflict.json"
-rm -f /tmp/accc_frag_html.$$ /tmp/accc_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus acc_conflict

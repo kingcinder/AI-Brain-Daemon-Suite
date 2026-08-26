@@ -47,7 +47,6 @@ TOP_K=""
 PROPOSAL=""
 PROP_DIR=""
 NO_DEPLOY=0
-DRY=0
 GENERATE_LLM=0
 AUTONOMY_GATE=0
 DEFER_GATE=0
@@ -62,7 +61,7 @@ while [[ $# -gt 0 ]]; do
     --proposal) PROPOSAL="$2"; shift 2 ;;
     --proposals-dir) PROP_DIR="$2"; shift 2 ;;
     --no-deploy) NO_DEPLOY=1; shift ;;
-    --dry-run) DRY=1; NO_DEPLOY=1; shift ;;
+    --dry-run) NO_DEPLOY=1; shift ;;
     --generate-llm) GENERATE_LLM=1; shift ;;
     --autonomy-gate) AUTONOMY_GATE=1; shift ;;
     --defer-gate) DEFER_GATE=1; shift ;;
@@ -133,10 +132,10 @@ if [ "$GENERATE_LLM" -eq 1 ]; then
   [ -n "$LLM_MODULE" ] && GEN_ARGS+=(--module "$LLM_MODULE")
   [ -n "$LLM_PROVIDER" ] && GEN_ARGS+=(--provider "$LLM_PROVIDER")
   echo "pipeline: generating LLM proposal..." >&2
-  GEN_OUT=$(bash "$SELF_DIR/generate-proposals-llm.sh" "${GEN_ARGS[@]}" 2>"$WORKSPACE/memory/self-mod/llm-generate.err") || {
+  if ! bash "$SELF_DIR/generate-proposals-llm.sh" "${GEN_ARGS[@]}" 2>"$WORKSPACE/memory/self-mod/llm-generate.err"; then
     echo "pipeline: LLM generation failed — see memory/self-mod/llm-generate.err" >&2
     # Continue only if store already has queued proposals
-  }
+  fi
   if [ -f "$WORKSPACE/memory/self-mod/last-llm-proposal.json" ]; then
     PROPOSAL="${PROPOSAL:-$WORKSPACE/memory/self-mod/last-llm-proposal.json}"
   fi

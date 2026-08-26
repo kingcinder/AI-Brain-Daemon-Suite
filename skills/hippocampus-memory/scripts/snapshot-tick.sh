@@ -87,10 +87,15 @@ printf '%s\n' "$(printf '%s' "$SNAP_OUT" | jq -c '{snapshot_id, created_at, file
 
 # ── 4. Prune to the most recent KEEP snapshots (non-fatal) ─────────────────
 if [ "${KEEP:-14}" -gt 0 ]; then
-    OLD=$(ls -1t "$SNAP_ROOT" 2>/dev/null | grep -v '^index.jsonl$' | grep -v '^last-known-good$' | tail -n +$((KEEP + 1)))
+    # Newest-first mtime listing (find -printf, not ls|grep): names that are
+    # not the ledger / not the last-known-good marker, skipping the newest
+    # KEEP entries to find the stale ones to prune.
+    OLD=$(find "$SNAP_ROOT" -mindepth 1 -maxdepth 1 \
+        ! -name 'index.jsonl' ! -name 'last-known-good' \
+        -printf '%T@ %f\n' 2>/dev/null | sort -rn | tail -n +$((KEEP + 1)) | cut -d' ' -f2-)
     if [ -n "$OLD" ]; then
         for d in $OLD; do
-            rm -rf "$SNAP_ROOT/$d" 2>/dev/null || true
+            rm -rf -- "${SNAP_ROOT:?}/$d" 2>/dev/null || true
         done
     fi
 fi

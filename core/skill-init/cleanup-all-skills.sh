@@ -32,14 +32,15 @@ SKIPPED=0
 for INSTALLER in "$SKILLS_DIR"/*/install.sh; do
   [ -x "$INSTALLER" ] || { SKIPPED=$((SKIPPED+1)); continue; }
   SKILL_NAME=$(basename "$(dirname "$INSTALLER")")
-  if WORKSPACE="$WS" bash "$INSTALLER" --uninstall $YES >/tmp/skill-cleanup-$$.log 2>&1; then
+  CLEAN_LOG=$(mktemp "${TMPDIR:-/tmp}/aibrain-skill-cleanup.XXXXXX")
+  if WORKSPACE="$WS" bash "$INSTALLER" --uninstall $YES >"$CLEAN_LOG" 2>&1; then
     OK=$((OK+1))
   else
-    echo "  WARN: $SKILL_NAME --uninstall failed (see /tmp/skill-cleanup-$$.log)" >&2
+    echo "  WARN: $SKILL_NAME --uninstall failed (see $CLEAN_LOG)" >&2
     FAILED=$((FAILED+1))
   fi
+  rm -f "$CLEAN_LOG"
 done
 
-rm -f /tmp/skill-cleanup-$$.log
 echo "--- Per-skill cleanup: $OK ok, $FAILED failed, $SKIPPED skipped (no installer) ---"
 [ "$FAILED" -eq 0 ] && exit 0 || exit 1

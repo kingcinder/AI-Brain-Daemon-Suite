@@ -79,12 +79,14 @@ DATA_JSON=$(jq -n --argjson activeCount "$ACTIVE_COUNT" --argjson resolvedCount 
   --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" \
   '{installed: true, activeCount: $activeCount, resolvedCount: $resolvedCount, patterns: $patterns, calibration: $calibration, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-echo "$HTML" > /tmp/acce_frag_html.$$
-echo "$SCRIPT" > /tmp/acce_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "acc_error" --argjson order 50 --arg label "Errors" --arg icon "🔴" \
-  --rawfile html /tmp/acce_frag_html.$$ --rawfile script /tmp/acce_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/acc_error.json"
-rm -f /tmp/acce_frag_html.$$ /tmp/acce_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus acc_error

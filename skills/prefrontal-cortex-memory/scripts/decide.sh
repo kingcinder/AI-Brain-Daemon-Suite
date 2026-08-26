@@ -16,6 +16,10 @@ WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
 
+# Private scratch dir — mktemp, never predictable /tmp/pfc_*.$$ paths
+PFC_TMP="$(mktemp -d)"
+trap 'rm -rf "$PFC_TMP"' EXIT
+
 CONTEXT="general"
 OPTIONS_JSON="[]"
 
@@ -71,7 +75,6 @@ if [ -x "$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" ]; then
     NEURO_DA=$("$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get dopamine 2>/dev/null || echo "0.5")
     NEURO_CORT=$("$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get cortisol 2>/dev/null || echo "0.5")
 fi
-WORKSPACE_CONTEXT=$(read_field "$WORKSPACE/memory/workspace.json" '.context' "{}")
 
 # ── Goals & inhibitions (PFC's own state) ────────────────────────────────────
 GOALS=$(jq -c '[.goals[] | select(.status == "active")]' "$STATE_FILE")
@@ -94,7 +97,7 @@ if [ "${PFC_SEMANTIC_MATCHING:-auto}" != "off" ] && [ -x "$SCRIPT_DIR/semantic-m
   # under `set -e`, a command substitution that legitimately returns non-zero
   # (semantic-match.sh's designed fallback signal) kills the WHOLE calling
   # script right there, before the next line even runs. if/then is exempt.
-  if SEMANTIC_RESULT=$("$SCRIPT_DIR/semantic-match.sh" --options "$OPTIONS_JSON" --goals "$GOALS" --inhibitions "$INHIBITIONS" 2>/tmp/pfc_semantic_err.$$); then
+  if SEMANTIC_RESULT=$("$SCRIPT_DIR/semantic-match.sh" --options "$OPTIONS_JSON" --goals "$GOALS" --inhibitions "$INHIBITIONS" 2>"$PFC_TMP/semantic_err"); then
     SEMANTIC_STATUS=0
   else
     SEMANTIC_STATUS=$?
@@ -107,22 +110,22 @@ if [ "${PFC_SEMANTIC_MATCHING:-auto}" != "off" ] && [ -x "$SCRIPT_DIR/semantic-m
       SEMANTIC_INHIBITION_MATCHES=$(echo "$SEMANTIC_RESULT" | jq -c '.inhibition_matches // []')
     fi
   fi
-  rm -f /tmp/pfc_semantic_err.$$
+  rm -f "$PFC_TMP/semantic_err"
 fi
 
-cp "$HABIT_STATE_PATH" /tmp/pfc_habit_state.$$ 2>/dev/null || echo '{"habits":[]}' > /tmp/pfc_habit_state.$$
-cp "$SEMANTIC_STATE_PATH" /tmp/pfc_semantic_state.$$ 2>/dev/null || echo '{"patterns":{"themes":[],"strategies":[],"antipatterns":[]}}' > /tmp/pfc_semantic_state.$$
-echo "$OPTIONS_JSON" > /tmp/pfc_options.$$
-echo "$GOALS" > /tmp/pfc_goals.$$
-echo "$INHIBITIONS" > /tmp/pfc_inhibitions.$$
-echo "$SEMANTIC_GOAL_MATCHES" > /tmp/pfc_semantic_goals.$$
-echo "$SEMANTIC_INHIBITION_MATCHES" > /tmp/pfc_semantic_inhibitions.$$
+cp "$HABIT_STATE_PATH" "$PFC_TMP/habit_state" 2>/dev/null || echo '{"habits":[]}' > "$PFC_TMP/habit_state"
+cp "$SEMANTIC_STATE_PATH" "$PFC_TMP/semantic_state" 2>/dev/null || echo '{"patterns":{"themes":[],"strategies":[],"antipatterns":[]}}' > "$PFC_TMP/semantic_state"
+echo "$OPTIONS_JSON" > "$PFC_TMP/options"
+echo "$GOALS" > "$PFC_TMP/goals"
+echo "$INHIBITIONS" > "$PFC_TMP/inhibitions"
+echo "$SEMANTIC_GOAL_MATCHES" > "$PFC_TMP/semantic_goals"
+echo "$SEMANTIC_INHIBITION_MATCHES" > "$PFC_TMP/semantic_inhibitions"
 
 RESULT=$(CALIBRATION="$CALIBRATION" COGNITIVE_LOAD="$COGNITIVE_LOAD" CONFLICT_LOAD="$CONFLICT_LOAD" CONTEXT="$CONTEXT" DRIVE="$DRIVE" ENERGY="$ENERGY" ERROR_PATTERNS="$ERROR_PATTERNS" GUT_SIGNAL="$GUT_SIGNAL" HABIT_STRENGTH="$HABIT_STRENGTH" INTERO_DISC="$INTERO_DISC" NEURO_CORT="$NEURO_CORT" NEURO_DA="$NEURO_DA" OPEN_LOOPS="$OPEN_LOOPS" SATURATION="$SATURATION" SEEKING="$SEEKING" SEMANTIC_METHOD="$SEMANTIC_METHOD" VALENCE="$VALENCE" \
-  OPTIONS_FILE="/tmp/pfc_options.$$" GOALS_FILE="/tmp/pfc_goals.$$" INHIBITIONS_FILE="/tmp/pfc_inhibitions.$$" \
-  HABIT_STATE_FILE="/tmp/pfc_habit_state.$$" \
-  SEMANTIC_STATE_FILE="/tmp/pfc_semantic_state.$$" \
-  SEMANTIC_GOALS_FILE="/tmp/pfc_semantic_goals.$$" SEMANTIC_INHIBITIONS_FILE="/tmp/pfc_semantic_inhibitions.$$" \
+  OPTIONS_FILE=""$PFC_TMP/options"" GOALS_FILE=""$PFC_TMP/goals"" INHIBITIONS_FILE=""$PFC_TMP/inhibitions"" \
+  HABIT_STATE_FILE=""$PFC_TMP/habit_state"" \
+  SEMANTIC_STATE_FILE=""$PFC_TMP/semantic_state"" \
+  SEMANTIC_GOALS_FILE=""$PFC_TMP/semantic_goals"" SEMANTIC_INHIBITIONS_FILE=""$PFC_TMP/semantic_inhibitions"" \
   python3 << 'PYTHON'
 import os
 
@@ -333,7 +336,7 @@ PYTHON
 )
 
 echo "$RESULT"
-rm -f /tmp/pfc_options.$$ /tmp/pfc_goals.$$ /tmp/pfc_inhibitions.$$ /tmp/pfc_habits.$$ /tmp/pfc_habit_state.$$ /tmp/pfc_semantic_state.$$ /tmp/pfc_semantic_goals.$$ /tmp/pfc_semantic_inhibitions.$$
+rm -f "$PFC_TMP/options" "$PFC_TMP/goals" "$PFC_TMP/inhibitions" "$PFC_TMP/habits" "$PFC_TMP/habit_state" "$PFC_TMP/semantic_state" "$PFC_TMP/semantic_goals" "$PFC_TMP/semantic_inhibitions"
 
 # Log the decision (best-effort, never block the caller on this).
 # flock-guarded via safe-write.sh: this file is written on every decide.sh
@@ -350,7 +353,7 @@ LOG_ENTRY=$(echo "$RESULT" | jq -c --arg now "$NOW" '. + {timestamp: $now}')
 
 if [ -x "$SCRIPT_DIR/safe-write.sh" ]; then
   MUTATE_SCRIPT=$(mktemp)
-  echo "$LOG_ENTRY" > /tmp/pfc_log_entry.$$
+  echo "$LOG_ENTRY" > "$PFC_TMP/log_entry"
   cat > "$MUTATE_SCRIPT" << 'MUTATE_EOF'
 #!/bin/bash
 set -euo pipefail
@@ -360,8 +363,8 @@ jq --argjson entry "$ENTRY" \
   "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
 MUTATE_EOF
   chmod +x "$MUTATE_SCRIPT"
-  PFC_LOG_ENTRY_FILE="/tmp/pfc_log_entry.$$" "$SCRIPT_DIR/safe-write.sh" "$STATE_FILE" "$MUTATE_SCRIPT" 2>/dev/null || true
-  rm -f "$MUTATE_SCRIPT" /tmp/pfc_log_entry.$$
+  PFC_LOG_ENTRY_FILE=""$PFC_TMP/log_entry"" "$SCRIPT_DIR/safe-write.sh" "$STATE_FILE" "$MUTATE_SCRIPT" 2>/dev/null || true
+  rm -f "$MUTATE_SCRIPT" "$PFC_TMP/log_entry"
 else
   jq --argjson entry "$LOG_ENTRY" '.decisionLog = ([$entry] + .decisionLog | .[0:30]) | .lastUpdated = $entry.timestamp' \
     "$STATE_FILE" > "$STATE_FILE.tmp" 2>/dev/null && mv "$STATE_FILE.tmp" "$STATE_FILE" || true

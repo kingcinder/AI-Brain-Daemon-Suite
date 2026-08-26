@@ -65,12 +65,14 @@ DATA_JSON=$(jq -n --argjson load "$LOAD" --argjson goals "$GOALS" --argjson inhi
   --arg lastUpdated "$(jq -r '.lastUpdated // "never"' "$STATE_FILE")" --arg lastConsultedAt "$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")" \
   '{installed: true, executiveLoad: $load, goals: $goals, inhibitions: $inhibitions, decisions: $decisions, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-echo "$HTML" > /tmp/pfc_frag_html.$$
-echo "$SCRIPT" > /tmp/pfc_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "prefrontal" --argjson order 15 --arg label "Executive" --arg icon "🧭" \
-  --rawfile html /tmp/pfc_frag_html.$$ --rawfile script /tmp/pfc_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/prefrontal.json"
-rm -f /tmp/pfc_frag_html.$$ /tmp/pfc_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus prefrontal

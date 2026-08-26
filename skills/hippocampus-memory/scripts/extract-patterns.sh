@@ -14,7 +14,6 @@
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
-SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DAYS="${1:-7}"
 STATE_FILE="$WORKSPACE/memory/semantic-state.json"
 EVENTS_FILE="$WORKSPACE/memory/hippocampus-events.jsonl"

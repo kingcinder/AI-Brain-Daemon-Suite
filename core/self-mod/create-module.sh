@@ -41,7 +41,6 @@ NAME=$(echo "$NM" | jq -r '.name // empty')
 CAPS=$(echo "$NM" | jq -c '.capabilities // []')
 DESC=$(echo "$NM" | jq -r '.description // "Auto-generated module"')
 STATE_FILE=$(echo "$NM" | jq -r '.state_file // "memory/'"$NAME"'-state.json"')
-SKEL_SCRIPT=$(echo "$NM" | jq -r '.base_script // "scripts/encode-pipeline.sh"')
 
 SKILL_DIR="$SUITE_ROOT/skills/$NAME"
 MANIFEST="$SKILL_DIR/capability-manifest.json"

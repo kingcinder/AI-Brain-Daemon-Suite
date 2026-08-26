@@ -12,7 +12,6 @@
 set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$SELF_DIR/../.." && pwd)"
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 TIERS_FILE="$SELF_DIR/autonomy-tiers.json"
 STATE_FILE="$WORKSPACE/memory/self-mod/autonomy-tiers-state.json"

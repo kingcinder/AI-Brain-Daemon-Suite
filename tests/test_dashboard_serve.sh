@@ -180,6 +180,30 @@ else
     fail "expected 403 for tokenless regenerate, got $REGEN_NO_TOKEN"
 fi
 
+# Auth hardening: the token is ALSO set as an HttpOnly + SameSite=Strict cookie
+# on every response — an XSS reading document.cookie can't steal it, and a
+# cross-site request can't carry it. Assert the cookie flags, then prove the
+# cookie channel alone (no header) authorizes regenerate.
+SET_COOKIE=$(curl -s -D - -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/__dashboard_mtime" | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: //p' | head -1)
+if [[ "$SET_COOKIE" == aibrain_dash_token=* ]] && [[ "$SET_COOKIE" == *HttpOnly* ]] && [[ "$SET_COOKIE" == *SameSite=Strict* ]]; then
+    pass "auth cookie set with HttpOnly + SameSite=Strict"
+else
+    fail "auth cookie missing or missing flags: $SET_COOKIE"
+fi
+
+BODY=$(curl -s --max-time 5 "http://127.0.0.1:$PORT/brain-dashboard.html")
+TOKEN=$(echo "$BODY" | sed -n 's/.*window.__DASH_TOKEN = "\([a-f0-9]*\)".*/\1/p' | head -1)
+if [ -n "$TOKEN" ]; then
+    REGEN_COOKIE=$(curl -s --max-time 60 -X POST "http://127.0.0.1:$PORT/__regenerate" -b "aibrain_dash_token=$TOKEN")
+    if echo "$REGEN_COOKIE" | jq -e '(.ran | type) == "array"' >/dev/null 2>&1; then
+        pass "POST /__regenerate with cookie (no header) succeeds"
+    else
+        fail "regenerate via cookie failed: $REGEN_COOKIE"
+    fi
+else
+    fail "token not injected into served page (needed for cookie-auth test)"
+fi
+
 # The regenerate endpoint rebuilds the dashboard from each skill's
 # sync-state.sh / generate-dashboard.sh. verification-memory's fragment (the
 # 🩺 tab, incl. the autonomy contract history card) is only written when

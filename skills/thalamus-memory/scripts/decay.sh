@@ -8,7 +8,6 @@ set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
 STATE_FILE="$WORKSPACE/memory/thalamus-state.json"
-SIGNAL_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [[ ! -f "$STATE_FILE" ]]; then
     exit 0

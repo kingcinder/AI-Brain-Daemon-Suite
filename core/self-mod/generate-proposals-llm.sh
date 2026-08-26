@@ -164,8 +164,6 @@ if [ "$EMIT" -eq 1 ]; then
   exit 0
 fi
 
-CURRENT=$(cat "$SUITE_ROOT/$TARGET_REL")
-CURRENT_CLIP=$(printf '%s' "$CURRENT" | head -c 8000)
 COMMENT_LINE="# V4-llm-gen: model-proposed annotation ($(date -u +%Y-%m-%d))"
 
 # ROADMAP M6: rollback learning — inject past failure patterns into the
@@ -432,10 +430,15 @@ echo "generate-proposals-llm: raw=$RAW_FILE api=$API_FILE" >&2
 PROP_FILE=$(mktemp)
 set +e
 python3 - "$RAW_FILE" "$API_FILE" "$PROP_FILE" "$TARGET_MODULE" "$TARGET_REL" "$SUITE_ROOT" <<'PY'
-import json, sys, re, hashlib, base64
+import json, sys, re, hashlib, base64, os
 from pathlib import Path
 
 raw_path, api_path, out_path, module, target, suite = sys.argv[1:7]
+# Shared path-safety module (single source of truth for normalization and
+# immutable matching — the same one check-target.sh / apply-patch.sh use, so
+# this generator's pre-filter can never disagree with the gate).
+sys.path.insert(0, os.path.join(suite, "core", "self-mod"))
+import pathguard
 raw = Path(raw_path).read_text(errors="replace") if Path(raw_path).exists() else ""
 api_text = Path(api_path).read_text(errors="replace") if Path(api_path).exists() else ""
 
@@ -564,19 +567,35 @@ if not content or not isinstance(content, str) or not content.strip():
     sys.exit(4)
 
 # Enforce module/path allowlist (reject if model targeted outside)
+# NOTE: normalization uses pathguard.norm (NOT str.lstrip("./"), which would
+# silently rewrite "../../etc/passwd" into "etc/passwd" — same bug class the
+# apply-patch rewrite fixed).
 prop["module"] = module
 tps = prop.get("target_paths") or [target]
 if isinstance(tps, str):
     tps = [tps]
 norm = []
 for t in tps:
-    t = str(t).lstrip("./")
+    t = pathguard.norm(str(t))
     if t.startswith(f"skills/{module}/"):
         norm.append(t)
 if not norm:
     print("BAD_TARGET", tps, file=sys.stderr)
     sys.exit(5)
 prop["target_paths"] = norm
+# M6 files-map gating: if the model emitted per-file content, every key goes
+# through the exact same norm + module allowlist as target_paths. (check-target
+# re-validates files keys authoritatively downstream; this is the pre-filter.)
+fm = prop.get("files")
+if isinstance(fm, dict) and fm:
+    gated = {}
+    for k, v in fm.items():
+        nk = pathguard.norm(str(k))
+        if not nk.startswith(f"skills/{module}/"):
+            print("BAD_FILES_KEY", k, file=sys.stderr)
+            sys.exit(5)
+        gated[nk] = v
+    prop["files"] = gated
 if not str(prop.get("proposal_id", "")).startswith("prop"):
     prop["proposal_id"] = "prop_llm_" + hashlib.sha256(content.encode()).hexdigest()[:12]
 prop["content"] = content if content.endswith("\n") else content + "\n"

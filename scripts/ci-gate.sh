@@ -73,15 +73,38 @@ step() { # name command...
   "$@" || fail "$name" "$?"
 }
 
-step "1/4 validate manifests" bash core/schema/validate-manifest.sh --all
-step "2/4 daemon job table (deep-brain-kernel.py --check)" env \
+step "1/5 validate manifests" bash core/schema/validate-manifest.sh --all
+step "2/5 daemon job table (deep-brain-kernel.py --check)" env \
   WORKSPACE="$SUITE_ROOT" \
   DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1 \
   python3 deep-brain-kernel.py --check
-step "3/4 skill unit tests" bash tests/run_skill_unit_tests.sh
-step "4/4 verification sweep" env \
+step "3/5 skill unit tests" bash tests/run_skill_unit_tests.sh
+step "4/5 verification sweep" env \
   WORKSPACE="$SWEEP_WS" \
   bash skills/verification-memory/scripts/run-declared-tests.sh --quiet
+# 5/5 static analysis: shellcheck on the core surface when the binary is
+# present (installed in CI via apt). Graceful when absent locally — a missing
+# lint binary must never red the gate on a machine that simply didn't install
+# it, but a present shellcheck with findings MUST red it.
+step "5/5 shellcheck (core surface, when available)" bash -c '
+  if ! command -v shellcheck >/dev/null 2>&1; then
+    echo "shellcheck not installed — skipping static analysis step (CI installs it)"
+    exit 0
+  fi
+  failures=0
+  while IFS= read -r -d "" f; do
+    out=$(shellcheck -S warning "$f" 2>/dev/null || true)
+    if [ -n "$out" ]; then
+      echo "$out"
+      failures=$((failures + 1))
+    fi
+  done < <(find core scripts -name "*.sh" -print0; find skills -path "*/scripts/*.sh" -print0; printf "%s\0" install.sh uninstall.sh)
+  if [ "$failures" -gt 0 ]; then
+    echo "shellcheck: $failures file(s) with findings" >&2
+    exit 1
+  fi
+  echo "shellcheck: core surface clean"
+'
 
 echo
-echo "✅ ci-gate: all four steps green — this is a green CI run."
+echo "✅ ci-gate: all five steps green — this is a green CI run."

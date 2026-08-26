@@ -189,12 +189,14 @@ DATA_JSON=$(jq -n --argjson total "$TOTAL" --argjson passed "$PASSED" --argjson 
   --argjson autonomyHistory "$AUTOHIST_JSON" \
   '{installed: true, total: $total, passed: $passed, failed: $failed, failures: $failures, lastRun: $lastRun, history: $history, modules: $modules, healthiest: $healthiest, unhealthiest: $unhealthiest, autonomyHistory: $autonomyHistory}')
 
-echo "$HTML" > /tmp/vm_frag_html.$$
-echo "$SCRIPT" > /tmp/vm_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "verification" --argjson order 96 --arg label "Verification" --arg icon "🩺" \
-  --rawfile html /tmp/vm_frag_html.$$ --rawfile script /tmp/vm_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/verification.json"
-rm -f /tmp/vm_frag_html.$$ /tmp/vm_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus verification 2>/dev/null || true

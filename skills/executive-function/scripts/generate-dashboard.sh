@@ -98,12 +98,14 @@ DATA_JSON=$(jq -n --argjson E "$E" --arg band "$BAND" --argjson G "$G" --argjson
     '{installed: true, E: $E, band: $band, G: $G, Q: $Q, loadReduction: $loadReduction, lastCycle: $lastCycle, phase: $phase, proposalCount: $proposalCount, latestProposal: $latestProposal, successCount: $successCount, failCount: $failCount}' \
     2>/dev/null) || DATA_JSON='{"installed": true}'
 
-echo "$HTML" > /tmp/exec_frag_html.$$
-echo "$SCRIPT" > /tmp/exec_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "executive" --argjson order 12 --arg label "Governance" --arg icon "🎛️" \
-  --rawfile html /tmp/exec_frag_html.$$ --rawfile script /tmp/exec_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/executive.json"
-rm -f /tmp/exec_frag_html.$$ /tmp/exec_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus executive

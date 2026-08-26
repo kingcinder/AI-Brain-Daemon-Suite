@@ -90,18 +90,18 @@ USER_PROMPT=$(jq -n \
 # returns non-zero, before LLM_STATUS is ever read. This is the exact
 # footgun semantic-match.sh's own header comment warns callers about.
 if RAW_OUTPUT=$("$LLM_CALL" --system "$SYSTEM_PROMPT" --user "$USER_PROMPT" \
-  --timeout "${LLM_TIMEOUT:-30}" --retries "${LLM_RETRIES:-1}" --json 2>/tmp/encode-pipeline-err.$$); then
+  --timeout "${LLM_TIMEOUT:-30}" --retries "${LLM_RETRIES:-1}" --json 2>"$ENC_ERR"); then
   LLM_STATUS=0
 else
   LLM_STATUS=$?
 fi
 
 if [ "$LLM_STATUS" -ne 0 ]; then
-  echo "⚡ encode-pipeline: local LLM call failed — $(tail -1 /tmp/encode-pipeline-err.$$ 2>/dev/null) — no updates applied." >&2
-  rm -f /tmp/encode-pipeline-err.$$
+  echo "⚡ encode-pipeline: local LLM call failed — $(tail -1 "$ENC_ERR" 2>/dev/null) — no updates applied." >&2
+  rm -f "$ENC_ERR"
   exit 0
 fi
-rm -f /tmp/encode-pipeline-err.$$
+rm -f "$ENC_ERR"
 
 # Some local servers/models wrap JSON in ```json fences even in JSON mode — strip if present.
 CLEANED=$(echo "$RAW_OUTPUT" | sed -e 's/^```json//' -e 's/^```//' -e 's/```$//')
@@ -163,6 +163,7 @@ done < <(echo "$ATTENTION" | jq -c '.[]')
 #    across the suite, instead of an unguarded read/mutate/write. ─────────────
 if [ -x "$SAFE_WRITE" ]; then
   MUTATE_SCRIPT=$(mktemp)
+ENC_ERR=$(mktemp "${TMPDIR:-/tmp}/aibrain-encode-err.XXXXXX")
   trap 'rm -f "$MUTATE_SCRIPT"' EXIT
   cat > "$MUTATE_SCRIPT" << 'MUTATE_EOF'
 #!/bin/bash

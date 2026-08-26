@@ -66,15 +66,17 @@ DATA_JSON=$(jq -n \
   --arg lastUpdated "$(jq -r '.lastUpdated // "never"' "$STATE_FILE")" --arg lastConsultedAt "$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")" \
   '{installed: true, beatCount: $beatCount, lastAction: $lastAction, lastBeat: $lastBeat, projects: $projects, recentActions: $recentActions, options: $options, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-echo "$HTML" > /tmp/heartbeat_frag_html.$$
-echo "$SCRIPT" > /tmp/heartbeat_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 
 jq -n \
   --arg id "heartbeat" --argjson order 75 --arg label "Pulse" --arg icon "💓" \
-  --rawfile html /tmp/heartbeat_frag_html.$$ --rawfile script /tmp/heartbeat_frag_script.$$ \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" \
   --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/heartbeat.json"
 
-rm -f /tmp/heartbeat_frag_html.$$ /tmp/heartbeat_frag_script.$$
+rm -rf "$FRAG_TMP"
 "$SCRIPT_DIR/dashboard-builder.sh" --focus heartbeat

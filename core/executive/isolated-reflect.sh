@@ -117,7 +117,7 @@ if [ "$WITH_INFERENCE" -eq 1 ]; then
 fi
 
 # ── 3. Offline synthesis from isolated tree only ─────────────────────────────
-REFLECTION=$(ISO="$ISO" WORKSPACE_ISO="$ISO" python3 - <<'PY'
+REFLECTION=$(env ISO="$ISO" WORKSPACE_ISO="$ISO" python3 - <<'PY'
 import json, os, hashlib
 from pathlib import Path
 from datetime import datetime, timezone

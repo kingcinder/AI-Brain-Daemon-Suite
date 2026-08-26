@@ -15,7 +15,6 @@
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
-SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 OPTIONS_JSON='[]'
 EPSILON="${EPSILON:-0.1}"

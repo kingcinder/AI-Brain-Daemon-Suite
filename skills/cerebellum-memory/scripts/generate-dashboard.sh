@@ -56,12 +56,14 @@ SCRIPTEOF
 LAST_UPDATED=$(jq -r '.lastUpdated // "never"' "$STATE_FILE"); LAST_CONSULTED=$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")
 DATA_JSON=$(jq -n --argjson global "$GLOBAL" --argjson skills "$SKILLS" --arg lastUpdated "$LAST_UPDATED" --arg lastConsultedAt "$LAST_CONSULTED" '{installed: true, globalCalibration: $global, skills: $skills, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-echo "$HTML" > /tmp/cereb_frag_html.$$
-echo "$SCRIPT" > /tmp/cereb_frag_script.$$
+FRAG_TMP="$(mktemp -d)"
+trap 'rm -rf "$FRAG_TMP"' EXIT
+echo "$HTML" > "$FRAG_TMP/html"
+echo "$SCRIPT" > "$FRAG_TMP/script"
 jq -n --arg id "cerebellum" --argjson order 95 --arg label "Precision" --arg icon "🎚️" \
-  --rawfile html /tmp/cereb_frag_html.$$ --rawfile script /tmp/cereb_frag_script.$$ --argjson data "$DATA_JSON" \
+  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/cerebellum.json"
-rm -f /tmp/cereb_frag_html.$$ /tmp/cereb_frag_script.$$
+rm -rf "$FRAG_TMP"
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus cerebellum

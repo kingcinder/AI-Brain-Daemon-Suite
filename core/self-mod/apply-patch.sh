@@ -13,10 +13,19 @@
 # Usage:
 #   apply-patch.sh --suite-root PATH --proposal PATH.json [--dry-run]
 #
-# Does not check immutable rules (caller must run check-target first).
+# Caller must run check-target first for the authoritative immutable/
+# manifest gate. This script additionally refuses (defense-in-depth, never
+# skippable):
+#   * any write that resolves outside the suite (path traversal, incl. via
+#     symlinks), and
+#   * any write to an Immutable Core path (from immutable-paths.list),
+#     including through a symlink that resolves onto an immutable file, and
+#   * patch_unified diffs whose headers name a file outside the suite or an
+#     immutable path.
 
 set -euo pipefail
 
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 SUITE_ROOT=""
 PROPOSAL=""
 DRY=0
@@ -35,13 +44,35 @@ done
   exit 2
 }
 
-python3 - "$SUITE_ROOT" "$PROPOSAL" "$DRY" <<'PY'
+# PYTHONPATH carries this directory so the embedded Python can import the
+# shared path-safety module — the same one check-target.sh uses, so the two
+# can never disagree about what a path means.
+PYTHONPATH="$SELF_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SUITE_ROOT" "$PROPOSAL" "$DRY" "$SELF_DIR" <<'PY'
 import json, sys, base64, subprocess
 from pathlib import Path
+
+import pathguard
 
 suite = Path(sys.argv[1]).resolve()
 prop = json.loads(Path(sys.argv[2]).read_text())
 dry = sys.argv[3] == "1"
+self_dir = Path(sys.argv[4])
+
+# Defense-in-depth immutable list: prefer the suite-relative list (present in
+# the live tree and in every sandbox copy), fall back to the script's own.
+# FAIL CLOSED: if no list is found anywhere, refuse to write at all — an
+# absent immutable-paths.list must never degrade to "nothing is immutable".
+IMMUTABLE = []
+IMMUTABLE_SRC = None
+for cand in (suite / "core" / "self-mod" / "immutable-paths.list",
+             self_dir / "immutable-paths.list"):
+    if cand.is_file():
+        IMMUTABLE_SRC = cand
+        IMMUTABLE = pathguard.load_immutable(cand)
+        break
+if IMMUTABLE_SRC is None:
+    print(json.dumps({"ok": False, "error": "immutable-paths.list not found — refusing to write (fail closed)"}))
+    sys.exit(1)
 
 targets = prop.get("target_paths") or prop.get("targets") or []
 if prop.get("target"):
@@ -53,6 +84,18 @@ if not targets:
 applied = []
 if prop.get("patch_unified"):
     patch_text = prop["patch_unified"]
+    # Gate the diff BEFORE applying: every header path must resolve inside the
+    # suite and must not be immutable. This closes the patch_unified bypass
+    # (patch -p1 applies whatever the diff says, ignoring target_paths).
+    bad = []
+    for pt in pathguard.patch_targets(patch_text):
+        if pathguard.resolve_in_suite(suite, pt) is None:
+            bad.append({"target": pt, "reason": "outside_suite_root"})
+        elif pathguard.is_immutable(pt, IMMUTABLE):
+            bad.append({"target": pt, "reason": "immutable_core"})
+    if bad:
+        print(json.dumps({"ok": False, "error": "patch_unified_target_rejected", "rejected": bad}))
+        sys.exit(1)
     if dry:
         print(json.dumps({"ok": True, "dry_run": True, "mode": "unified_diff", "targets": targets}))
         sys.exit(0)
@@ -79,13 +122,20 @@ if content is None and not isinstance(files_map, dict):
 
 
 def _write(rel, body):
-    """Write one file body to `rel` inside the suite, suite-escape guarded."""
-    rel = rel.replace("\\", "/").lstrip("./")
+    """Write one file body to `rel` inside the suite. Refuses anything that
+    resolves outside the suite or onto an Immutable Core path (checked on the
+    RESOLVED path, so a symlink pointing at an immutable file is refused)."""
+    rel = pathguard.norm(rel)
     dest = (suite / rel).resolve()
     try:
         dest.relative_to(suite)
     except ValueError:
         print(json.dumps({"ok": False, "error": f"outside suite: {rel}"}))
+        sys.exit(1)
+    # Immutable check on the resolved path (symlink target), plus the literal
+    # rel path — both must be safe.
+    if pathguard.resolved_is_immutable(suite, dest, IMMUTABLE) or pathguard.is_immutable(rel, IMMUTABLE):
+        print(json.dumps({"ok": False, "error": f"immutable core: {rel}"}))
         sys.exit(1)
     if dry:
         applied.append(rel)

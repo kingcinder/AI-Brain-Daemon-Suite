@@ -170,7 +170,8 @@ _score_signal() {
     # 1. Goal relevance: does signal text match any active goal description?
     local goal_relevance=0.0
     if [[ -n "$goals" ]]; then
-        local combined="$source $signal_name $(echo "$signal_json" | jq -r '.payload | tostring' 2>/dev/null || echo '')"
+        local combined
+        combined="$source $signal_name $(echo "$signal_json" | jq -r '.payload | tostring' 2>/dev/null || echo '')"
         while IFS= read -r goal; do
             [[ -z "$goal" ]] && continue
             # Simple word overlap scoring — literal substring match (glob with
@@ -433,7 +434,6 @@ _process() {
         return 0
     fi
 
-    local processed=0
     tail -n +$((start_line + 1)) "$SIGNAL_LOG" 2>/dev/null | while IFS= read -r line; do
         [[ -z "$line" ]] && continue
 
