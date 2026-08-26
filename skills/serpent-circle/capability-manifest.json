@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "module": "serpent-circle",
+  "version": "1.0.0",
+  "capabilities": [
+    "meta_skillchain_orchestration",
+    "repo_inventory",
+    "multi_language_perf_audit",
+    "dry_run_planning",
+    "commit_push_gate"
+  ],
+  "inputs": [
+    {
+      "name": "target_repo",
+      "type": "state_file",
+      "source": "git working tree (repo root)",
+      "required": true
+    },
+    {
+      "name": "repo_inventory",
+      "type": "state_file",
+      "source": ".serpent-circle/repo-inventory.txt",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "chain_state",
+      "type": "state_write",
+      "target": ".serpent-circle/state.json"
+    },
+    {
+      "name": "chain_plan",
+      "type": "state_write",
+      "target": ".serpent-circle/chain-plan.md"
+    },
+    {
+      "name": "chain_inventory",
+      "type": "state_write",
+      "target": ".serpent-circle/repo-inventory.txt"
+    }
+  ],
+  "side_effects": [
+    "filesystem_write",
+    "network_io"
+  ],
+  "dependencies": [],
+  "tests": [
+    {
+      "path": "tests/test_serpent_circle.sh",
+      "kind": "unit"
+    }
+  ],
+  "immutable": false
+}

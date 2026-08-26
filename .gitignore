@@ -42,3 +42,6 @@ logs/
 
 # Test temp
 /tmp/
+
+# Serpent Circle chain workspace (per-repo renovation artifacts)
+.serpent-circle/
