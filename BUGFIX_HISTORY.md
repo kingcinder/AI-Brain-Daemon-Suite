@@ -18,6 +18,43 @@ specifically to stop that.
 
 ---
 
+## 2026-08-25 — Serpent Circle renovation pass (hardening + cleanup)
+
+First executed run of the Serpent Circle meta-skillchain skill. Full detail in
+`docs/2026-08-25-serpent-circle.md`; security-specific items below.
+
+### Security: self-mod pipeline path-safety (traversal + patch bypass)
+- **Found by:** hardening audit of `core/self-mod/`.
+- **Root cause:** `apply-patch.sh`/`check-target.sh` duplicated path logic;
+  `norm()` stripped a single leading `.` (turning `../etc/passwd` into an
+  in-suite path), and `patch_unified` headers were only checked for git-style
+  `a/`/`b/` prefixes — `patch -p1` strips one component from *any* header, so
+  `x/core/concurrency/semaphore.sh` bypassed the immutable gate.
+- **Fix:** shared `core/self-mod/pathguard.py` (`norm()`/`resolve_in_suite()`/
+  `patch_targets()`); absolute paths rejected; diff headers gated on the exact
+  `-p1` form; `apply-patch.sh` now **fails closed** if the immutable list is
+  missing. Regression: `tests/test_files_map_gate.sh` (21 assertions).
+
+### Bug: semaphore `contexts.count` crash drift
+- **Root cause:** `semaphore_acquire_inference()` incremented the count and only
+  `semaphore_release_inference()` decremented it; a holder killed without
+  release (SIGKILL/OOM) left the count inflated forever, eventually blocking
+  all inference.
+- **Fix:** stale-holder reconciliation against the live pid list. Regression:
+  `tests/test_semaphore_recovery.sh`.
+
+### Security: dashboard regenerate auth
+- **Root cause:** `POST /__regenerate` relied on a single custom header.
+- **Fix:** HttpOnly SameSite=Strict auth cookie alongside the header;
+  timing-safe comparison (`secrets.compare_digest`).
+
+### Hygiene: deterministic temp files + shellcheck-clean surface
+- All pipeline temp files moved to `mktemp` + traps (no predictable `/tmp`
+  paths); 215 shell files shellcheck-clean at warning level (ci-gate scans
+  core/scripts/skills).
+
+---
+
 ## 2026-07-20/21 — Full-cycle verification findings (ops + measurement)
 
 ### Bug/ops: VRAM gate measured on the wrong GPU
