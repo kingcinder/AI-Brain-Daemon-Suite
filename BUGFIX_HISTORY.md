@@ -55,6 +55,20 @@ First executed run of the Serpent Circle meta-skillchain skill. Full detail in
 
 ---
 
+## 2026-08-26 — Serpent Circle skill relocated out of this repo
+
+The Serpent Circle meta-skillchain skill (`skills/serpent-circle/` + its
+`tests/test_serpent_circle.sh`) was removed from this repo per owner
+direction — it is a repo-renovation meta-skill, not a Suite brain skill, and
+was being run against its own repo. It now lives standalone at:
+- `~/.agents/skills/serpent-circle/` (Freebuff global skills home)
+
+The `tests/test_serpent_circle.sh` unit test moved with it. The dated docs `docs/2026-08-25-serpent-circle.md` and
+`docs/2026-08-26-serpent-circle-real-run.md` remain as historical records of
+passes the skill executed against this repo.
+
+---
+
 ## 2026-08-26 — Serpent Circle standing policy: run for real whenever invoked
 
 ### Found via

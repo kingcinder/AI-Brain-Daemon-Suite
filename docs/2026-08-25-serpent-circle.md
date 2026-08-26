@@ -1,5 +1,11 @@
 # Serpent Circle — Renovation Pass 2026-08-25
 
+> **RELOCATED 2026-08-26:** the Serpent Circle skill no longer lives in this
+> repo. It moved to the Freebuff global skills home:
+> `~/.agents/skills/serpent-circle`. This
+> document is a historical record of the renovation pass the skill executed
+> against this repo.
+
 The first executed run of the **Serpent Circle** meta-skillchain skill
 (`skills/serpent-circle/`), chaining: brainstorm (architecture + performance)
 → writing-plans → executing-plans → systematic-debugging → cleanup →
@@ -37,5 +43,6 @@ FOR REAL whenever invoked — no dry-run-first step. See
 
 `.serpent-circle/` holds the ledger (gitignored): `repo-inventory.txt`,
 `state.json`, `chain-plan.md`, `01-design/design.md`, `02-plan/plan.md`.
-Re-run the whole circle with `bash skills/serpent-circle/scripts/serpent-circle.sh --repo "$PWD"`
+Re-run the whole circle (from its new home) with `bash
+~/.agents/skills/serpent-circle/scripts/serpent-circle.sh --repo "$PWD"`
 (no flags = REAL RUN; `--dry-run` is explicit opt-in only).
