@@ -6,12 +6,16 @@ before start), **actions**, **output** (written to the chain workspace),
 
 Chain workspace: `.serpent-circle/` at the repo root (gitignored).
 
+> **STANDING POLICY:** the chain runs FOR REAL whenever this skill is invoked.
+> There is no dry-run-first step; `--dry-run` is opt-in only when the user
+> explicitly asks for a preview. Invocation authorizes commit + push.
+
 ---
 
 ## Stage 1 — Brainstorm (architecture + performance)
 
-**Prerequisite:** `.serpent-circle/repo-inventory.txt` (produced by
-`--dry-run`/`--inventory`).
+**Prerequisite:** `.serpent-circle/repo-inventory.txt` (produced by the real
+run scaffold, or by `--inventory`).
 
 **Actions (1a → 1b → 1c → 1d):**
 
@@ -107,9 +111,10 @@ CHANGES.md is complete.
    changes, nothing foreign.
 2. Write a conventional commit (`git commit`) with the repo's established
    footer convention.
-3. **Push is gated:** require a git remote *and* explicit approval
-   (`--push-ok` or a TTY confirmation). If no remote exists, stop after the
-   commit and report.
+3. **Push rides with the real run:** the invocation is the standing
+   authorization. Push to the configured remote; pass `--push-ok` as the
+   script's mechanical gate. If no remote exists, stop after the commit and
+   report.
 
-**Output:** commit (+ push if approved).
-**Gate:** commit exists; push happened only with remote + approval.
+**Output:** commit + push.
+**Gate:** commit exists; push happened (or a clear no-remote report).

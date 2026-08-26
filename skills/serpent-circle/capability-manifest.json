@@ -6,7 +6,7 @@
     "meta_skillchain_orchestration",
     "repo_inventory",
     "multi_language_perf_audit",
-    "dry_run_planning",
+    "real_run_execution",
     "commit_push_gate"
   ],
   "inputs": [

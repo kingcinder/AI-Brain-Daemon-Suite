@@ -1,7 +1,10 @@
 #!/bin/bash
 # test_serpent_circle.sh — unit test for the Serpent Circle meta-skillchain skill.
-# Hermetic: runs --dry-run against a temp repo it creates itself; never touches
-# the real repo, never commits, never pushes.
+# Hermetic: runs against a temp repo it creates itself; never touches the real
+# repo, never commits, never pushes.
+#
+# STANDING POLICY: the skill RUNS FOR REAL whenever invoked (no mode flags =
+# real run). --dry-run remains available only as an explicit opt-in.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKILL="$ROOT/skills/serpent-circle"
@@ -63,7 +66,56 @@ else
     bad "--self-test failed"
 fi
 
-# 7. --dry-run in a temp repo: 6-stage plan, no execution, no commit
+# 7. REAL RUN (no mode flags) in a temp repo: scaffolds workspace, writes
+#    inventory + plan labeled REAL RUN, state dry_run:false, and still never
+#    commits (the script itself only scaffolds; the agent drives the chain).
+TMP2="$(mktemp -d)"
+trap 'rm -rf "${TMP:-}" "${TMP2:-}"' EXIT
+mkdir -p "$TMP2/proj"
+printf '#!/bin/bash\necho hi\n' > "$TMP2/proj/tool.sh"
+printf '.serpent-circle/\n' > "$TMP2/proj/.gitignore"
+git -C "$TMP2/proj" init -q 2>/dev/null || true
+git -C "$TMP2/proj" add . >/dev/null 2>&1 || true
+git -C "$TMP2/proj" -c user.email=t@t -c user.name=t commit -qm base >/dev/null 2>&1 || true
+
+REAL_OUT="$TMP2/real.out"
+if bash "$ORCH" --repo "$TMP2/proj" >"$REAL_OUT" 2>&1; then
+    ok "real run (default, no flags) exits 0"
+else
+    bad "real run failed"; cat "$REAL_OUT"
+fi
+if grep -q 'REAL RUN' "$REAL_OUT" 2>/dev/null; then
+    ok "real run banner printed"
+else
+    bad "real run banner missing"; tail -5 "$REAL_OUT"
+fi
+REAL_PLAN="$TMP2/proj/.serpent-circle/chain-plan.md"
+if [ -f "$REAL_PLAN" ] && grep -q 'REAL RUN' "$REAL_PLAN" 2>/dev/null; then
+    ok "real run plan labeled REAL RUN"
+else
+    bad "real run plan missing/not labeled REAL RUN"
+fi
+if [ -f "$TMP2/proj/.serpent-circle/state.json" ] \
+    && grep -q '"dry_run": false' "$TMP2/proj/.serpent-circle/state.json" 2>/dev/null; then
+    ok "real run state.json records dry_run:false"
+else
+    bad "real run state.json missing or not dry_run:false"
+fi
+if [ "$(git -C "$TMP2/proj" rev-list --count HEAD 2>/dev/null || echo 0)" = "1" ]; then
+    ok "real run scaffold created no commit"
+else
+    bad "real run scaffold changed commit count"
+fi
+if [ -z "$(git -C "$TMP2/proj" status --porcelain)" ]; then
+    ok "real run scaffold left git status clean"
+else
+    bad "real run scaffold polluted git status"
+fi
+
+# 8. --dry-run remains available as an explicit opt-in and stays hermetic
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" "$TMP2"' EXIT
+mkdir -p "$TMP/proj/legacy-IGNORE" "$TMP/proj/pkg"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/proj/legacy-IGNORE" "$TMP/proj/pkg"

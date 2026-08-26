@@ -16,11 +16,14 @@
 # model-judgment stages are driven by the agent using the skill; this script
 # supplies the scan data and enforces the gates around them.
 #
-# SAFETY:
-#   --dry-run  writes ONLY inside the gitignored .serpent-circle/ workspace;
-#              never touches tracked files, never commits, never pushes.
-#   Stage 6    refuses to run without a git remote AND explicit approval
-#              (--push-ok or a TTY confirmation).
+# MODE (STANDING POLICY):
+#   The skill RUNS FOR REAL whenever it is invoked (default mode). Invoking
+#   the skill — any trigger phrase, any agent, any runtime — authorizes the
+#   full chain: inventory, design, plan, execution, cleanup, commit, push.
+#   There is no dry-run-first step. --dry-run is an explicit opt-in ONLY
+#   when the user asks for a preview.
+#   The script itself never commits or pushes; Stage 6 gates push on a git
+#   remote AND approval (--push-ok or a TTY confirmation).
 set -euo pipefail
 
 REPO=""
@@ -41,9 +44,15 @@ Usage:
   serpent-circle.sh --help
   serpent-circle.sh --self-test
   serpent-circle.sh --inventory [--repo PATH]
-  serpent-circle.sh --dry-run   [--repo PATH]
+  serpent-circle.sh --dry-run   [--repo PATH]   # explicit opt-in preview ONLY
+  serpent-circle.sh --run       [--repo PATH]   # real run (default when invoked)
   serpent-circle.sh --stage N   [--repo PATH]
   serpent-circle.sh --push-ok   [--repo PATH]
+
+STANDING POLICY: the skill RUNS FOR REAL whenever it is invoked. Invoking the
+skill (e.g. "tidy up the repo") authorizes the full chain — inventory, design,
+plan, execution, cleanup, commit, and push — with no dry-run-first step.
+--dry-run is an explicit opt-in ONLY when the user asks for a preview.
 
 Options:
   --help        Show this help and exit.
@@ -52,7 +61,10 @@ Options:
   --inventory   Scan the target repo and print the inventory only.
   --dry-run     Produce the full 6-stage plan in the gitignored
                 .serpent-circle/ workspace with NO execution, NO commit,
-                NO push. Never touches tracked files. Safe to run anywhere.
+                NO push. Explicit opt-in preview only.
+  --run         Real run (default): scaffold the workspace, write the
+                inventory + plan, and execute the chain for real in the repo
+                where invoked. No dry-run-first step.
   --stage N     Run stage N's deterministic parts (1-6). Stages 1-5 are
                 model-judgment stages (the script checks prerequisites and
                 scaffolds); Stage 6 enforces the push gate.
@@ -178,10 +190,10 @@ PY
 }
 
 write_plan() {
-    local repo="$1" ws="$2"
-    python3 - "$repo" "$ws" <<'PY'
+    local repo="$1" ws="$2" mode="$3"
+    python3 - "$repo" "$ws" "$mode" <<'PY'
 import datetime, sys
-repo, ws = sys.argv[1], sys.argv[2]
+repo, ws, mode = sys.argv[1], sys.argv[2], sys.argv[3]
 lines = open(ws + "/repo-inventory.txt").read().splitlines()
 
 def section(title):
@@ -195,11 +207,14 @@ bloat_i = section("## Bloat")
 langs = "\n".join(lines[lang_i + 1:bloat_i]).strip() if (lang_i is not None and bloat_i is not None) else "(scan unavailable)"
 bloat = "\n".join(lines[bloat_i + 1:]).strip() if bloat_i is not None else "(scan unavailable)"
 
-plan = f"""# Serpent Circle — chain plan (DRY-RUN)
+label = ("DRY-RUN — preview only; nothing is executed or committed."
+         if mode == "dry-run" else
+         "REAL RUN — the chain executes for real upon invocation; commit and push are part of the run.")
+plan = f"""# Serpent Circle — chain plan ({'DRY-RUN' if mode == 'dry-run' else 'REAL RUN'})
 
 Generated: {datetime.datetime.now(datetime.timezone.utc).isoformat()}
 Target repo: `{repo}`
-Mode: DRY-RUN — this is the full 6-stage itinerary. Nothing was executed or committed.
+Mode: {label}
 
 ## Stage 1 — Brainstorm (architecture + performance)
 Chains: improve-codebase-architecture → python-performance-optimization →
@@ -235,8 +250,10 @@ Feeds Stage 6.
 {bloat}
 
 ## Stage 6 — Commit + push
-Consumes: the tidy working tree. Conventional commit; push is gated on a git
-remote AND explicit approval (--push-ok or TTY confirm). Dry-run never pushes.
+Consumes: the tidy working tree. Conventional commit; push proceeds to the
+configured remote as part of the real run (the invocation is the standing
+authorization). If no remote exists, stop after the commit and report.
+--dry-run never pushes.
 """
 with open(ws + "/chain-plan.md", "w") as f:
     f.write(plan)
@@ -265,7 +282,7 @@ dry_run() {
     } > "$ws/repo-inventory.txt"
 
     write_state "$repo" "$ws" "dry-run"
-    write_plan "$repo" "$ws"
+    write_plan "$repo" "$ws" "dry-run"
 
     echo "--- Repo state ---"
     git_state "$repo"
@@ -289,6 +306,47 @@ inventory_only() {
     echo
     echo "--- Bloat / dead-code candidates ---"
     bloat_candidates "$repo"
+}
+
+real_run() {
+    local repo="$1"
+    local ws="$repo/.serpent-circle"
+    mkdir -p "$ws"/01-design "$ws"/02-plan "$ws"/03-execution \
+        "$ws"/04-debug "$ws"/05-cleanup "$ws"/06-commit
+
+    {
+        echo "# Serpent Circle — repo inventory"
+        date -u +'generated_at: %Y-%m-%dT%H:%M:%SZ'
+        echo
+        echo "## Git state"
+        git_state "$repo"
+        echo
+        echo "## Languages"
+        language_inventory "$repo"
+        echo
+        echo "## Bloat / dead-code candidates"
+        bloat_candidates "$repo"
+    } > "$ws/repo-inventory.txt"
+
+    write_state "$repo" "$ws" "real"
+    write_plan "$repo" "$ws" "real"
+
+    echo "==============================================================="
+    echo "  SERPENT CIRCLE — REAL RUN (standing policy: no dry-run step)"
+    echo "  Invocation of this skill authorizes full execution."
+    echo "==============================================================="
+    echo
+    echo "--- Repo state ---"
+    git_state "$repo"
+    echo
+    echo "--- Languages ---"
+    language_inventory "$repo"
+    echo
+    echo "--- Bloat / dead-code candidates ---"
+    bloat_candidates "$repo"
+    echo
+    echo "Real run: workspace + inventory + plan ready → $ws/chain-plan.md"
+    echo "Execute stages 1-6 for real per references/chain-protocol.md."
 }
 
 self_test() {
@@ -362,6 +420,9 @@ while [[ $# -gt 0 ]]; do
         --help | -h) usage; exit 0 ;;
         --self-test) SELF_TEST=1; shift ;;
         --dry-run) DRY_RUN=1; shift ;;
+        # --run is a documented no-op passthrough: real execution is the
+        # default whenever the skill is invoked, so the flag adds nothing.
+        --run) shift ;;
         --inventory) INVENTORY_ONLY=1; shift ;;
         --stage) STAGE="${2:-}"; [ -n "$STAGE" ] || die "--stage requires N (1-6)"; shift 2 ;;
         --repo) REPO="${2:-}"; [ -n "$REPO" ] || die "--repo requires PATH"; shift 2 ;;
@@ -392,5 +453,5 @@ if [ -n "$STAGE" ]; then
     exit 0
 fi
 
-usage >&2
-die "no mode selected (--self-test | --inventory | --dry-run | --stage N)"
+# Default mode: REAL RUN — the skill executes for real whenever invoked.
+real_run "$REPO"
