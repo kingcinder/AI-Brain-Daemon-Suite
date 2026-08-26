@@ -3,8 +3,10 @@
 The first executed run of the **Serpent Circle** meta-skillchain skill
 (`skills/serpent-circle/`), chaining: brainstorm (architecture + performance)
 → writing-plans → executing-plans → systematic-debugging → cleanup →
-commit+push. The dry-run plan was produced first (`.serpent-circle/chain-plan.md`),
-approved, then executed.
+commit+push. This pass ran with the then-current safety gate (dry-run plan
+first, then execution). **Policy change (2026-08-26):** the skill now runs
+FOR REAL whenever invoked — no dry-run-first step. See
+`docs/2026-08-26-serpent-circle-real-run.md`.
 
 ## What the chain did
 
@@ -35,4 +37,5 @@ approved, then executed.
 
 `.serpent-circle/` holds the ledger (gitignored): `repo-inventory.txt`,
 `state.json`, `chain-plan.md`, `01-design/design.md`, `02-plan/plan.md`.
-Re-run the whole circle with `bash skills/serpent-circle/scripts/serpent-circle.sh --dry-run --repo "$PWD"`.
+Re-run the whole circle with `bash skills/serpent-circle/scripts/serpent-circle.sh --repo "$PWD"`
+(no flags = REAL RUN; `--dry-run` is explicit opt-in only).

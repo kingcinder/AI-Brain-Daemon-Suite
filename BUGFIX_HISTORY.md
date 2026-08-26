@@ -55,6 +55,40 @@ First executed run of the Serpent Circle meta-skillchain skill. Full detail in
 
 ---
 
+## 2026-08-26 — Serpent Circle standing policy: run for real whenever invoked
+
+### Found via
+Owner mandate (2026-08-25/26): "THIS IS NOT A DRY RUN — any time the skill is
+invoked from this point forward forever into the future, the meta skill is to
+be ran for real; that needs to be explicit WHENEVER AND WHEREEVER the skill
+is now ran."
+
+### Change: no dry-run-first step, ever
+- **Root cause (of the old behavior):** the skill's original safety gate
+  required a `--dry-run` plan + review before any execution. That contradicted
+  the owner's standing authorization to execute the full chain on invocation.
+- **Files:** `skills/serpent-circle/scripts/serpent-circle.sh`,
+  `skills/serpent-circle/SKILL.md`, `skills/serpent-circle/references/chain-protocol.md`,
+  `skills/serpent-circle/capability-manifest.json`, `tests/test_serpent_circle.sh`,
+  `docs/2026-08-25-serpent-circle.md` (stale re-run command fixed),
+  `docs/2026-08-26-serpent-circle-real-run.md` (new report).
+- **Fix:** no-mode invocation now defaults to `real_run()` — scaffolds the
+  workspace, writes `state.json` with `dry_run:false`, writes a REAL-RUN-labeled
+  plan. `--dry-run` is explicit opt-in only. SKILL.md + chain-protocol + loader
+  description all state the mandate; push rides with the real run (invocation is
+  the standing authorization), still mechanically gated on `--push-ok` in the
+  script. Capability `dry_run_planning` → `real_run_execution`.
+- **Verified:** ci-gate 5/5 green; 52/52 unit tests; 215/215 shellcheck clean;
+  manifests all PASS; skill self-test OK; serpent-circle unit test 31/31
+  (new real-run assertions: no-mode default exits 0, REAL RUN banner, state
+  `dry_run:false`, no commit created, git status clean). Freebuff propagation
+  via the `~/.agents/skills/serpent-circle` symlink.
+- **Blast radius (documented):** the real run targets the repo where the skill
+  is invoked and pushes only to that repo's configured remote (stops after
+  commit if none). Never touches anything outside that working tree.
+
+---
+
 ## 2026-07-20/21 — Full-cycle verification findings (ops + measurement)
 
 ### Bug/ops: VRAM gate measured on the wrong GPU
