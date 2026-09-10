@@ -38,8 +38,8 @@ import os
 from pathlib import Path
 
 from ..contract import (
-    JobSpec, MemoryStore, MemoryViolation, Runtime,
-    ScheduleError, Scheduler, utc_now_iso,
+    ContractError, JobSpec, MemoryStore, MemoryViolation, Runtime,
+    ScheduleError, Scheduler, ScriptResult, utc_now_iso,
 )
 
 log = logging.getLogger("runtime.juno")
@@ -219,3 +219,47 @@ class JunoRuntime(Runtime):
             self.memory.append_jsonl("provenance-log.jsonl", record)
         except Exception as e:  # noqa: BLE001 — provenance must not break callers
             log.warning("provenance append failed: %s", e)
+
+    def run_script(self, relpath: str, args: list[str] | None = None,
+                   timeout_s: float = 300) -> ScriptResult:
+        """Direct-kind job execution on the Juno runtime.
+
+        HONESTY NOTE: this works only where the agent runtime actually has a
+        POSIX shell — this environment does (exec/bash), so the adapter
+        probes for it and runs suite scripts the same way codypc does, with
+        WORKSPACE pointed at the adapter root. Where no shell exists the
+        adapter raises ContractError and the scheduled-task body must run
+        the script agent-mediated (the agent's exec tool) instead. Scripts
+        are bash with coreutil deps (decay.sh also shells to python3); the
+        probe covers bash only — a script whose own shebang/deps are
+        missing fails loudly with its own stderr, never silently.
+        """
+        import shutil
+        import subprocess
+        if shutil.which("bash") is None:
+            raise ContractError(
+                "no bash on this runtime: direct-kind script execution is "
+                "agent-mediated here — run the script via the agent's exec "
+                "tool in the scheduled-task body, then complete() manually")
+        script = (self._suite_root / relpath).resolve()
+        try:
+            script.relative_to(self._suite_root)
+        except ValueError:
+            raise ContractError(f"script escapes suite root: {relpath!r}")
+        if not script.is_file():
+            raise ContractError(f"script not found: {script}")
+        env = os.environ.copy()
+        env["WORKSPACE"] = str(self._root)
+        try:
+            proc = subprocess.run(
+                ["bash", str(script), *(args or [])],
+                env=env, capture_output=True, text=True,
+                timeout=timeout_s,
+            )
+        except subprocess.TimeoutExpired as e:
+            out = (e.stdout or "") + (e.stderr or "")
+            return ScriptResult(returncode=-1, output=out[-20000:],
+                                timed_out=True)
+        out = (proc.stdout or "") + (proc.stderr or "")
+        return ScriptResult(returncode=proc.returncode,
+                            output=out[-20000:], timed_out=False)

@@ -67,6 +67,10 @@ them onto the substrate's real storage.
 - `provenance(event, detail)` — append-only audit event
   `{ts, event, actor, detail}`. **Never raises** (best-effort); the audit
   trail must not be able to break the job it records.
+- `run_script(relpath, args, timeout_s) -> ScriptResult` — execute a
+  suite-bundled script (direct-kind jobs), suite-rooted per S1. Adapters
+  opt in by overriding; the base raises `ContractError`. Missing scripts
+  raise (loud); timeouts return `timed_out=True`.
 
 ### 5. `ContractJob` — portable job logic
 
@@ -198,10 +202,36 @@ mind path is exercised separately by `--exercise-mind` (expects failure
 without a local endpoint — asserts the failure is `MindUnavailable`, not
 silence).
 
+## Vertical slices (evidence, not just design)
+
+1. **Slice 1 — spawn-kind** (`jobs/weekly_reflection.py`):
+   `hippocampus_weekly_reflection` as a `ContractJob`. Proved: prompt
+   building, embedded-mind split flow, deterministic persistence in
+   `complete()` (closing the trace-found gap where the default provider
+   could "succeed" without writing `memory/self/*.md`), provenance.
+2. **Slice 2 — direct-kind** (`jobs/direct_job.py`): `hippocampus_decay`
+   as a `ContractJob` via the new `Runtime.run_script()` primitive
+   (`ScriptResult{returncode, output, timed_out}`). Proved: the contract
+   covers the JOBS table's majority kind, on both adapters, running the
+   real `skills/hippocampus-memory/scripts/decay.sh` (demo: importance
+   0.900 → 0.602 over 40 days, matching the 0.99^d formula). Documented
+   divergences from `deep-brain-kernel.run_direct`: no once-retry on
+   non-zero exit (kernel-side policy), no pidfd shutdown tracking, and
+   suite-rooted (not skills-relative) path language.
+3. **Slice 3 — schedule-table core** (`core/runtime/schedule.py`):
+   `Job`, `_spec_matches`, `_job_key`, `due_now` extracted verbatim from
+   `deep-brain-kernel.py`; the kernel now imports them (the one surgical
+   change to the monolith — behavior-identical, proven by the kernel's own
+   21 unit tests). `ScheduleTable` adds portable `due_at()` /
+   `mark_fired()` / `minute_collisions()` so any runtime shares dispatch
+   semantics without forking them.
+
 ## What this branch does NOT do
 
-- No changes to `deep-brain-kernel.py`, the scheduler, any skill, or the
-  live deployment. The codypc path is preserved, not replaced.
+- No changes to any skill, the live deployment, install.sh, or the
+  systemd units. The one kernel change is the schedule-core import above;
+  the JOBS table, dispatch loop, hardware probes, and self-mod pipeline
+  are untouched.
 - No new network surface, no credentials, no remote inference.
 - `core/runtime/*` is added to `core/self-mod/immutable-paths.list`: the
   contract is safety infrastructure and must not be self-modifiable. (Decision

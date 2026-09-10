@@ -136,3 +136,82 @@ does not need systemd to *schedule*, only to be *deployed/lifecycled*.
    capability-probe interface with documented no-op fallbacks.
 5. `run_suite_script` tool allowlist + `$WORKSPACE/skills/*/scripts/` layout
    — the agent-loop's action surface.
+
+## 7. Metaphor vs mechanism — ruthless notes
+
+The survey's job is to say where the architecture is a story about itself
+rather than a mechanism. Findings below are from code reading and
+execution traces, not from the docs' self-description. `docs/V4_STATUS.md`
+already keeps a "Plumbing vs exercised" ledger — this section extends
+that honesty to the design language.
+
+**"Learning" is heuristic adaptation, not learning.** No gradient flows
+anywhere in this suite. The learning signals are EMA/counters, scalar
+delta rules, replay heuristics, and LLM-authored summaries. "Stage-1
+proprioception" (acc-calibration) is a hit-rate counter on the ACC's own
+flags. `NEUROSCIENCE_MAPPING.md` draws the mechanism/metaphor line
+carefully and deserves credit; `ROADMAP.md`'s stage language ("Stage-1
+proprioception", "Stage 3") sometimes outruns it. The accurate sentence:
+this is a memory/scheduling exoskeleton with heuristic adaptation around
+a frozen model. The only mechanism that can change the heuristics is the
+self-mod pipeline — which is real code, harness-tested (the
+`full_cycle_20260720T234945Z` deploy→rollback is genuinely exercised) —
+but the live deployment currently shows zero proposals, zero deploys,
+`steward_mode`, and 10 unhealthy jobs. "LANDED" in the docs means
+"implemented + harness-tested", not "production-exercised". The autonomy
+ladder is a formalism awaiting its first climber. That is not a flaw in
+the code; it is a gap between the docs' tense and the deployment's.
+
+**The weekly reflection loop was aspirational in the default config —
+fixed by the contract.** Traced end to end: the default `agentloop`
+provider can run `reflect.sh` but exposes no file-write tool for
+`memory/self/growth.md` / `opinions.md` / `identity.md`. The job could
+produce text, exit successfully, and record success while persisting
+nothing — "honest self-evolution" as a green check with no write behind
+it. This branch fixes it structurally: `complete()` owns persistence
+(slice 1), and the hippocampus capability manifest now declares
+`memory/self/*.md` as an output (this branch, validated). What the
+contract cannot fix: the codypc agent-loop's missing write tool is still
+missing on the live path — that is a provider change, not a contract
+change, and it is documented as such.
+
+**"Brain regions" are bash scripts + JSON — and that is fine.** The
+neuroscience mapping is an organizing metaphor, honestly labeled in
+`NEUROSCIENCE_MAPPING.md`. Keep the line sharp: metaphor organizes,
+mechanism decides. Nothing in this refactor pretends otherwise.
+
+**The verification region is NOT metaphor.** Manifest-driven declared-test
+sweep, fixture-honesty rules (including the standing rule that a passing
+self-test only proves the runner agrees with its own fixture), pre-deploy
+gate — this is the suite's strongest mechanism, and it is why the
+contract carries S4/S5 as requirements rather than suggestions. The one
+real gap found here: memory/KV growth is not measured during sandbox
+evaluation, only in deploy monitoring — a proposal that bloats state
+passes eval and gets caught (maybe) after deploy. Documented, not fixed;
+fixing it means instrumenting the sandbox, which is Phase-3 core work.
+
+**"Organism" (Stage 2) is currently a single-node daemon.** The runtime
+contract is the first real step toward multi-substrate — but a contract
+with one production adapter is a proposal, not a port. The Juno adapter
+is honest about being agent-mediated (schedule writes are request docs,
+not cron mutations). Do not let the contract's existence imply the
+migration happened.
+
+**Slice 3 caught a near-miss, not a bug.** While writing the
+`ScheduleTable` equivalence test I initially assumed
+`hippocampus_weekly_consolidation` lacked `days="6"` (its comment block
+describes the Sunday intent above the entry); the entry does carry
+`days="6"`. No code change resulted — but the episode is evidence the
+test is doing its job: the portable core now pins the table's actual
+firing behavior, so a future edit that drops a `days=` kwarg fails loudly
+in `test_contract.py` instead of silently rescheduling a job to daily.
+
+**Fixed vs documented.** Fixed in this branch: reflection persistence gap
+(contract `complete()`), manifest output gap (`memory/self/*.md`),
+schedule-logic duplication risk (extraction into
+`core/runtime/schedule.py`, kernel imports it — no fork). Documented,
+not fixed: no-gradient "learning" (architectural, not a bug); live
+autonomy unproven (needs Dyther's deployment, not this branch);
+agent-loop file-write gap on codypc (provider change, live path);
+sandbox memory/KV measurement gap (Phase-3 core work); `bc` missing in
+this sandbox breaking 5 pre-existing unit tests (environment, not code).

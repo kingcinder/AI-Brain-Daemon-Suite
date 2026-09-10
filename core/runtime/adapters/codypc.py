@@ -31,8 +31,9 @@ import subprocess
 from pathlib import Path
 
 from ..contract import (
-    JobSpec, MemoryStore, MemoryViolation, Mind, MindUnavailable, Runtime,
-    Scheduler, ScheduleError, utc_now_iso,
+    ContractError, JobSpec, MemoryStore, MemoryViolation, Mind,
+    MindUnavailable, Runtime, Scheduler, ScheduleError, ScriptResult,
+    utc_now_iso,
 )
 
 log = logging.getLogger("runtime.codypc")
@@ -223,3 +224,37 @@ class CodypcRuntime(Runtime):
             self.memory.append_jsonl("memory/provenance/events.jsonl", record)
         except Exception as e:  # noqa: BLE001 — provenance must not break callers
             log.warning("provenance append failed: %s", e)
+
+    def run_script(self, relpath: str, args: list[str] | None = None,
+                   timeout_s: float = 300) -> ScriptResult:
+        """Direct-kind job execution: run a suite-bundled script with bash,
+        WORKSPACE pointed at this runtime's workspace.
+
+        Mirrors deep-brain-kernel.run_direct's invocation (bash + WORKSPACE
+        env) minus two kernel-side behaviors, documented in
+        core/runtime/jobs/direct_job.py: no once-retry on non-zero exit,
+        no pidfd shutdown tracking.
+        """
+        script = (self._suite_root / relpath).resolve()
+        try:
+            script.relative_to(self._suite_root)
+        except ValueError:
+            raise ContractError(f"script escapes suite root: {relpath!r}")
+        if not (script.is_file() and os.access(script, os.X_OK)):
+            raise ContractError(
+                f"script not found or not executable: {script}")
+        env = os.environ.copy()
+        env["WORKSPACE"] = str(self._workspace)
+        try:
+            proc = subprocess.run(
+                ["bash", str(script), *(args or [])],
+                env=env, capture_output=True, text=True,
+                timeout=timeout_s,
+            )
+        except subprocess.TimeoutExpired as e:
+            out = (e.stdout or "") + (e.stderr or "")
+            return ScriptResult(returncode=-1, output=out[-20000:],
+                                timed_out=True)
+        out = (proc.stdout or "") + (proc.stderr or "")
+        return ScriptResult(returncode=proc.returncode,
+                            output=out[-20000:], timed_out=False)
