@@ -58,6 +58,20 @@ class Approval:
     revoked_at: str | None = None
     revoke_note: str = ""
 
+    def to_dict(self) -> dict:
+        return {"approver": self.approver, "statement": self.statement,
+                "at": self.at, "revoked": self.revoked,
+                "revoked_at": self.revoked_at,
+                "revoke_note": self.revoke_note}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Approval":
+        return cls(approver=d["approver"], statement=d["statement"],
+                   at=d.get("at") or utc_now_iso(),
+                   revoked=d.get("revoked", False),
+                   revoked_at=d.get("revoked_at"),
+                   revoke_note=d.get("revoke_note", ""))
+
 
 @dataclass
 class Proposal:
@@ -107,6 +121,45 @@ class Proposal:
                 f"got {self.prompt_source!r} — nothing is ever unprompted")
         if ".." in self.target.replace("\\", "/").split("/"):
             raise ValueError(f"target escapes scope: {self.target!r}")
+
+    # -- persistence ---------------------------------------------------------
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "scope": self.scope, "target": self.target,
+            "change_kind": self.change_kind, "change": self.change,
+            "rationale": self.rationale,
+            "prompt_source": self.prompt_source,
+            "verification_plan": self.verification_plan,
+            "rollback_plan": self.rollback_plan,
+            "new_content": self.new_content,
+            "tier": self.tier.value if self.tier else None,
+            "hard_rule_flags": list(self.hard_rule_flags),
+            "gate_requirement": self.gate_requirement,
+            "status": self.status,
+            "approvals": [a.to_dict() for a in self.approvals],
+            "agent_checks": self.agent_checks,
+            "history": self.history,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Proposal":
+        p = cls(
+            id=d["id"], scope=d["scope"], target=d["target"],
+            change_kind=d["change_kind"], change=d["change"],
+            rationale=d["rationale"], prompt_source=d["prompt_source"],
+            verification_plan=d.get("verification_plan", []),
+            rollback_plan=d.get("rollback_plan", ""),
+            new_content=d.get("new_content"),
+        )
+        p.tier = Tier(d["tier"]) if d.get("tier") else None
+        p.hard_rule_flags = tuple(d.get("hard_rule_flags", ()))
+        p.gate_requirement = d.get("gate_requirement")
+        p.status = d.get("status", "draft")
+        p.approvals = [Approval.from_dict(a)
+                       for a in d.get("approvals", [])]
+        p.agent_checks = d.get("agent_checks", [])
+        p.history = d.get("history", [])
+        return p
 
     # -- status machine ----------------------------------------------------
     def transition(self, new_status: str, note: str = "") -> None:

@@ -150,6 +150,18 @@ class Journal:
                    if r.get("proposal") == proposal_id]
         return matches[-1] if matches else None
 
+    def latest_state_for_target(self, target: str,
+                                day: str | None = None) -> dict | None:
+        """Most recent frozen state for a target across ALL proposals.
+
+        Targets move on: a later proposal may legitimately change what an
+        earlier one set. Reconciliation must compare against the target's
+        latest journaled state, not each proposal's frozen moment —
+        otherwise superseded proposals false-positive forever."""
+        matches = [r for _, r in self._iter_blocks(STATE_FENCE, 90, day)
+                   if r.get("target") == target]
+        return matches[-1] if matches else None
+
     # -- health baselining --------------------------------------------------
     def daily_health_check(self, recent_days: int = 7,
                            baseline_days: int = 23,

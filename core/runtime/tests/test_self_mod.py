@@ -18,6 +18,7 @@ approval revocation (no expiry; revocation never auto-rolls-back).
 """
 
 import sys
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -627,6 +628,100 @@ class SelfModTest(unittest.TestCase):
             p.transition("applied")  # draft -> applied skips everything
         with self.assertRaises(StatusTransitionError):
             self.pipe.verify(p)  # verify requires 'proposed'
+
+    # -- heartbeat ---------------------------------------------------------------------------
+    def _live_runtime(self, tmp):
+        from core.runtime.juno_main import get_pipeline, get_store
+        from core.runtime.adapters.juno import JunoRuntime
+        rt = JunoRuntime(root=Path(tmp) / "rt",
+                         skills_root=Path(tmp) / "skills",
+                         memory_root=Path(tmp) / "memory")
+        (Path(tmp) / "memory").mkdir(parents=True, exist_ok=True)
+        (Path(tmp) / "memory" / "conventions.md").write_text("old\n")
+        return rt, get_pipeline(rt), get_store(rt)
+
+    def test_proposal_serialization_round_trip(self):
+        p = make_proposal("p-rt")
+        p.approve_self("looks good")
+        d = p.to_dict()
+        q = Proposal.from_dict(json.loads(json.dumps(d)))
+        self.assertEqual(q.id, "p-rt")
+        self.assertEqual(q.prompt_source, "dyther_direct")
+        self.assertEqual(len(q.approvals), 1)
+        self.assertEqual(q.approvals[0].approver, "self")
+        self.assertFalse(q.approvals[0].revoked)
+
+    def test_store_round_trip(self):
+        from core.runtime.self_mod.store import ProposalStore
+        store = ProposalStore(Path(self.tmp.name) / "store")
+        p = make_proposal("p-store")
+        p.transition("proposed", "test")
+        store.save(p)
+        q = store.load("p-store")
+        self.assertEqual(q.status, "proposed")
+        self.assertEqual(q.target, "conventions.md")
+        self.assertIsNone(store.load("nope"))
+        self.assertEqual([x.id for x in store.all()], ["p-store"])
+
+    def test_heartbeat_advances_and_needs_agent_for_approval(self):
+        from core.runtime.juno_main import heartbeat
+        with tempfile.TemporaryDirectory() as tmp:
+            rt, pipe, store = self._live_runtime(tmp)
+            p = make_proposal(
+                "p-beat",
+                verification_plan=[{"kind": "command",
+                                    "run": ["python3", "-c", "pass"]}])
+            store.save(p)
+            report = heartbeat(rt)
+            # draft -> proposed -> verified -> gate assesses, then stops:
+            # approval is never the pipeline's.
+            q = store.load("p-beat")
+            self.assertEqual(q.status, "verified")
+            kinds = [a["to"] for a in report["advanced"]]
+            self.assertEqual(kinds, ["proposed", "verified"])
+            self.assertEqual(len(report["needs_agent"]), 1)
+            self.assertEqual(report["needs_agent"][0]["kind"], "approval")
+            self.assertIn("streak", report)
+
+    def test_heartbeat_full_cycle_across_beats(self):
+        from core.runtime.juno_main import heartbeat
+        with tempfile.TemporaryDirectory() as tmp:
+            rt, pipe, store = self._live_runtime(tmp)
+            p = make_proposal(
+                "p-cycle",
+                verification_plan=[{"kind": "command",
+                                    "run": ["python3", "-c", "pass"]}])
+            store.save(p)
+            heartbeat(rt)  # -> verified, awaiting approval
+            # the cron worker (agent) approves per the graduation bands:
+            q = store.load("p-cycle")
+            q.approve_self("tier 0, streak<5 band allows self with rationale")
+            store.save(q)
+            report = heartbeat(rt)  # approved -> applied -> monitored
+            q = store.load("p-cycle")
+            self.assertEqual(q.status, "done")
+            # reconciled quietly against its own journaled state
+            rec = [r for r in report["reconciled"] if r["id"] == "p-cycle"]
+            self.assertTrue(rec and rec[0]["match"])
+            # tamper externally -> next beat diverges + opens repair draft
+            (Path(tmp) / "memory" / "conventions.md").write_text("tampered\n")
+            report2 = heartbeat(rt)
+            rec2 = [r for r in report2["reconciled"]
+                    if r["id"] == "p-cycle"]
+            self.assertTrue(rec2 and not rec2[0]["match"])
+            self.assertEqual(len(report2["repair_drafts"]), 1)
+            draft = store.load(report2["repair_drafts"][0])
+            self.assertEqual(draft.status, "draft")
+            self.assertEqual(draft.prompt_source, "scheduled")
+
+    def test_heartbeat_journals_itself(self):
+        from core.runtime.juno_main import heartbeat
+        with tempfile.TemporaryDirectory() as tmp:
+            rt, pipe, store = self._live_runtime(tmp)
+            heartbeat(rt)
+            hist = pipe.journal.signal_history("self_mod.heartbeat", days=2)
+            self.assertEqual(len(hist), 1)
+            self.assertEqual(hist[0][1], 1.0)
 
 
 if __name__ == "__main__":

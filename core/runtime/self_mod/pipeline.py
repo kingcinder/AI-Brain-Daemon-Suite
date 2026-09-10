@@ -310,13 +310,18 @@ class Pipeline:
         self._record(proposal, "done", attestation=note.strip())
 
     def reconcile(self, proposal: Proposal,
-                  observed_now: str | None = None) -> dict:
+                  observed_now: str | None = None,
+                  quiet: bool = False) -> dict:
         """Compare the target's CURRENT state against the state frozen in
         the Eternal Journal at apply/attestation time.
 
         File targets are re-read directly by the pipeline. Agent-mediated
         (cron) targets need the agent's fresh read as observed_now — the
         reading is agent-mediated, the comparison is automated.
+
+        quiet=True suppresses the journal prose on match (for the
+        heartbeat, which reconciles every beat — matches are routine,
+        divergences are journaled regardless).
 
         Returns {"match": bool, "expected": ..., "observed": ...,
         "repair_proposal": Proposal | None}. On divergence the journal
@@ -348,10 +353,11 @@ class Pipeline:
         else:
             observed = observed_now.strip()
         if observed == expected:
-            self.journal.append(
-                "Self-mod",
-                f"reconciliation {proposal.id}: match "
-                f"({target} still {expected[:32]}...)")
+            if not quiet:
+                self.journal.append(
+                    "Self-mod",
+                    f"reconciliation {proposal.id}: match "
+                    f"({target} still {expected[:32]}...)")
             return {"match": True, "expected": expected,
                     "observed": observed, "repair_proposal": None}
         detail = (f"reconciliation {proposal.id}: DIVERGED — journal says "
