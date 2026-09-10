@@ -7,3 +7,4 @@ core/concurrency/semaphore.sh
 core/sandbox/sandbox-run.sh
 core/executive-load/calc-executive-load.sh
 core/self-mod/*
+core/runtime/*
