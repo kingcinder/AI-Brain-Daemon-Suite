@@ -11,7 +11,14 @@ complete() → JobResult + artifacts printed. This is exactly the
 embedded-mind flow the Juno adapter uses in production (the agent performs
 the reflection step between build_prompt and complete).
 
+With --job memory-decay the demo instead runs slice 2: the real
+hippocampus decay.sh through Runtime.run_script() on the chosen adapter,
+against a seeded memory/index.json. This exercises the direct-kind path
+end to end (both adapters).
+
 Options:
+    --job {weekly-reflection,memory-decay}
+                      which vertical slice to run (default: weekly-reflection)
     --exercise-mind   also call runtime.mind.invoke() once. On codypc without
                       a local endpoint this must raise MindUnavailable (loud
                       failure, not silence) — the demo asserts that.
@@ -30,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from core.runtime.adapters import CodypcRuntime, JunoRuntime  # noqa: E402
 from core.runtime.contract import ContractError, MindUnavailable  # noqa: E402
 from core.runtime.jobs import WeeklyReflectionJob  # noqa: E402
+from core.runtime.jobs.direct_job import hippocampus_decay_job  # noqa: E402
 
 SAMPLE_REFLECTION = """This week I stopped reaching for conversational closure faster than
 the evidence supported. The calibration questions forced the issue: twice I
@@ -45,6 +53,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--adapter", choices=["codypc", "juno"], required=True)
     ap.add_argument("--workspace", default=None)
+    ap.add_argument("--job", choices=["weekly-reflection", "memory-decay"],
+                    default="weekly-reflection")
     ap.add_argument("--reflection-file", default=None)
     ap.add_argument("--exercise-mind", action="store_true")
     ap.add_argument("--print-prompt", action="store_true")
@@ -55,8 +65,10 @@ def main() -> int:
 
     if args.adapter == "codypc":
         runtime = CodypcRuntime(workspace=ws, suite_root=suite_root)
-    else:
-        runtime = JunoRuntime(root=ws, suite_root=suite_root)
+    else:        runtime = JunoRuntime(root=ws, suite_root=suite_root)
+
+    if args.job == "memory-decay":
+        return _demo_memory_decay(runtime, ws, args)
 
     job = WeeklyReflectionJob()
     spec = job.spec()
@@ -102,9 +114,53 @@ def main() -> int:
     return 0
 
 
+
+def _demo_memory_decay(runtime, ws, args) -> int:
+    """Slice 2 demo: run the real hippocampus decay.sh through
+    Runtime.run_script() against a seeded memory/index.json."""
+    import json
+
+    job = hippocampus_decay_job()
+    spec = job.spec()
+    spec.validate()
+    print(f"adapter : {runtime.name}")
+    print(f"job     : {spec.id} (kind={spec.kind} days={spec.days} "
+          f"{spec.hours}:{spec.minutes} UTC)")
+    print(f"script  : {spec.task}")
+
+    # Seed a memory index with one stale memory to decay.
+    mem_dir = Path(ws) / "memory"
+    mem_dir.mkdir(parents=True, exist_ok=True)
+    index = {
+        "memories": [
+            {"id": "demo-old",
+             "importance": 0.9,
+             "lastAccessed": "2026-08-01",
+             "created": "2026-08-01",
+             "content": "demo memory for slice-2 run"},
+        ],
+        "decayLastRun": "never",
+    }
+    (mem_dir / "index.json").write_text(json.dumps(index, indent=2))
+
+    result = job.run(runtime)
+    print(f"\nok      : {result.ok}")
+    print(f"summary : {result.summary}")
+    if result.error:
+        print(f"error   : {result.error[-800:]}")
+        return 1
+    after = json.loads((mem_dir / "index.json").read_text())
+    mem = after["memories"][0]
+    print(f"decayed : importance 0.900 -> {mem['importance']} "
+          f"(decayLastRun={after.get('decayLastRun')})")
+    print(f"\nworkspace: {ws}")
+    return 0
+
 if __name__ == "__main__":
     try:
         sys.exit(main())
     except ContractError as e:
         print(f"contract error: {e}", file=sys.stderr)
         sys.exit(3)
+
+

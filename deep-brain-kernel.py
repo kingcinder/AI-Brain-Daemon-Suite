@@ -104,6 +104,12 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
+# The schedule-table core (Job, spec matching, dedupe key, due_now) lives in
+# core/runtime/schedule.py so every runtime shares identical dispatch
+# semantics. The kernel runs as a script, so anchor the import on this file.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from core.runtime.schedule import Job, _job_key, _spec_matches, due_now
+
 # ── Logging: stderr (JSON on stdout reserved for callers) ────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -1012,24 +1018,10 @@ def _minute_range(start: datetime, end: datetime, max_minutes: int = 24 * 60):
         count += 1
 
 
-# ── Pillar 5: job table (ported from, and matching, the tested bash version) ─
-@dataclass
-class Job:
-    name: str
-    kind: str  # "direct" or "spawn"
-    hours: str  # "*" or comma-separated ints
-    minutes: str  # comma-separated ints
-    target: str  # direct: path relative to SKILLS_DIR ; spawn: task text sent to `hermes chat -q`
-    days: str = "*"  # "*" or comma-separated weekday ints, Python convention:
-                      # 0=Monday .. 6=Sunday (datetime.weekday()). "*" = every day,
-                      # matching every job's behavior before this field existed.
-    spawn_max_steps: int = 8   # per-job override for agent-loop MAX_STEPS
-                                # (thinking models need more reasoning budget
-                                # before producing tool calls)
-    thinking_model: bool = False  # when True, auto-appends a no-reasoning
-                                   # prompt suffix so the model skips chain-of-
-                                   # thought and produces tool calls directly
-    last_fired_key: Optional[str] = field(default=None, repr=False)
+# ── Pillar 5: job table ──
+# Job, _spec_matches, _job_key, and due_now are imported from
+# core/runtime/schedule.py (the portable schedule-table core). The JOBS
+# table below is unchanged and keeps the identical Job(...) shape.
 
 
 # Every minute value below is globally unique across this table — see
@@ -1166,42 +1158,6 @@ JOBS: list[Job] = [
     Job("neuromod_update", "direct", "*", "6,21,36,51",
         "thalamus-memory/scripts/neuromod-update.sh"),
 ]
-
-
-def _spec_matches(spec: str, value: int) -> bool:
-    if spec == "*":
-        return True
-    return str(value) in {s.strip() for s in spec.split(",")}
-
-
-def _job_key(moment: datetime) -> str:
-    """Dedupe key for a scheduling moment: date + hour + minute.
-
-    BUG FIX: the key here previously omitted the date ("H:M" only). A job's
-    last_fired_key is stored per-job and never reset, so on the day after a
-    job first fired, today's "H:M" would be byte-identical to the value
-    already stored from yesterday — due_now() would see last_fired_key ==
-    key and return False, permanently, for every future occurrence. Every
-    job in this table (not just the new weekly ones below) was silently
-    exposed to this: each would fire exactly once, ever, after the daemon
-    started, then never again — indistinguishable from "working" unless you
-    happened to check --status weeks later and noticed the success count
-    frozen at 1. This bug was inherited unchanged from legacy/brain-daemon.sh
-    (same date-less key there). Including the date fixes it for daily jobs
-    too, and is what actually makes the new weekly jobs below viable at all
-    — a weekly job is the worst-case exposure of this bug, since "did it
-    fire since last Sunday" was never being asked in the first place.
-    """
-    return f"{moment.date().isoformat()}:{moment.hour}:{moment.minute}"
-
-
-def due_now(job: Job, moment: datetime) -> bool:
-    key = _job_key(moment)
-    if job.last_fired_key == key:
-        return False
-    return (_spec_matches(job.days, moment.weekday())
-            and _spec_matches(job.hours, moment.hour)
-            and _spec_matches(job.minutes, moment.minute))
 
 
 def check_schedule_table() -> int:

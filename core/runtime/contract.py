@@ -86,6 +86,20 @@ class JobResult:
     error: str | None = None
 
 
+@dataclass
+class ScriptResult:
+    """Outcome of Runtime.run_script().
+
+    returncode mirrors the process exit status (-1 when the adapter killed
+    the process on timeout rather than the process exiting itself).
+    output is the combined stdout/stderr tail — adapters cap it; the full
+    stream belongs to the substrate's own logs, not the contract.
+    """
+    returncode: int
+    output: str
+    timed_out: bool = False
+
+
 # --------------------------------------------------------------------------
 # Abstract substrate surface
 # --------------------------------------------------------------------------
@@ -187,6 +201,14 @@ class Runtime(abc.ABC):
     def provenance(self, event: str, detail: dict) -> None:
         """Append-only audit event {ts, event, actor, detail}. Best-effort:
         must never raise, must never break the caller (S7)."""
+
+    def run_script(self, relpath: str, args: list[str] | None = None,
+                   timeout_s: float = 300) -> ScriptResult:
+        """Execute a suite-bundled script (direct-kind job). Default:
+        unsupported — adapters opt in by overriding. relpath is resolved
+        against the suite root, never the workspace (S1). A missing script
+        raises ContractError (loud, not silent)."""
+        raise ContractError(f"run_script not supported by runtime '{self.name}'")
 
     # -- S1 -----------------------------------------------------------------
     def check_immutable(self, relpath: str) -> bool:
