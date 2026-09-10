@@ -31,7 +31,9 @@ from pathlib import Path
 
 # --------------------------------------------------------------------------
 # Trust anchor — the heart cannot rewrite its own valves.
-# Mirrors core/self-mod/immutable-paths.list (which also lists these).
+# A superset of core/self-mod/immutable-paths.list (which also lists the
+# shared entries): the Juno side additionally protects the contract files
+# and the Eternal Journal shape.
 # Matched against normalized target paths by fnmatch; also by suffix so an
 # absolute or differently-rooted path to the same file still trips.
 # --------------------------------------------------------------------------
@@ -41,6 +43,10 @@ TRUST_ANCHOR_PATTERNS = (
     "core/runtime/RUNTIME_CONTRACT.md",
     "core/runtime/schedule.py",
     "core/runtime/self_mod/*",
+    # The Eternal Journal is the source of truth: the pipeline may append
+    # via the Journal class, but no proposal may target journal files —
+    # rewriting history would destroy reconciliation and baselining alike.
+    "journal/*",
 )
 
 # The suite's own immutable core, defense-in-depth: a Juno proposal that

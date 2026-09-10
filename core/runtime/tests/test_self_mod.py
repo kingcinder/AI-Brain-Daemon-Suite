@@ -486,6 +486,140 @@ class SelfModTest(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"),
                          "new conventions text\n")
 
+    # -- Eternal Journal ----------------------------------------------------------------------
+    def test_journal_signal_history(self):
+        j = self.pipe.journal
+        j.record_signal("test.latency", 1.0, unit="s", day="2026-09-01")
+        j.record_signal("test.latency", 2.0, unit="s", day="2026-09-03")
+        hist = j.signal_history("test.latency", days=10, day="2026-09-05")
+        self.assertEqual([v for _, v in hist], [1.0, 2.0])
+        self.assertEqual(hist[0][0], "2026-09-01")
+
+    def test_journal_health_check_flags_deviation(self):
+        from datetime import date, timedelta
+        j = self.pipe.journal
+        base = date(2026, 9, 1)
+        # 12 flat baseline days, then a 3-day jump.
+        for i in range(12):
+            j.record_signal("test.flat", 1.0,
+                            day=(base + timedelta(days=i)).isoformat())
+        for i in range(12, 15):
+            j.record_signal("test.flat", 5.0,
+                            day=(base + timedelta(days=i)).isoformat())
+        anomalies = j.daily_health_check(
+            recent_days=3, baseline_days=12, min_baseline_points=5,
+            day="2026-09-15")
+        self.assertEqual(len(anomalies), 1)
+        self.assertEqual(anomalies[0]["signal"], "test.flat")
+        # journaled as an anomaly too
+        body = self.rt.memory.read("journal/2026-09-15.md")
+        self.assertIn("```anomaly", body)
+
+    def test_journal_health_check_quiet_when_stable(self):
+        from datetime import date, timedelta
+        j = self.pipe.journal
+        base = date(2026, 9, 1)
+        for i in range(15):
+            j.record_signal("test.stable", 1.0,
+                            day=(base + timedelta(days=i)).isoformat())
+        anomalies = j.daily_health_check(
+            recent_days=3, baseline_days=12, min_baseline_points=5,
+            day="2026-09-15")
+        self.assertEqual(anomalies, [])
+
+    def test_journal_is_immutable_to_proposals(self):
+        self.assertIsNotNone(is_immutable_target("journal/2026-09-10.md"))
+        self.assertIsNotNone(
+            is_immutable_target("memory:journal/2026-09-10.md"))
+        p = make_proposal("p-journal", target="journal/2026-09-10.md",
+                          change="rewrite history", rationale="x")
+        self.pipe.submit(p)
+        self.assertEqual(p.status, "rejected")
+
+    def test_apply_freezes_state_and_reconcile_matches(self):
+        p = make_proposal(
+            "p-jstate",
+            verification_plan=[{"kind": "command",
+                                "run": ["python3", "-c", "pass"]}])
+        self.pipe.submit(p)
+        self.pipe.verify(p)
+        p.approve_self("journal test")
+        self.pipe.gate(p)
+        applied = self.pipe.apply(p)
+        self.pipe.monitor(p, applied.backup)
+        frozen = self.pipe.journal.latest_state("p-jstate")
+        self.assertIsNotNone(frozen)
+        self.assertTrue(frozen["state"].startswith("sha256:"))
+        result = self.pipe.reconcile(p)
+        self.assertTrue(result["match"])
+        self.assertIsNone(result["repair_proposal"])
+
+    def test_reconcile_divergence_returns_repair_draft(self):
+        p = make_proposal(
+            "p-jdiv",
+            verification_plan=[{"kind": "command",
+                                "run": ["python3", "-c", "pass"]}])
+        self.pipe.submit(p)
+        self.pipe.verify(p)
+        p.approve_self("divergence test")
+        self.pipe.gate(p)
+        applied = self.pipe.apply(p)
+        self.pipe.monitor(p, applied.backup)
+        # something else modifies the target outside the pipeline
+        (Path(self.tmp.name) / "memory" / "conventions.md").write_text(
+            "tampered\n", encoding="utf-8")
+        result = self.pipe.reconcile(p)
+        self.assertFalse(result["match"])
+        repair = result["repair_proposal"]
+        self.assertIsNotNone(repair)
+        self.assertEqual(repair.status, "draft")
+        self.assertEqual(repair.prompt_source, "scheduled")
+        self.assertIn("p-jdiv", repair.id)
+        # the draft is submittable through the normal pipeline
+        self.pipe.submit(repair)
+        self.assertEqual(repair.status, "proposed")
+
+    def test_attest_requires_observed_state(self):
+        p = make_proposal("p-att", scope="cron",
+                          target="recursive-self-improvement",
+                          change_kind="schedule", change="x", rationale="y",
+                          new_content="body\n")
+        self.pipe.submit(p)
+        self.pipe.verify(p)
+        p.approve_dyther("cron test")
+        self.pipe.gate(p)
+        self.pipe.apply(p)
+        self.assertEqual(p.status, "plan_issued")
+        with self.assertRaises(ValueError):
+            self.pipe.attest_plan_executed(p, "did the steps", "")
+        with self.assertRaises(ValueError):
+            self.pipe.attest_plan_executed(p, "did the steps", "   ")
+        self.pipe.attest_plan_executed(
+            p, "ran cron.view/update/view; body confirmed",
+            observed_state="cron body after update:\nbody\n")
+        self.assertEqual(p.status, "done")
+        frozen = self.pipe.journal.latest_state("p-att")
+        self.assertIn("body", frozen["state"])
+
+    def test_reconcile_cron_via_agent_read(self):
+        p = make_proposal("p-cronrec", scope="cron",
+                          target="recursive-self-improvement",
+                          change_kind="schedule", change="x", rationale="y",
+                          new_content="body v2\n")
+        self.pipe.submit(p)
+        self.pipe.verify(p)
+        p.approve_dyther("cron reconcile test")
+        self.pipe.gate(p)
+        self.pipe.apply(p)
+        self.pipe.attest_plan_executed(
+            p, "updated and read back", observed_state="body v2")
+        ok = self.pipe.reconcile(p, observed_now="body v2")
+        self.assertTrue(ok["match"])
+        bad = self.pipe.reconcile(p, observed_now="body v3")
+        self.assertFalse(bad["match"])
+        self.assertIsNotNone(bad["repair_proposal"])
+        self.assertEqual(bad["repair_proposal"].prompt_source, "scheduled")
+
     # -- status machine ----------------------------------------------------------------------
     def test_illegal_transitions_raise(self):
         p = make_proposal("p-st")

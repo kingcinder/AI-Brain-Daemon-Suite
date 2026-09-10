@@ -12,10 +12,16 @@ Modules:
   verify    — verification stages; failed verification blocks apply
   apply     — snapshot/apply/rollback; rollback is hash-proven
   graduation — clean-streak tracker; rollback resets to zero
-  pipeline  — propose -> verify -> gate -> apply -> monitor orchestration
+  pipeline  — propose -> verify -> gate -> apply -> monitor orchestration,
+              journaled; reconcile() closes the loop through the journal
   juno_capability — the pipeline's hands on the agent runtime
+
+The Eternal Journal (core/runtime/journal.py) is the source of truth:
+health signals accumulate into the behavioral baseline, and frozen
+post-apply states are what reconciliation checks reality against.
 """
 
+from ..journal import Journal
 from .apply import Applier, ApplyResult, BackupRecord, RollbackResult
 from .graduation import GraduationTracker
 from .juno_capability import JunoSelfMod
@@ -30,9 +36,9 @@ from .verify import StageResult, VerificationResult, Verifier
 __all__ = [
     "Applier", "ApplyResult", "Approval", "BackupRecord", "GateRefused",
     "GraduationTracker", "HARD_RULES", "HardRule", "ImmutableTargetError",
-    "JunoSelfMod", "PROMPT_SOURCES", "Pipeline", "Proposal", "RollbackResult",
-    "StageResult", "StatusTransitionError", "Tier", "VerificationResult",
-    "Verifier", "approval_requirement", "assert_mutable_target", "classify",
-    "is_immutable_target", "parse_hard_rules", "scan_hard_rules",
-    "utc_now_iso",
+    "Journal", "JunoSelfMod", "PROMPT_SOURCES", "Pipeline", "Proposal",
+    "RollbackResult", "StageResult", "StatusTransitionError", "Tier",
+    "VerificationResult", "Verifier", "approval_requirement",
+    "assert_mutable_target", "classify", "is_immutable_target",
+    "parse_hard_rules", "scan_hard_rules", "utc_now_iso",
 ]

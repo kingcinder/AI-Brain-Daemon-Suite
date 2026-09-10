@@ -97,7 +97,10 @@ class JunoSelfMod:
                             "exactly as proposed"},
                 {"n": 4, "action": "pipeline.attest_plan_executed",
                  "purpose": "record what was executed and how step 3 "
-                            "verified it — a note is required, not optional"},
+                            "verified it — a note AND the observed_state "
+                            "(the step-3 read-back) are required; the "
+                            "read-back is frozen in the Eternal Journal "
+                            "for later reconciliation"},
             ],
             "rollback": ("re-issue cron.update with the body recorded in "
                          "step 1"),
