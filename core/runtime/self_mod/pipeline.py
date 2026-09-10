@@ -18,7 +18,13 @@ Enforcement invariants (no exceptions, no overrides):
     approval counts as absent; revocation never auto-rolls-back.
   * monitor() re-runs the automated verification steps post-apply; on
     success the clean streak increments, on failure it resets to zero and
-    rolls back automatically.
+    rolls back automatically. Outcomes are journaled as health signals —
+    the Eternal Journal accumulates the behavioral baseline.
+  * apply() freezes the post-apply state in the journal; attestations of
+    agent-mediated targets must carry the observed read-back, frozen the
+    same way. reconcile() checks current state against the frozen claim;
+    divergence journals an anomaly and returns a draft repair proposal —
+    the loop closes through the journal.
   * The pipeline never approves, never resolves agent checks, never
     infers — those are the agent's (and Dyther's) alone.
 """
@@ -28,7 +34,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from pathlib import Path
 
-from .apply import Applier, ApplyResult, BackupRecord, RollbackResult
+from .apply import Applier, ApplyResult, BackupRecord, RollbackResult, sha256_file
+from ..journal import Journal
 from .graduation import GraduationTracker
 from .proposal import PROMPT_SOURCES, Proposal, StatusTransitionError, utc_now_iso
 from .tiers import Tier, approval_requirement, classify, is_immutable_target
@@ -52,6 +59,7 @@ class Pipeline:
                                emit_plan=capability.issue_cron_plan,
                                backup_root=capability.backup_root)
         self.graduation = GraduationTracker(runtime.memory)
+        self.journal = Journal(runtime.memory)
 
     # -- audit ----------------------------------------------------------------
     def _record(self, proposal: Proposal, event: str, **detail) -> None:
@@ -169,6 +177,18 @@ class Pipeline:
                                 f"plan at {result.plan_path}")
         else:
             proposal.transition("applied", result.detail)
+            # Freeze the observed post-apply state in the journal — the
+            # claim reconciliation checks reality against.
+            try:
+                path = self.capability.resolve_target(
+                    proposal.scope, proposal.target)
+                if path is not None and path.is_file():
+                    self.journal.record_state(
+                        proposal.id, f"{proposal.scope}:{proposal.target}",
+                        f"sha256:{sha256_file(path)}",
+                        note="post-apply read-back")
+            except Exception:
+                pass  # journaling never breaks the pipeline
         self._record(proposal, proposal.status,
                      backup=(result.backup.backup_dir if result.backup else None),
                      plan=result.plan_path)
@@ -234,10 +254,17 @@ class Pipeline:
         if not failures:
             proposal.transition("done", "monitor: verification still green")
             self._record(proposal, "done")
-            self.graduation.record_clean()
+            streak = self.graduation.record_clean()
+            self.journal.record_signal("self_mod.clean_streak", streak,
+                                       note=f"proposal {proposal.id} clean")
+            self.journal.record_signal("self_mod.monitor", 1,
+                                       note=f"proposal {proposal.id}: green")
             return None
         self._record(proposal, "monitor_failed", failures=failures)
         self.graduation.record_failure()
+        self.journal.record_signal("self_mod.monitor", 0,
+                                   note=f"proposal {proposal.id}: "
+                                        f"{failures}")
         if backup is None:
             proposal.transition("rejected",
                                 f"monitor failed {failures} and no backup "
@@ -253,11 +280,19 @@ class Pipeline:
                      failures=failures, detail=rb.detail)
         return rb
 
-    def attest_plan_executed(self, proposal: Proposal, note: str = "") -> None:
+    def attest_plan_executed(self, proposal: Proposal, note: str,
+                             observed_state: str) -> None:
         """For plan_issued (agent-mediated, e.g. cron) targets: the agent
         executed the plan and verified it. The pipeline cannot observe the
         agent's tools, so it records the attestation honestly as an
-        attestation — not as a verification it performed."""
+        attestation — not as a verification it performed.
+
+        observed_state is REQUIRED: the agent's fresh read-back of the
+        resulting state (e.g. the cron body as re-read after update). It is
+        frozen in the Eternal Journal as the claim reconciliation checks
+        reality against. An attestation without a read-back is not
+        attestable — the journal needs something to hold onto.
+        """
         if proposal.status != "plan_issued":
             raise StatusTransitionError(
                 f"attest requires status 'plan_issued', got "
@@ -265,5 +300,80 @@ class Pipeline:
         if not note or not note.strip():
             raise ValueError("attestation requires a note describing what "
                              "was executed and how it was verified")
+        if not observed_state or not observed_state.strip():
+            raise ValueError("attestation requires observed_state — the "
+                             "fresh read-back of the resulting state")
+        self.journal.record_state(
+            proposal.id, f"{proposal.scope}:{proposal.target}",
+            observed_state.strip(), note="agent read-back at attestation")
         proposal.transition("done", f"agent attests: {note.strip()}")
         self._record(proposal, "done", attestation=note.strip())
+
+    def reconcile(self, proposal: Proposal,
+                  observed_now: str | None = None) -> dict:
+        """Compare the target's CURRENT state against the state frozen in
+        the Eternal Journal at apply/attestation time.
+
+        File targets are re-read directly by the pipeline. Agent-mediated
+        (cron) targets need the agent's fresh read as observed_now — the
+        reading is agent-mediated, the comparison is automated.
+
+        Returns {"match": bool, "expected": ..., "observed": ...,
+        "repair_proposal": Proposal | None}. On divergence the journal
+        records an anomaly and a draft repair proposal
+        (prompt_source="scheduled") is returned — the loop closes through
+        the journal: detect -> propose -> verify -> gate -> apply.
+        """
+        frozen = self.journal.latest_state(proposal.id)
+        if frozen is None:
+            return {"match": False, "expected": None, "observed": None,
+                    "repair_proposal": None,
+                    "detail": "no journaled state for this proposal — "
+                              "nothing to reconcile against"}
+        expected = frozen["state"]
+        target = f"{proposal.scope}:{proposal.target}"
+        path = None
+        try:
+            path = self.capability.resolve_target(
+                proposal.scope, proposal.target)
+        except Exception:
+            pass
+        if path is not None:
+            observed = (f"sha256:{sha256_file(path)}" if path.is_file()
+                        else "target missing")
+        elif observed_now is None:
+            raise ValueError(
+                "agent-mediated targets need observed_now — the agent's "
+                "fresh read of the target")
+        else:
+            observed = observed_now.strip()
+        if observed == expected:
+            self.journal.append(
+                "Self-mod",
+                f"reconciliation {proposal.id}: match "
+                f"({target} still {expected[:32]}...)")
+            return {"match": True, "expected": expected,
+                    "observed": observed, "repair_proposal": None}
+        detail = (f"reconciliation {proposal.id}: DIVERGED — journal says "
+                  f"{target} was {expected[:64]}, now {observed[:64]}")
+        self.journal.record_anomaly("reconciliation_divergence", detail)
+        self._record(proposal, "reconciliation_diverged",
+                     expected=expected, observed=observed)
+        repair = Proposal(
+            id=f"{proposal.id}-repair-{utc_now_iso()[:10]}",
+            scope=proposal.scope, target=proposal.target,
+            change_kind=proposal.change_kind,
+            change=(f"restore {target} to its journaled state "
+                    f"({expected[:32]}...); divergence detected by "
+                    f"reconciliation"),
+            rationale=(f"The Eternal Journal records {target} as "
+                       f"{expected[:64]} after {proposal.id}, but it now "
+                       f"reads {observed[:64]}. Restore the journaled "
+                       f"state or journal the intended new state."),
+            verification_plan=[{"kind": "agent-check",
+                                "description": "re-read target after "
+                                               "repair and confirm match"}],
+            rollback_plan="restore from the repair's own backup",
+            prompt_source="scheduled")
+        return {"match": False, "expected": expected, "observed": observed,
+                "repair_proposal": repair}
