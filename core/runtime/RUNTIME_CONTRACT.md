@@ -96,11 +96,14 @@ requirements. Adapters and job logic must satisfy all of them.
 - **S1 Immutable core.** `core/self-mod/*`, `core/locks/*`,
   `core/concurrency/semaphore.sh`, `core/sandbox/sandbox-run.sh`,
   `core/executive-load/calc-executive-load.sh`,
-  `skills/prefrontal-cortex-memory/scripts/decide.sh`, and now
-  `core/runtime/*` (this contract — the safety kernel must not be
-  self-modifiable) are never self-mod targets, **at every autonomy tier**,
-  enforced by path matching, not by tier config. Traversal/absolute/symlink
-  escapes are rejected, never rewritten.
+  `skills/prefrontal-cortex-memory/scripts/decide.sh`, and the contract
+  trust anchor — `core/runtime/contract.py`, `core/runtime/RUNTIME_CONTRACT.md`,
+  `core/runtime/schedule.py`, `core/runtime/self_mod/*` (the safety kernel
+  and the self-mod pipeline itself are not self-modifiable) — are never
+  self-mod targets, **at every autonomy tier**, enforced by path matching,
+  not by tier config. Adapters, jobs, demos and tests stay mutable under
+  verification. Traversal/absolute/symlink escapes are rejected, never
+  rewritten.
 - **S2 Fail-safe autonomy default.** Missing, unreadable, or invalid
   autonomy state ⇒ `steward_mode`. Autonomy is never over-granted on absent
   evidence. `auto_mode` requires ALL of: graduation streak at target, zero

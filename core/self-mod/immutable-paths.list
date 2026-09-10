@@ -10,3 +10,4 @@ core/self-mod/*
 core/runtime/contract.py
 core/runtime/RUNTIME_CONTRACT.md
 core/runtime/schedule.py
+core/runtime/self_mod/*

@@ -163,6 +163,9 @@ class Mind(abc.ABC):
 
 # S1: immutable core — never self-mod targets, at every autonomy tier.
 # Mirrors core/self-mod/immutable-paths.list (which also lists these).
+# Narrowed deliberately (see immutable-paths.list): adapters, jobs, demos
+# and tests stay mutable under verification — the contract interface, its
+# spec, the dispatch semantics, and the self-mod pipeline itself do not.
 IMMUTABLE_CORE_PATTERNS = (
     "skills/prefrontal-cortex-memory/scripts/decide.sh",
     "core/locks/rwlock.sh",
@@ -171,7 +174,10 @@ IMMUTABLE_CORE_PATTERNS = (
     "core/sandbox/sandbox-run.sh",
     "core/executive-load/calc-executive-load.sh",
     "core/self-mod/*",
-    "core/runtime/*",   # this contract: safety infrastructure, not self-modifiable
+    "core/runtime/contract.py",
+    "core/runtime/RUNTIME_CONTRACT.md",
+    "core/runtime/schedule.py",
+    "core/runtime/self_mod/*",  # the heart cannot rewrite its own valves
 )
 
 # S2: autonomy evidence thresholds (mirror deep-brain-kernel.compute_autonomy_mode).
