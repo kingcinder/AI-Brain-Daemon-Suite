@@ -41,6 +41,7 @@ from ..contract import (
     ContractError, JobSpec, MemoryStore, MemoryViolation, Runtime,
     ScheduleError, Scheduler, ScriptResult, utc_now_iso,
 )
+from ..self_mod.juno_capability import JunoSelfMod
 
 log = logging.getLogger("runtime.juno")
 
@@ -188,7 +189,9 @@ class JunoRuntime(Runtime):
     name = "juno"
 
     def __init__(self, root: Path | str | None = None,
-                 suite_root: Path | str | None = None):
+                 suite_root: Path | str | None = None,
+                 skills_root: Path | str | None = None,
+                 memory_root: Path | str | None = None):
         self._root = Path(root or Path.home() / ".juno-brain").resolve()
         self.memory = JunoMemoryStore(self._root)
         self.scheduler = JunoScheduler(self._root)
@@ -196,6 +199,17 @@ class JunoRuntime(Runtime):
         self._suite_root = Path(
             suite_root or Path(__file__).resolve().parent.parent.parent
         ).resolve()
+        # Self-mod capability: the pipeline's hands. Operates on real
+        # targets (skills dir, memory dir); cron targets become executable
+        # plan documents — the adapter never pretends to call agent tools.
+        self.self_mod = JunoSelfMod(
+            self,
+            skills_root=skills_root,
+            memory_root=(memory_root if memory_root is not None
+                         else self._root / "memory"),
+            plans_dir=self._root / "self-mod-plans",
+            backup_root=self._root / "self-mod-backups",
+        )
 
     def asset(self, relpath: str) -> str | None:
         p = (self._suite_root / relpath).resolve()
