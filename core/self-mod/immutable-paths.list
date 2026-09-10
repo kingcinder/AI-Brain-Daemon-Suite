@@ -7,4 +7,6 @@ core/concurrency/semaphore.sh
 core/sandbox/sandbox-run.sh
 core/executive-load/calc-executive-load.sh
 core/self-mod/*
-core/runtime/*
+core/runtime/contract.py
+core/runtime/RUNTIME_CONTRACT.md
+core/runtime/schedule.py
