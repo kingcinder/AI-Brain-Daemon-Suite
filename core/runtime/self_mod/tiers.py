@@ -171,6 +171,46 @@ class Tier(enum.Enum):
     TIER_1 = "tier_1"      # significant, Dyther-gated
 
 
+# --------------------------------------------------------------------------
+# Graduation — Tier 1 approval requirements shrink with a clean streak.
+# Dyther's rule: nothing is ever unprompted (prompt_source is required on
+# every proposal at every band); the streak only shrinks *who approves*.
+# Band 2 (20) mirrors the suite's AUTONOMY_CLEAN_STREAK_TARGET.
+# --------------------------------------------------------------------------
+
+GRADUATION_BAND_1_STREAK = 5
+GRADUATION_BAND_2_STREAK = 20
+
+# Change kinds considered "routine" at band 1: config values and schedule
+# bodies. Lower blast radius than code; still verified, still notified.
+BAND_1_ROUTINE_KINDS = frozenset({"config", "schedule"})
+
+
+def approval_requirement(tier: Tier, change_kind: str,
+                         hard_rule_flags: tuple[str, ...],
+                         streak: int) -> str:
+    """Who may approve this proposal at this streak. Returns one of:
+
+      "dyther"      — Dyther's recorded approval required (silence never counts)
+      "self"        — recorded self-approval suffices (Tier 0)
+      "self_notify" — recorded self-approval + rationale suffices, AND
+                      Dyther is notified of the apply with the revocation path
+
+    Hard-rule-flagged proposals never graduate: a tripwire always needs
+    Dyther, at any streak. Escalation never silently passes.
+    """
+    if tier is Tier.TIER_0:
+        return "self"
+    if hard_rule_flags:
+        return "dyther"
+    if streak >= GRADUATION_BAND_2_STREAK:
+        return "self_notify"
+    if (streak >= GRADUATION_BAND_1_STREAK
+            and change_kind in BAND_1_ROUTINE_KINDS):
+        return "self_notify"
+    return "dyther"
+
+
 # Tier 0 is deliberately narrow: text-only changes inside the memory scope.
 # Everything else — code, config, schedules, skills, ambiguity — is Tier 1.
 TIER_0_SCOPES = frozenset({"memory"})

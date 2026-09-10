@@ -7,11 +7,18 @@ recorded to the runtime's memory store (``self_mod/proposals/<id>.jsonl``)
 and to provenance.
 
 Enforcement invariants (no exceptions, no overrides):
+  * submit() refuses proposals without a valid prompt_source — nothing is
+    ever unprompted, at any graduation band.
   * apply() refuses any proposal whose status is not "verified".
-  * gate() refuses Tier 1 without a recorded Dyther approval, and refuses
-    any tier with unresolved agent checks.
+  * gate() refuses any tier with unresolved agent checks, and enforces the
+    graduation-band requirement: streak 0 => every Tier 1 needs Dyther;
+    clean streak shrinks the requirement for routine Tier 1, never for
+    hard-rule-flagged proposals (tripwires always need Dyther).
+  * Approvals never expire — only explicit revocation ends them. A revoked
+    approval counts as absent; revocation never auto-rolls-back.
   * monitor() re-runs the automated verification steps post-apply; on
-    failure it rolls back automatically.
+    success the clean streak increments, on failure it resets to zero and
+    rolls back automatically.
   * The pipeline never approves, never resolves agent checks, never
     infers — those are the agent's (and Dyther's) alone.
 """
@@ -22,8 +29,9 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .apply import Applier, ApplyResult, BackupRecord, RollbackResult
-from .proposal import Proposal, StatusTransitionError, utc_now_iso
-from .tiers import Tier, classify, is_immutable_target
+from .graduation import GraduationTracker
+from .proposal import PROMPT_SOURCES, Proposal, StatusTransitionError, utc_now_iso
+from .tiers import Tier, approval_requirement, classify, is_immutable_target
 from .verify import VerificationResult, Verifier
 
 
@@ -43,6 +51,7 @@ class Pipeline:
         self.applier = Applier(capability.resolve_target,
                                emit_plan=capability.issue_cron_plan,
                                backup_root=capability.backup_root)
+        self.graduation = GraduationTracker(runtime.memory)
 
     # -- audit ----------------------------------------------------------------
     def _record(self, proposal: Proposal, event: str, **detail) -> None:
@@ -64,6 +73,12 @@ class Pipeline:
     # -- stages -----------------------------------------------------------------
     def submit(self, proposal: Proposal) -> Proposal:
         """Classify the tier and screen immutable targets."""
+        # Defense in depth: the constructor already requires prompt_source,
+        # but submit re-asserts — a proposal object built by other means
+        # must not slip through.
+        assert proposal.prompt_source in PROMPT_SOURCES, (
+            f"proposal {proposal.id} has no valid prompt_source — "
+            "nothing is ever unprompted")
         matched = is_immutable_target(f"{proposal.scope}:{proposal.target}")
         if matched is None:
             matched = is_immutable_target(proposal.target)
@@ -105,7 +120,13 @@ class Pipeline:
         return result
 
     def gate(self, proposal: Proposal) -> None:
-        """Tier gate. Raises GateRefused on any failure — apply stays blocked."""
+        """Tier gate. Raises GateRefused on any failure — apply stays blocked.
+
+        The requirement comes from the graduation band: at streak 0 every
+        Tier 1 needs Dyther; as the clean streak grows, routine Tier 1 may
+        self-approve with rationale + notification. Hard-rule-flagged
+        proposals never graduate — tripwires always need Dyther.
+        """
         if proposal.status != "verified":
             raise GateRefused(
                 f"gate requires status 'verified', got {proposal.status!r}")
@@ -114,21 +135,35 @@ class Pipeline:
                        if c["passed"] is not True]
             raise GateRefused(
                 f"{len(pending)} agent check(s) unresolved: {pending}")
-        if proposal.tier is Tier.TIER_1 and not proposal.dyther_approved():
-            raise GateRefused(
-                "Tier 1 requires Dyther's recorded approval — "
-                "silence is never approval")
-        if proposal.tier is Tier.TIER_0 and not proposal.self_approved():
-            raise GateRefused("Tier 0 requires recorded self-approval")
-        proposal.transition("approved", "gate passed")
-        self._record(proposal, "approved")
+        req = approval_requirement(
+            proposal.tier, proposal.change_kind,
+            proposal.hard_rule_flags, self.graduation.streak)
+        if req == "dyther":
+            if not proposal.dyther_approved():
+                raise GateRefused(
+                    "Tier 1 requires Dyther's recorded approval — "
+                    "silence is never approval")
+        else:  # "self" or "self_notify"
+            if not proposal.self_approved():
+                raise GateRefused(
+                    f"gate requires a recorded self-approval "
+                    f"(requirement={req}) — silence is never approval")
+        proposal.gate_requirement = req
+        proposal.transition("approved", f"gate passed (requirement={req})")
+        self._record(proposal, "approved", requirement=req)
 
     def apply(self, proposal: Proposal) -> ApplyResult:
         if proposal.status != "approved":
             raise GateRefused(
                 f"apply requires status 'approved' (verified + gated), "
                 f"got {proposal.status!r}")
-        result = self.applier.apply(proposal)
+        try:
+            result = self.applier.apply(proposal)
+        except Exception:
+            # The change never landed cleanly — the streak resets.
+            self.graduation.record_failure()
+            self._record(proposal, "apply_failed")
+            raise
         if result.plan_path:
             proposal.transition("plan_issued",
                                 f"plan at {result.plan_path}")
@@ -137,7 +172,49 @@ class Pipeline:
         self._record(proposal, proposal.status,
                      backup=(result.backup.backup_dir if result.backup else None),
                      plan=result.plan_path)
+        if proposal.gate_requirement == "self_notify":
+            self._notify_dyther(proposal)
         return result
+
+    def _notify_dyther(self, proposal: Proposal) -> None:
+        """Graduated self-approval is never silent: record a notification
+        for Dyther with what changed, why, and the revocation path. The
+        pipeline records; the agent surfaces it (weekly review / next
+        conversation). Delivery is the agent's job — this file is the proof
+        the notification exists."""
+        statements = [a.statement for a in proposal.approvals
+                      if a.approver == "self" and not a.revoked]
+        body = (
+            f"# Self-mod notification — proposal {proposal.id}\n\n"
+            f"Applied under graduated self-approval "
+            f"(gate requirement: self_notify, "
+            f"clean streak at gate: {self.graduation.streak}).\n\n"
+            f"- scope/target: {proposal.scope}:{proposal.target}\n"
+            f"- change: {proposal.change}\n"
+            f"- rationale: {proposal.rationale}\n"
+            f"- prompt source: {proposal.prompt_source}\n"
+            f"- self-approval rationale: "
+            f"{statements[-1] if statements else '(none recorded)'}\n\n"
+            f"If this change should not stand, revoke the approval: the "
+            f"pipeline's revoke() marks it absent and flags the proposal "
+            f"for re-review. Rollback is a separate explicit decision.\n"
+        )
+        try:
+            self.runtime.memory.write(
+                f"self_mod/notifications/{proposal.id}.md", body)
+        except Exception:
+            pass
+        self._record(proposal, "notified_dyther")
+
+    def revoke(self, proposal: Proposal, approver: str,
+               note: str = "") -> None:
+        """Revoke an approval on a proposal. Never expires on its own —
+        only this ends it. Revocation blocks future applies under that
+        approval and flags the proposal for re-review; it does not
+        auto-roll-back an already-applied change."""
+        proposal.revoke_approval(approver, note)
+        self._record(proposal, "approval_revoked", approver=approver,
+                     note=note)
 
     def monitor(self, proposal: Proposal,
                 backup: BackupRecord | None = None) -> RollbackResult | None:
@@ -157,8 +234,10 @@ class Pipeline:
         if not failures:
             proposal.transition("done", "monitor: verification still green")
             self._record(proposal, "done")
+            self.graduation.record_clean()
             return None
         self._record(proposal, "monitor_failed", failures=failures)
+        self.graduation.record_failure()
         if backup is None:
             proposal.transition("rejected",
                                 f"monitor failed {failures} and no backup "

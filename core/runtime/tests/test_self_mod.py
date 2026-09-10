@@ -10,7 +10,11 @@ What these prove:
   (c) rollback restores prior state byte-for-byte (hash-proven);
   (d) a Tier 1 proposal without Dyther's approval does not apply.
 Plus: tier classification, hard-rule escalation, traversal rejection,
-agent-check gating, monitor auto-rollback, and cron plan emission.
+agent-check gating, monitor auto-rollback, cron plan emission,
+prompt_source enforcement (nothing unprompted), graduation bands
+(Tier 1 requirements shrink with clean streak; tripwires never graduate),
+streak accounting (clean monitor increments, rollback resets), and
+approval revocation (no expiry; revocation never auto-rolls-back).
 """
 
 import sys
@@ -34,12 +38,13 @@ def make_proposal(pid, scope="memory", target="conventions.md",
                   change_kind="text", change="tweak wording",
                   rationale="review found the convention unclear",
                   new_content="new conventions text\n",
-                  verification_plan=None, rollback_plan="restore from backup"):
+                  verification_plan=None, rollback_plan="restore from backup",
+                  prompt_source="dyther_direct"):
     return Proposal(
         id=pid, scope=scope, target=target, change_kind=change_kind,
         change=change, rationale=rationale, new_content=new_content,
         verification_plan=verification_plan or [],
-        rollback_plan=rollback_plan)
+        rollback_plan=rollback_plan, prompt_source=prompt_source)
 
 
 class SelfModTest(unittest.TestCase):
@@ -86,7 +91,7 @@ class SelfModTest(unittest.TestCase):
         p2 = Proposal(id="p-imm3", scope="skills",
                       target="core/runtime/contract.py", change_kind="code",
                       change="rewrite the contract", rationale="x",
-                      rollback_plan="y")
+                      rollback_plan="y", prompt_source="dyther_direct")
         self.pipe.submit(p2)
         self.assertEqual(p2.status, "rejected")
 
@@ -94,7 +99,8 @@ class SelfModTest(unittest.TestCase):
         p = Proposal(id="p-valve", scope="skills",
                      target="core/runtime/self_mod/verify.py",
                      change_kind="code", change="loosen verification",
-                     rationale="x", rollback_plan="y")
+                     rationale="x", rollback_plan="y",
+                     prompt_source="dyther_direct")
         self.pipe.submit(p)
         self.assertEqual(p.status, "rejected")
         self.assertIn("self_mod", p.history[-1]["note"])
@@ -236,14 +242,17 @@ class SelfModTest(unittest.TestCase):
         self.pipe.apply(p)
         self.assertEqual(p.status, "applied")
 
-    def test_self_approval_rejected_for_tier1(self):
+    def test_gate_refuses_tier1_self_approval_at_streak_0(self):
+        # approve_self records; the gate authorizes. At streak 0 a Tier 1
+        # self-approval does not satisfy the requirement.
         p = make_proposal("p-t1self", scope="skills", target="demo/SKILL.md",
                           change_kind="code", change="x", rationale="y",
                           new_content="z\n")
         self.pipe.submit(p)
         self.assertEqual(p.tier, Tier.TIER_1)
-        with self.assertRaises(ValueError):
-            p.approve_self("trying to self-approve a Tier 1")
+        p.approve_self("trying to self-approve a Tier 1")
+        with self.assertRaises(GateRefused):
+            self.pipe.gate(p)
 
     # -- agent-check gating -----------------------------------------------------------
     def test_agent_check_blocks_gate_until_resolved(self):
@@ -311,6 +320,171 @@ class SelfModTest(unittest.TestCase):
         plan = Path(result.plan_path)
         self.assertTrue(plan.exists())
         self.assertIn("cron.update", plan.read_text(encoding="utf-8"))
+
+    # -- prompt_source: nothing is ever unprompted -------------------------------
+    def test_prompt_source_required(self):
+        # Omitted entirely: construction itself is impossible...
+        with self.assertRaises(TypeError):
+            Proposal(id="p-np", scope="memory", target="conventions.md",
+                     change_kind="text", change="x", rationale="y",
+                     rollback_plan="z")  # no prompt_source
+        # ...and an invalid value is rejected loudly.
+        with self.assertRaises(ValueError):
+            make_proposal("p-bad-src", prompt_source="it felt right")
+
+    def test_prompt_source_recorded_at_submit(self):
+        p = make_proposal("p-src", prompt_source="weekly_review")
+        self.pipe.submit(p)
+        self.assertEqual(p.status, "proposed")
+        self.assertEqual(p.prompt_source, "weekly_review")
+
+    # -- graduation bands -------------------------------------------------------------------
+    def test_approval_requirement_bands(self):
+        from core.runtime.self_mod.tiers import approval_requirement
+        t1 = Tier.TIER_1
+        self.assertEqual(approval_requirement(t1, "config", (), 0), "dyther")
+        self.assertEqual(approval_requirement(t1, "config", (), 4), "dyther")
+        self.assertEqual(approval_requirement(t1, "config", (), 5),
+                         "self_notify")
+        self.assertEqual(approval_requirement(t1, "code", (), 10), "dyther")
+        self.assertEqual(approval_requirement(t1, "code", (), 19), "dyther")
+        self.assertEqual(approval_requirement(t1, "code", (), 20),
+                         "self_notify")
+        # Hard-rule tripwires never graduate, at any streak.
+        self.assertEqual(
+            approval_requirement(t1, "config",
+                                 ("no-reboot-without-approval",), 99),
+            "dyther")
+        self.assertEqual(
+            approval_requirement(Tier.TIER_0, "text", (), 0), "self")
+
+    def test_band1_routine_self_approval_notifies_dyther(self):
+        for _ in range(5):
+            self.pipe.graduation.record_clean()
+        self.assertEqual(self.pipe.graduation.streak, 5)
+        p = make_proposal("p-band1", scope="cron",
+                          target="recursive-self-improvement",
+                          change_kind="schedule",
+                          change="shift by one hour",
+                          rationale="review found the slot colliding",
+                          new_content="cron body shifted\n")
+        self.pipe.submit(p)
+        self.assertEqual(p.tier, Tier.TIER_1)
+        self.pipe.verify(p)
+        p.approve_self("routine schedule shift; verified green; "
+                       "reversible via plan re-issue")
+        self.pipe.gate(p)  # no Dyther approval — and no GateRefused
+        self.assertEqual(p.gate_requirement, "self_notify")
+        result = self.pipe.apply(p)
+        self.assertTrue(result.ok)
+        note = (Path(self.tmp.name) / "rt" / "self_mod" / "notifications"
+                / "p-band1.md")
+        self.assertTrue(note.exists(), "Dyther must be notified")
+        text = note.read_text(encoding="utf-8")
+        self.assertIn("revoke", text)
+
+    def test_band1_code_stays_dyther_gated(self):
+        for _ in range(10):
+            self.pipe.graduation.record_clean()
+        p = make_proposal("p-band1code", scope="skills",
+                          target="demo/SKILL.md", change_kind="code",
+                          change="rewrite skill logic", rationale="y",
+                          new_content="# new\n")
+        self.pipe.submit(p)
+        self.pipe.verify(p)
+        p.approve_self("self-approving code at streak 10")
+        with self.assertRaises(GateRefused):
+            self.pipe.gate(p)
+        p.approve_dyther("code changes stay mine until graduation")
+        self.pipe.gate(p)  # now it passes
+
+    # -- streak accounting --------------------------------------------------------------------
+    def test_streak_increments_on_clean_monitor(self):
+        self.assertEqual(self.pipe.graduation.streak, 0)
+        p = make_proposal(
+            "p-streak",
+            verification_plan=[{"kind": "command",
+                                "run": ["python3", "-c", "pass"]}])
+        self.pipe.submit(p)
+        self.pipe.verify(p)
+        p.approve_self("streak test")
+        self.pipe.gate(p)
+        applied = self.pipe.apply(p)
+        self.pipe.monitor(p, applied.backup)
+        self.assertEqual(p.status, "done")
+        self.assertEqual(self.pipe.graduation.streak, 1)
+
+    def test_streak_resets_on_rollback(self):
+        for _ in range(3):
+            self.pipe.graduation.record_clean()
+        self.assertEqual(self.pipe.graduation.streak, 3)
+        marker = Path(self.tmp.name) / "healthy.marker"
+        check = (f"import sys, pathlib; sys.exit(0 if pathlib.Path"
+                 f"({str(marker)!r}).exists() else 1)")
+        p = make_proposal(
+            "p-streak-rb",
+            verification_plan=[{"kind": "command",
+                                "run": ["python3", "-c", check]}])
+        self.pipe.submit(p)
+        marker.write_text("ok", encoding="utf-8")
+        self.pipe.verify(p)
+        p.approve_self("streak reset test")
+        self.pipe.gate(p)
+        applied = self.pipe.apply(p)
+        marker.unlink()  # regression after deploy
+        rb = self.pipe.monitor(p, applied.backup)
+        self.assertIsNotNone(rb)
+        self.assertEqual(p.status, "rolled_back")
+        self.assertEqual(self.pipe.graduation.streak, 0)
+
+    # -- revocation: approvals never expire, only revocation ends them --------------------------
+    def test_revocation_blocks_gate(self):
+        p = make_proposal("p-rev", scope="skills", target="demo/SKILL.md",
+                          change_kind="code", change="x", rationale="y",
+                          new_content="z\n")
+        self.pipe.submit(p)
+        self.pipe.verify(p)
+        p.approve_dyther("approved, then reconsidered")
+        self.pipe.revoke(p, "dyther", "on reflection, not yet")
+        self.assertFalse(p.dyther_approved())
+        with self.assertRaises(GateRefused):
+            self.pipe.gate(p)
+
+    def test_revoke_with_no_active_approval_raises(self):
+        p = make_proposal("p-rev2")
+        with self.assertRaises(ValueError):
+            p.revoke_approval("dyther")
+
+    def test_approvals_do_not_expire(self):
+        # An approval recorded long ago still counts — there is no TTL.
+        p = make_proposal("p-noexp", scope="skills", target="demo/SKILL.md",
+                          change_kind="code", change="x", rationale="y",
+                          new_content="z\n")
+        self.pipe.submit(p)
+        self.pipe.verify(p)
+        p.approve_dyther("approved months ago")
+        p.approvals[0].at = "2020-01-01T00:00:00Z"  # backdate
+        self.assertTrue(p.dyther_approved())
+        self.pipe.gate(p)  # passes: age alone never invalidates
+
+    def test_revocation_does_not_auto_rollback(self):
+        p = make_proposal(
+            "p-rev3",
+            verification_plan=[{"kind": "command",
+                                "run": ["python3", "-c", "pass"]}])
+        self.pipe.submit(p)
+        self.pipe.verify(p)
+        p.approve_self("revocation target")
+        self.pipe.gate(p)
+        applied = self.pipe.apply(p)
+        self.pipe.monitor(p, applied.backup)
+        self.assertEqual(p.status, "done")
+        target = Path(self.tmp.name) / "memory" / "conventions.md"
+        # Revoking after apply flags for re-review — the change stands
+        # until an explicit rollback proposal says otherwise.
+        self.pipe.revoke(p, "self", "reconsidering")
+        self.assertEqual(target.read_text(encoding="utf-8"),
+                         "new conventions text\n")
 
     # -- status machine ----------------------------------------------------------------------
     def test_illegal_transitions_raise(self):

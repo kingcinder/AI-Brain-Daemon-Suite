@@ -37,11 +37,26 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+# Where a proposal came from. Required on every proposal, at every
+# graduation band — nothing is ever unprompted. The streak only shrinks
+# *who approves*, never *whether a prompt exists*.
+PROMPT_SOURCES = frozenset({
+    "dyther_direct",   # Dyther asked for the change in conversation
+    "weekly_review",   # the weekly reflection surfaced it as a finding
+    "scheduled",       # a scheduled job (incl. the monitor) produced it
+})
+
+
 @dataclass
 class Approval:
     approver: str            # "self" | "dyther"
     statement: str           # recorded verbatim; never inferred
     at: str = field(default_factory=utc_now_iso)
+    # Approvals never expire on their own (Dyther's rule) — only explicit
+    # revocation ends them. A revoked approval counts as absent everywhere.
+    revoked: bool = False
+    revoked_at: str | None = None
+    revoke_note: str = ""
 
 
 @dataclass
@@ -65,6 +80,7 @@ class Proposal:
     change_kind: str
     change: str
     rationale: str
+    prompt_source: str       # required: "dyther_direct" | "weekly_review" | "scheduled"
     verification_plan: list[dict] = field(default_factory=list)
     rollback_plan: str = ""
     new_content: str | None = None
@@ -72,6 +88,7 @@ class Proposal:
     # Pipeline-managed:
     tier: Tier | None = None
     hard_rule_flags: tuple[str, ...] = ()
+    gate_requirement: str | None = None  # set by gate(): "dyther"|"self"|"self_notify"
     status: str = "draft"
     approvals: list[Approval] = field(default_factory=list)
     agent_checks: list[dict] = field(default_factory=list)  # pending/resolved
@@ -84,6 +101,10 @@ class Proposal:
             raise ValueError(f"unknown change_kind {self.change_kind!r}")
         if not self.target or not self.target.strip():
             raise ValueError("target must be non-empty")
+        if self.prompt_source not in PROMPT_SOURCES:
+            raise ValueError(
+                f"prompt_source must be one of {sorted(PROMPT_SOURCES)}, "
+                f"got {self.prompt_source!r} — nothing is ever unprompted")
         if ".." in self.target.replace("\\", "/").split("/"):
             raise ValueError(f"target escapes scope: {self.target!r}")
 
@@ -99,10 +120,16 @@ class Proposal:
                              "note": note})
 
     # -- approvals ----------------------------------------------------------
+    # Recording vs. authorization are separate: these methods record who
+    # said what; the pipeline gate decides whether a recorded approval
+    # satisfies the graduation-band requirement. A recorded approval the
+    # gate refuses is harmless — apply stays blocked.
     def approve_self(self, statement: str) -> None:
-        if self.tier is not Tier.TIER_0:
-            raise ValueError("self-approval is only valid for Tier 0")
-        self.approvals.append(Approval(approver="self", statement=statement))
+        if not statement or not statement.strip():
+            raise ValueError("self-approval must carry a statement — "
+                             "silence is never approval")
+        self.approvals.append(Approval(approver="self",
+                                       statement=statement.strip()))
 
     def approve_dyther(self, statement: str) -> None:
         if not statement or not statement.strip():
@@ -111,11 +138,32 @@ class Proposal:
         self.approvals.append(Approval(approver="dyther",
                                        statement=statement.strip()))
 
+    def revoke_approval(self, approver: str, note: str = "") -> None:
+        """Explicitly revoke this approver's approval(s). Approvals never
+        expire on their own — only this ends them. Revocation does not
+        auto-roll-back an already-applied change; it marks the approval
+        absent (blocking future applies under it) and flags the proposal
+        for re-review. Rollback is a separate explicit decision."""
+        targets = [a for a in self.approvals
+                   if a.approver == approver and not a.revoked]
+        if not targets:
+            raise ValueError(f"no active approval by {approver!r} to revoke")
+        for a in targets:
+            a.revoked = True
+            a.revoked_at = utc_now_iso()
+            a.revoke_note = note
+        self.history.append({"at": utc_now_iso(), "to": self.status,
+                             "note": f"approval revoked: {approver} "
+                                     f"({note})" if note else
+                             f"approval revoked: {approver}"})
+
     def dyther_approved(self) -> bool:
-        return any(a.approver == "dyther" for a in self.approvals)
+        return any(a.approver == "dyther" and not a.revoked
+                   for a in self.approvals)
 
     def self_approved(self) -> bool:
-        return any(a.approver == "self" for a in self.approvals)
+        return any(a.approver == "self" and not a.revoked
+                   for a in self.approvals)
 
     # -- agent checks --------------------------------------------------------
     def record_agent_check(self, description: str, passed: bool | None,
