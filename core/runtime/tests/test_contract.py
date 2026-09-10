@@ -207,10 +207,14 @@ class SafetyKernelTest(unittest.TestCase):
         for p in ("core/self-mod/run-pipeline.sh",
                   "core/locks/rwlock.sh",
                   "core/runtime/contract.py",
-                  "core/runtime/jobs/weekly_reflection.py",
+                  "core/runtime/RUNTIME_CONTRACT.md",
+                  "core/runtime/schedule.py",
+                  "core/runtime/self_mod/pipeline.py",
                   "skills/prefrontal-cortex-memory/scripts/decide.sh"):
             self.assertTrue(self.rt.check_immutable(p), p)
         for p in ("skills/hippocampus-memory/scripts/reflect.sh",
+                  "core/runtime/jobs/weekly_reflection.py",
+                  "core/runtime/adapters/juno.py",
                   "deep-brain-kernel.py"):
             self.assertFalse(self.rt.check_immutable(p), p)
 
