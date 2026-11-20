@@ -26,6 +26,13 @@ id_ed25519*
 *.tmp
 *.bak
 
+# Live harness runtime state — never commit the running brain's memory,
+# generated dashboard, or generated organ state faces (2026-11-20 sync)
+memory/
+run/
+/*_STATE.md
+brain-dashboard.html
+
 # Logs & local noise
 logs/
 *.log
