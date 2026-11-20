@@ -1,1 +1,46 @@
-{"capabilities":["cross_organ_binding","coherence_monitoring","global_workspace_state"],"dependencies":[],"inputs":[{"name":"organ_states","source":"memory/*-state.json","type":"state_file"}],"module":"claustrum-memory","outputs":[{"name":"cortical_binding","target":"memory/cortical.json (binding section)","type":"state_write"},{"name":"claustrum_state","target":"memory/claustrum-state.json","type":"state_write"},{"name":"binding_ledger","target":"memory/binding-ledger.jsonl","type":"append"}],"schema":1,"side_effects":["writes_shared_state","filesystem_write"],"tests":[{"kind":"unit","path":"tests/test_claustrum_binding.sh"}],"version":"1.0.0"}
+{
+  "capabilities": [
+    "cross_organ_binding",
+    "coherence_monitoring",
+    "global_workspace_state"
+  ],
+  "dependencies": [],
+  "inputs": [
+    {
+      "name": "organ_states",
+      "source": "memory/*-state.json",
+      "type": "state_file"
+    }
+  ],
+  "module": "claustrum-memory",
+  "outputs": [
+    {
+      "name": "cortical_binding",
+      "target": "memory/cortical.json (binding section)",
+      "type": "state_write"
+    },
+    {
+      "name": "claustrum_state",
+      "target": "memory/claustrum-state.json",
+      "type": "state_write"
+    },
+    {
+      "name": "binding_ledger",
+      "target": "memory/binding-ledger.jsonl",
+      "type": "log_entry"
+    }
+  ],
+  "schema": 1,
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "tests": [
+    {
+      "kind": "unit",
+      "path": "tests/test_claustrum_binding.sh"
+    }
+  ],
+  "version": "1.0.0",
+  "immutable": false
+}

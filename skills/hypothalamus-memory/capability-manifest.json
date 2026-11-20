@@ -1,1 +1,59 @@
-{"capabilities":["homeostatic_regulation","set_point_ownership","corrective_drives","milieu_monitoring"],"dependencies":[],"inputs":[{"name":"helm_health","source":"openclaw health","type":"command"},{"name":"interoceptive_state","required":false,"source":"memory/interoceptive-state.json","type":"state_file"},{"name":"pending_queues","required":false,"source":"memory/pending-*.json","type":"state_file"}],"module":"hypothalamus-memory","outputs":[{"name":"hypothalamus_state","target":"memory/hypothalamus-state.json","type":"state_write"},{"name":"homeostasis_ledger","target":"memory/homeostasis-ledger.jsonl","type":"append"},{"name":"corrective_drives","target":"core/gate (envelope ingress)","type":"envelope"}],"schema":1,"side_effects":["writes_shared_state","filesystem_write","emits_gate_envelopes"],"tests":[{"kind":"unit","path":"tests/test_hypothalamus_regulation.sh"}],"version":"1.0.0"}
+{
+  "capabilities": [
+    "homeostatic_regulation",
+    "set_point_ownership",
+    "corrective_drives",
+    "milieu_monitoring"
+  ],
+  "dependencies": [],
+  "inputs": [
+    {
+      "name": "helm_health",
+      "source": "openclaw health",
+      "type": "event"
+    },
+    {
+      "name": "interoceptive_state",
+      "required": false,
+      "source": "memory/interoceptive-state.json",
+      "type": "state_file"
+    },
+    {
+      "name": "pending_queues",
+      "required": false,
+      "source": "memory/pending-*.json",
+      "type": "state_file"
+    }
+  ],
+  "module": "hypothalamus-memory",
+  "outputs": [
+    {
+      "name": "hypothalamus_state",
+      "target": "memory/hypothalamus-state.json",
+      "type": "state_write"
+    },
+    {
+      "name": "homeostasis_ledger",
+      "target": "memory/homeostasis-ledger.jsonl",
+      "type": "log_entry"
+    },
+    {
+      "name": "corrective_drives",
+      "target": "core/gate (envelope ingress)",
+      "type": "event"
+    }
+  ],
+  "schema": 1,
+  "side_effects": [
+    "writes_shared_state",
+    "filesystem_write"
+  ],
+  "tests": [
+    {
+      "kind": "unit",
+      "path": "tests/test_hypothalamus_regulation.sh"
+    }
+  ],
+  "version": "1.0.0",
+  "immutable": false
+}
