@@ -2,7 +2,7 @@
 # tools.sh — Allowlisted tool registry for the internal agentic loop.
 #
 # The agent loop (agent-loop.sh) can ONLY execute tools declared here. This
-# is a fixed, curated allowlist of suite operations — the model proposes a
+# is a fixed, curated allowlist of suite operations — Juno proposes a
 # tool name + JSON args, the registry maps name → a fixed command with
 # jq-extracted arguments. Nothing is ever eval'd; an unknown tool name is a
 # rejected call, never an arbitrary command.
@@ -135,7 +135,7 @@ agent_tool_run() {
 
       # Resolve relative to WORKSPACE if not absolute
       local resolved ws
-      ws="${WORKSPACE:-$HOME/.hermes/workspace}"
+      ws="${WORKSPACE:-$HOME/.juno-brain/workspace}"
       if [[ "$script_path" = /* ]]; then
         resolved="$script_path"
       elif [[ "$script_path" == */* ]]; then
@@ -181,7 +181,7 @@ agent_tool_run() {
 
       # Execute: capture output, return as JSON result
       local output
-      output=$(WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}" bash "$resolved" "${script_args[@]}" 2>&1 | head -c 2000) || {
+      output=$(WORKSPACE="${WORKSPACE:-$HOME/.juno-brain/workspace}" bash "$resolved" "${script_args[@]}" 2>&1 | head -c 2000) || {
         echo "{\"tool_error\":\"run_suite_script\",\"reason\":\"exit code $?\"}"
         return 0
       }

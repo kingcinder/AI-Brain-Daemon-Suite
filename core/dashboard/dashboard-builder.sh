@@ -32,7 +32,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"
 OUTPUT_FILE="$WORKSPACE/brain-dashboard.html"
 FOCUS_ID=""

@@ -20,7 +20,7 @@ set -euo pipefail
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SELF_DIR/../.." && pwd)"
 SUITE_ROOT="$ROOT"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 PROPOSAL=""
 SKIP_EVAL=0
 LOCK_DIR=""
@@ -111,6 +111,15 @@ POST_ID=$(echo "$POST" | jq -r .snapshot_id)
 # Deploy record for monitor
 mkdir -p "$WORKSPACE/memory/self-mod/deploys"
 TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# Baseline metrics for the monitor (fix 2026-11-19, Juno): embed the measured
+# pre-deploy baseline in the record. Without it, monitor.sh falls back to a
+# default task_success baseline of 1.0 and rolls the deploy back against
+# whatever the live sweep happens to read — that artifact killed
+# prop_f8123e6a5856f7bc on 2026-11-16 (live 0.7 was measured BEFORE its deploy).
+BASELINE_JSON="null"
+if [ -f "$WORKSPACE/memory/self-mod/baseline-metrics.json" ]; then
+  BASELINE_JSON=$(cat "$WORKSPACE/memory/self-mod/baseline-metrics.json")
+fi
 RECORD=$(jq -nc \
   --arg pid "$PID" \
   --arg ts "$TS" \
@@ -120,6 +129,7 @@ RECORD=$(jq -nc \
   --arg suite "$SUITE_ROOT" \
   --argjson apply "$APPLY" \
   --argjson div "$DIV" \
+  --argjson baseline "$BASELINE_JSON" \
   '{
     proposal_id: $pid,
     deployed_at: $ts,
@@ -129,6 +139,7 @@ RECORD=$(jq -nc \
     suite_root: $suite,
     apply: $apply,
     divergence_at_deploy: $div,
+    baseline_metrics: $baseline,
     monitor: {status: "active", breaches: []},
     rolled_back: false
   }')

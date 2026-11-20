@@ -17,7 +17,7 @@ set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SELF_DIR/../.." && pwd)"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 PROP_DIR="$WORKSPACE/memory/self-mod/proposals"
 TOP_K=""
 

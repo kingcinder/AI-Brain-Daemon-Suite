@@ -15,7 +15,7 @@
 set -euo pipefail
 
 CORE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.juno-brain/workspace}"
 SNAPSHOT_SH="$CORE_ROOT/snapshot/snapshot.sh"
 PROV_SH="$CORE_ROOT/provenance/log-provenance.sh"
 

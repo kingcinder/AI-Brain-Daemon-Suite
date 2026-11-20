@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STORE="$WORKSPACE/memory/self-mod/proposals"
 INDEX="$STORE/index.jsonl"
 
@@ -65,6 +65,58 @@ with open(index, "a") as f:
 print(json.dumps({"stored": str(path), "proposal_id": pid, "status": prop["status"]}, indent=2))
 PY
   rm -f "$raw_file"
+
+  # ── Gated ingress (Phase C, Gated-Ingress Refactor 2026-11-20) ──────
+  # Every proposal enters the substrate as an envelope through the
+  # thalamic gate. Defect-fix class (explicit class/proposal_class
+  # field, or inferred: fix-shaped description + live target paths) is
+  # CRITICAL and routes to the helm decision queue under invariant I5 —
+  # never only to the Sunday batch. Best-effort by design: a missing or
+  # rejecting gate must never break the store; all hook output goes to
+  # memory/self-mod/gate-ingress.log, stdout stays byte-identical.
+  {
+    local _pid _pfile _class _urgency _dest _gate _root _env_tmp
+    _pid=$(tail -n 1 "$INDEX" 2>/dev/null | jq -r '.proposal_id // empty' 2>/dev/null || true)
+    _pfile="$STORE/${_pid}.json"
+    _root="$(cd "$(dirname "$0")/../.." && pwd)"
+    # Route through the gate LIBRARY directly (core/gate/envelope.py):
+    # validation + registry routing + I5 enqueue, bounded and fast.
+    # (gate.sh --envelope wraps the library in the thalamus's legacy
+    # scoring machinery, whose _ensure_relay path can block for
+    # minutes — the hook must never hang the store. Found by Phase F
+    # probe 3, 2026-11-20.)
+    _gate="$_root/core/gate/envelope.py"
+    if [ -n "$_pid" ] && [ -f "$_pfile" ] && [ -f "$_gate" ]; then
+      _class=$(jq -r '.class // .proposal_class // ""' "$_pfile")
+      if [ -z "$_class" ]; then
+        if jq -e '((.description // "") + " " + (.title // "")) | test("defect|overwrite|regression|live code"; "i")' "$_pfile" >/dev/null 2>&1 \
+           && [ "$(jq -r '(.target_paths // .targets // []) | length' "$_pfile")" -gt 0 ]; then
+          _class="defect-fix"
+        else
+          _class="routine"
+        fi
+      fi
+      case "$_class" in
+        defect-fix|defect_fix|critical-fix) _urgency="critical"; _dest="helm-queue" ;;
+        *) _urgency="routine"; _dest="self-mod-proposals" ;;
+      esac
+      _env_tmp=$(mktemp)
+      jq -nc --arg sid "env_${_pid#prop_}" --arg cls "$_class" \
+         --arg urg "$_urgency" --arg dst "$_dest" \
+         --arg src "$(jq -r '.source // "proposal-store"' "$_pfile")" \
+         --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+         --arg ref "$_pfile" --arg pid "$_pid" \
+         '{signal_id:$sid, origin:"juno", source_id:"proposal-store",
+           ts:$ts, type:("proposal." + $cls), urgency:$urg,
+           destination:$dst,
+           provenance:{parents:[$pid], evidence:[$src]},
+           payload_ref:$ref}' > "$_env_tmp"
+      WORKSPACE="$WORKSPACE" BRAIN_WORKSPACE="$WORKSPACE" \
+        timeout 60 python3 "$_gate" ingress "$_env_tmp" \
+            >> "$WORKSPACE/memory/self-mod/gate-ingress.log" 2>&1 || true
+      rm -f "$_env_tmp"
+    fi
+  } || true
 }
 
 cmd_list() {

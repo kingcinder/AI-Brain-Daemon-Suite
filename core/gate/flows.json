@@ -1,0 +1,921 @@
+{
+  "created": "2026-11-20",
+  "flows": [
+    {
+      "evidence": {
+        "path": "memory/.signal-checkpoints/thalamus-gate"
+      },
+      "id": "brain-signals",
+      "kind": "queue",
+      "producer": "core/signaling/publish.sh + core/gate/envelope.py ingress",
+      "reader": "thalamus-memory/scripts/gate.sh --process",
+      "reader_rhythm": "daemon thalamus_gate + signal_dispatch (every 2h)",
+      "semantics": "append",
+      "sla_seconds": 7200,
+      "store": "memory/brain-signals.jsonl"
+    },
+    {
+      "evidence": {
+        "path": "brain-dashboard.html"
+      },
+      "id": "brain-events",
+      "kind": "log",
+      "producer": "skills/*/scripts/log-event.sh",
+      "reader": "thalamus-memory dashboard-builder / generate-dashboard",
+      "reader_rhythm": "gate runs rebuild the dashboard",
+      "semantics": "append",
+      "sla_seconds": 86400,
+      "store": "memory/brain-events.jsonl"
+    },
+    {
+      "evidence": {
+        "field": "epoch",
+        "path": "memory/helm-health.json"
+      },
+      "id": "helm-queue",
+      "kind": "queue",
+      "producer": "openclaw shim (sessions:spawn, juno:enqueue, cron add)",
+      "reader": "Juno via openclaw drain:next (helm decision queue)",
+      "reader_rhythm": "helm-drain wake, every 15 min",
+      "semantics": "append",
+      "sla_seconds": 1200,
+      "store": "memory/spawn-queue.jsonl"
+    },
+    {
+      "evidence": {
+        "path": "memory/spawn-queue.watermark"
+      },
+      "id": "helm-results",
+      "kind": "log",
+      "producer": "openclaw shim drain:ack/drain:respond + helm-keeper merges",
+      "reader": "helm-keeper watermark/compaction + Juno drain",
+      "reader_rhythm": "keeper cycle 20s / helm-drain 15 min",
+      "semantics": "append",
+      "sla_seconds": 3600,
+      "store": "memory/spawn-results.jsonl"
+    },
+    {
+      "evidence": {
+        "field": "epoch",
+        "path": "memory/helm-health.json"
+      },
+      "id": "helm-deadletter",
+      "kind": "queue",
+      "producer": "openclaw shim (task failed 3 attempts)",
+      "reader": "Juno (helm-drain alarm) + invariant patrol freshness check",
+      "reader_rhythm": "helm-drain 15 min / patrol daily",
+      "semantics": "append",
+      "sla_seconds": 86400,
+      "store": "memory/spawn-deadletter.jsonl"
+    },
+    {
+      "evidence": {
+        "field": "epoch",
+        "path": "memory/helm-health.json"
+      },
+      "id": "helm-health",
+      "kind": "state",
+      "producer": "~/.juno-brain/bin/helm-keeper",
+      "reader": "openclaw health + invariant patrol + DSIC digest",
+      "reader_rhythm": "continuous (keeper 20s cycle)",
+      "semantics": "merge",
+      "sla_seconds": 600,
+      "store": "memory/helm-health.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/juno-results"
+      },
+      "id": "juno-results",
+      "kind": "queue",
+      "producer": "Juno via openclaw drain:respond",
+      "reader": "juno-ask.sh pollers (organ scripts, agent-loop, generate-proposals-juno)",
+      "reader_rhythm": "per-ask, poll 3s until timeout",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/juno-results"
+    },
+    {
+      "evidence": {
+        "path": "~/.juno-brain/run/patrol-state.json"
+      },
+      "id": "gate-receipts",
+      "kind": "log",
+      "producer": "core/gate/store_write.py (every gated write)",
+      "reader": "invariant patrol conservation-receipt audit",
+      "reader_rhythm": "DSIC daily patrol (Phase 0c)",
+      "semantics": "append",
+      "sla_seconds": 90000,
+      "store": "memory/gate-receipts.jsonl"
+    },
+    {
+      "evidence": {
+        "path": "memory/gate-leases"
+      },
+      "id": "gate-leases",
+      "kind": "state",
+      "producer": "core/gate/lease.sh (brain-daemon, helm-keeper at startup)",
+      "reader": "core/gate/lease.sh acquire/status + invariant patrol",
+      "reader_rhythm": "every singleton start / patrol daily",
+      "semantics": "merge",
+      "sla_seconds": 90000,
+      "store": "memory/gate-leases"
+    },
+    {
+      "evidence": {
+        "path": "HIPPOCAMPUS_CORE.md"
+      },
+      "id": "hippocampus-index",
+      "kind": "state",
+      "producer": "hippocampus-memory encode-pipeline.sh / summarize-pending.sh / sync-core.sh",
+      "reader": "hippocampus-memory/scripts/load-core.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 7200,
+      "store": "memory/index.json"
+    },
+    {
+      "dedupe_key": "id",
+      "evidence": {
+        "field": "epoch",
+        "path": "memory/helm-health.json"
+      },
+      "evidence_note": "reader rhythm health proves the drain is consuming; the store itself is writer-touched on both produce and consume",
+      "id": "pending-memories",
+      "kind": "queue",
+      "producer": "hippocampus-memory/scripts/encode-pipeline.sh (merge semantics; fix prop_8b37ab72c3f0829b)",
+      "reader": "hippocampus-memory/scripts/summarize-pending.sh",
+      "reader_rhythm": "helm-drain encoding rhythm, every 15 min",
+      "semantics": "merge",
+      "sla_seconds": 1200,
+      "store": "memory/pending-memories.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/index.json"
+      },
+      "id": "hippocampus-signals",
+      "kind": "queue",
+      "producer": "hippocampus-memory/scripts/preprocess.sh",
+      "reader": "hippocampus-memory/scripts/encode-pipeline.sh",
+      "reader_rhythm": "encoding blocks (daemon + helm rotation)",
+      "semantics": "append",
+      "sla_seconds": 86400,
+      "store": "memory/signals.jsonl"
+    },
+    {
+      "evidence": {
+        "path": "memory/salience-hints.json"
+      },
+      "id": "salience-hints",
+      "kind": "state",
+      "producer": "hippocampus-memory/scripts/note-salience.sh (amygdala salience_tag route)",
+      "reader": "hippocampus-memory/scripts/encode-pipeline.sh (scoring boost)",
+      "reader_rhythm": "encoding blocks",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/salience-hints.json"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/emotional-state.json"
+      },
+      "id": "emotional-state",
+      "kind": "state",
+      "producer": "amygdala-memory update-state.sh / decay-emotion.sh / encode-pipeline.sh",
+      "reader": "amygdala-memory/scripts/load-emotion.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/emotional-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/emotional-state.json"
+      },
+      "id": "emotional-signals",
+      "kind": "queue",
+      "producer": "amygdala-memory/scripts/preprocess-emotions.sh",
+      "reader": "amygdala-memory encode-emotions (agent phase)",
+      "reader_rhythm": "helm-drain rotation",
+      "semantics": "append",
+      "sla_seconds": 86400,
+      "store": "memory/emotional-signals.jsonl"
+    },
+    {
+      "evidence": {
+        "path": "brain-dashboard.html"
+      },
+      "id": "emotional-log",
+      "kind": "log",
+      "producer": "amygdala-memory/scripts/log-event.sh",
+      "reader": "amygdala dashboard-builder / DSIC digest",
+      "reader_rhythm": "daily",
+      "semantics": "append",
+      "sla_seconds": 90000,
+      "store": "memory/emotional-log.jsonl"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/reward-state.json"
+      },
+      "id": "reward-state",
+      "kind": "state",
+      "producer": "vta-memory log-reward.sh / decay-drive.sh / encode-pipeline.sh",
+      "reader": "vta-memory/scripts/load-motivation.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/reward-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/reward-state.json"
+      },
+      "id": "pending-rewards",
+      "kind": "queue",
+      "producer": "vta-memory/scripts/preprocess-rewards.sh",
+      "reader": "vta-memory encode-rewards (agent phase)",
+      "reader_rhythm": "helm-drain rotation",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/pending-rewards.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/reward-state.json"
+      },
+      "id": "reward-signals",
+      "kind": "queue",
+      "producer": "vta-memory/scripts/preprocess-rewards.sh",
+      "reader": "vta-memory encode-rewards (agent phase)",
+      "reader_rhythm": "helm-drain rotation",
+      "semantics": "append",
+      "sla_seconds": 86400,
+      "store": "memory/reward-signals.jsonl"
+    },
+    {
+      "evidence": {
+        "path": "brain-dashboard.html"
+      },
+      "id": "reward-log",
+      "kind": "log",
+      "producer": "vta-memory/scripts/log-reward.sh",
+      "reader": "vta dashboard-builder / DSIC digest",
+      "reader_rhythm": "daily",
+      "semantics": "append",
+      "sla_seconds": 90000,
+      "store": "memory/reward-log.jsonl"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/habit-state.json"
+      },
+      "id": "habit-state",
+      "kind": "state",
+      "producer": "basal-ganglia-memory encode-pipeline.sh / decay-habits.sh",
+      "reader": "basal-ganglia-memory/scripts/load-habits.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/habit-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/habit-state.json"
+      },
+      "id": "habit-signals",
+      "kind": "queue",
+      "producer": "basal-ganglia-memory encode-pipeline.sh (preprocess)",
+      "reader": "basal-ganglia-memory encode-pipeline.sh (classification)",
+      "reader_rhythm": "helm-drain rotation",
+      "semantics": "append",
+      "sla_seconds": 86400,
+      "store": "memory/habit-signals.jsonl"
+    },
+    {
+      "evidence": {
+        "path": "memory/habit-state.json"
+      },
+      "id": "pending-habits",
+      "kind": "queue",
+      "producer": "basal-ganglia-memory/scripts/encode-pipeline.sh",
+      "reader": "basal-ganglia encode-habits (agent phase)",
+      "reader_rhythm": "helm-drain rotation",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/pending-habits.json"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/conflict-state.json"
+      },
+      "id": "conflict-state",
+      "kind": "state",
+      "producer": "anterior-cingulate-memory encode-pipeline.sh / decay-load.sh",
+      "reader": "anterior-cingulate-memory/scripts/load-state.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/conflict-state.json"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/acc-state.json"
+      },
+      "id": "acc-state",
+      "kind": "state",
+      "producer": "acc-error-memory log-error.sh / encode-pipeline.sh / resolve-check.sh",
+      "reader": "acc-error-memory/scripts/load-state.sh + resolve-check.sh",
+      "reader_rhythm": "helm-drain step 2b, every 15 min",
+      "semantics": "merge",
+      "sla_seconds": 1200,
+      "store": "memory/acc-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/acc-state.json"
+      },
+      "evidence_note": "run-scoped staging: created, filtered and deleted inside a single acc-error encode run; unconsumed windows are re-extracted from transcripts next run",
+      "id": "pending-errors",
+      "kind": "queue",
+      "producer": "acc-error-memory/scripts/preprocess-errors.sh",
+      "reader": "acc-error-memory encode-pipeline.sh / analyze-day.sh",
+      "reader_rhythm": "helm-drain rotation + daemon blocks",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/pending-errors.json"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/interoceptive-state.json"
+      },
+      "id": "interoceptive-state",
+      "kind": "state",
+      "producer": "insula-memory update-state.sh / encode-pipeline.sh / decay-sense.sh",
+      "reader": "insula-memory/scripts/load-sense.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/interoceptive-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/interoceptive-state.json"
+      },
+      "evidence_note": "run-scoped staging: preprocess extracts since the watermark, the same encode run consumes it and only then advances the watermark",
+      "id": "pending-sense",
+      "kind": "queue",
+      "producer": "insula-memory/scripts/encode-pipeline.sh",
+      "reader": "insula encode (agent phase)",
+      "reader_rhythm": "daemon insula_encoding (8x/day) + helm rotation",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/pending-sense.json"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/social-state.json"
+      },
+      "id": "social-state",
+      "kind": "state",
+      "producer": "social-memory upsert-relationship.sh / log-interaction.sh / decay.sh",
+      "reader": "social-memory/scripts/get-relationship.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/social-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/social-state.json"
+      },
+      "id": "social-signals",
+      "kind": "queue",
+      "producer": "social-memory/scripts/preprocess-mentions.sh",
+      "reader": "social-memory/scripts/encode-pipeline.sh",
+      "reader_rhythm": "helm-drain rotation",
+      "semantics": "append",
+      "sla_seconds": 86400,
+      "store": "memory/social-signals.jsonl"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/pfc-state.json"
+      },
+      "id": "pfc-state",
+      "kind": "state",
+      "producer": "prefrontal-cortex-memory scripts / core/executive promote path",
+      "reader": "prefrontal-cortex-memory/scripts/get-state.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/pfc-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/pfc-state.json"
+      },
+      "id": "pfc-uncertainty",
+      "kind": "state",
+      "producer": "prefrontal-cortex-memory scripts",
+      "reader": "prefrontal-cortex-memory get-state/decide paths",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/pfc-uncertainty.json"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/cerebellum-state.json"
+      },
+      "id": "cerebellum-state",
+      "kind": "state",
+      "producer": "cerebellum-memory refine.sh / log-error.sh",
+      "reader": "cerebellum-memory/scripts/get-calibration.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/cerebellum-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/cerebellum-state.json"
+      },
+      "id": "calibration-state",
+      "kind": "state",
+      "producer": "cerebellum-memory scripts",
+      "reader": "cerebellum-memory/scripts/get-calibration.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/calibration-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/cerebellum-state.json"
+      },
+      "id": "calibration-errors",
+      "kind": "queue",
+      "producer": "cerebellum-memory scripts",
+      "reader": "cerebellum-memory/scripts/refine.sh",
+      "reader_rhythm": "daemon cerebellum_refine (3x/day)",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/calibration-errors.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/cerebellum-state.json"
+      },
+      "id": "learned-patterns",
+      "kind": "state",
+      "producer": "cerebellum-memory learning scripts",
+      "reader": "cerebellum-memory refine/calibration paths",
+      "reader_rhythm": "daemon cerebellum_refine (3x/day)",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/learned-patterns.json"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/heartbeat-state.json"
+      },
+      "id": "heartbeat-state",
+      "kind": "state",
+      "producer": "heartbeat-memory/scripts/helm-pulse.sh",
+      "reader": "heartbeat-memory/scripts/get-state.sh",
+      "reader_rhythm": "helm-drain 15 min",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/heartbeat-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/heartbeat-pulse.log"
+      },
+      "id": "heartbeat-pulse-log",
+      "kind": "log",
+      "producer": "heartbeat-memory/scripts/helm-pulse.sh",
+      "reader": "invariant patrol freshness.pulse + DSIC digest",
+      "reader_rhythm": "daemon heartbeat_beat (every 30 min) writes; patrol reads daily",
+      "semantics": "append",
+      "sla_seconds": 2700,
+      "store": "memory/heartbeat-pulse.log"
+    },
+    {
+      "evidence": {
+        "path": "memory/.signal-checkpoints/thalamus-gate"
+      },
+      "id": "thalamus-state",
+      "kind": "state",
+      "producer": "thalamus-memory gate.sh / decay.sh / neuromod-update.sh",
+      "reader": "thalamus-memory gate.sh / get-neuromod.sh / sync-state.sh",
+      "reader_rhythm": "daemon thalamus_gate + signal_dispatch (every 2h)",
+      "semantics": "merge",
+      "sla_seconds": 7200,
+      "store": "memory/thalamus-state.json"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/neuromod-state.json"
+      },
+      "id": "neuromod-state",
+      "kind": "state",
+      "producer": "thalamus-memory/scripts/neuromod-update.sh",
+      "reader": "thalamus-memory/scripts/get-neuromod.sh --json",
+      "reader_rhythm": "helm-drain 15 min; gate scoring reads per signal",
+      "semantics": "merge",
+      "sla_seconds": 1200,
+      "store": "memory/neuromod-state.json"
+    },
+    {
+      "evidence": {
+        "path": "brain-dashboard.html"
+      },
+      "evidence_note": "record owned by the claustrum organ since Phase G (2026-11-20); its binding section is written each binding pass, themes preserved",
+      "id": "cortical-state",
+      "kind": "state",
+      "producer": "claustrum-memory/bind.sh",
+      "reader": "thalamus dashboard-builder",
+      "reader_rhythm": "gate runs",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/cortical.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/verification-state.json"
+      },
+      "id": "verification-state",
+      "kind": "state",
+      "producer": "verification-memory/scripts/run-declared-tests.sh",
+      "reader": "verification-memory query-history.sh / dashboard",
+      "reader_rhythm": "daemon verification_pass (daily 23:xx)",
+      "semantics": "merge",
+      "sla_seconds": 90000,
+      "store": "memory/verification-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/verification-state.json"
+      },
+      "id": "verification-report",
+      "kind": "log",
+      "producer": "verification-memory/scripts/run-declared-tests.sh",
+      "reader": "DSIC digest / verification dashboard",
+      "reader_rhythm": "daily",
+      "semantics": "append",
+      "sla_seconds": 90000,
+      "store": "memory/verification-report.jsonl"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/pfc-state.json"
+      },
+      "id": "executive-store",
+      "kind": "state",
+      "producer": "core/executive (run-executive-cycle, propose-goals, record-goal-outcome)",
+      "reader": "core/executive run-executive-cycle.sh / arbitrate-proposals.sh",
+      "reader_rhythm": "daemon executive_goal_cycle (3x/day)",
+      "semantics": "append",
+      "sla_seconds": 32400,
+      "store": "memory/executive"
+    },
+    {
+      "evidence": {
+        "path": "memory/pfc-state.json"
+      },
+      "id": "executive-load",
+      "kind": "state",
+      "producer": "core/executive-load/calc-executive-load.sh callers + deep-brain-kernel",
+      "reader": "thalamus gate.sh (headroom dimension) + snapshot divergence check",
+      "reader_rhythm": "per gate run",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/executive-load.json"
+    },
+    {
+      "evidence": {
+        "path": "brain-dashboard.html"
+      },
+      "id": "workspace-state",
+      "kind": "state",
+      "producer": "core/dashboard + deep-brain-kernel",
+      "reader": "core/dashboard/dashboard-builder.sh",
+      "reader_rhythm": "dashboard builds",
+      "semantics": "merge",
+      "sla_seconds": 90000,
+      "store": "memory/workspace.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/self-mod/pipeline-runs/latest.json"
+      },
+      "evidence_note": "routine SLA is the weekly cycle + 1 day margin; critical proposals never rely on it (I5 helm-queue bypass)",
+      "id": "self-mod-proposals",
+      "kind": "queue",
+      "producer": "core/self-mod/proposal-store.sh add (generate-proposals-juno, run-pipeline ingest, DSIC, Juno)",
+      "reader": "gate ingress triage at add (critical defect-fix -> helm-queue) + rank-candidates.sh / run-pipeline.sh",
+      "reader_rhythm": "critical: helm-drain 15 min via helm-queue; routine: Sunday proposal cycle",
+      "semantics": "merge",
+      "sla_seconds": 691200,
+      "store": "memory/self-mod/proposals"
+    },
+    {
+      "evidence": {
+        "path": "memory/daemon-job-output.log"
+      },
+      "id": "self-mod-deploys",
+      "judged": true,
+      "kind": "record",
+      "producer": "core/self-mod/deploy-proposal.sh (embeds baseline_metrics at write, I4)",
+      "reader": "core/self-mod/monitor.sh via daemon self_mod_monitor",
+      "reader_rhythm": "daemon self_mod_monitor (3x/day)",
+      "semantics": "merge",
+      "sla_seconds": 32400,
+      "store": "memory/self-mod/deploys"
+    },
+    {
+      "evidence": {
+        "path": "memory/self-mod/pipeline-runs/latest.json"
+      },
+      "id": "self-mod-baseline-metrics",
+      "judged": true,
+      "kind": "record",
+      "producer": "core/self-mod/run-pipeline.sh / evaluate-proposal.sh (measured)",
+      "reader": "core/self-mod/evaluate-proposal.sh + monitor.sh + deploy-proposal.sh",
+      "reader_rhythm": "every pipeline/monitor run",
+      "semantics": "merge",
+      "sla_seconds": 691200,
+      "store": "memory/self-mod/baseline-metrics.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/daemon-job-output.log"
+      },
+      "id": "self-mod-live-metrics",
+      "kind": "record",
+      "producer": "core/self-mod/monitor.sh / verification sweep",
+      "reader": "core/self-mod/monitor.sh",
+      "reader_rhythm": "daemon self_mod_monitor (3x/day)",
+      "semantics": "merge",
+      "sla_seconds": 32400,
+      "store": "memory/self-mod/live-metrics.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/self-mod/autonomy-state.json"
+      },
+      "id": "self-mod-autonomy",
+      "kind": "state",
+      "producer": "deep-brain-kernel.py --autonomy",
+      "reader": "core/self-mod/run-pipeline.sh --autonomy-gate (evidence only, M9)",
+      "reader_rhythm": "weekly proposal cycle + on-demand pipeline runs",
+      "semantics": "merge",
+      "sla_seconds": 691200,
+      "store": "memory/self-mod/autonomy-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/self-mod/autonomy-state.json"
+      },
+      "id": "self-mod-autonomy-history",
+      "kind": "log",
+      "producer": "deep-brain-kernel.py --autonomy",
+      "reader": "DSIC / autonomy audit",
+      "reader_rhythm": "weekly",
+      "semantics": "append",
+      "sla_seconds": 691200,
+      "store": "memory/self-mod/autonomy-history.jsonl"
+    },
+    {
+      "evidence": {
+        "path": "memory/self-mod/graduation-streak.json"
+      },
+      "id": "self-mod-graduation",
+      "kind": "state",
+      "producer": "core/self-mod/graduation-tracker.sh",
+      "reader": "core/self-mod/run-pipeline.sh / graduation-tracker.sh",
+      "reader_rhythm": "every pipeline run",
+      "semantics": "merge",
+      "sla_seconds": 691200,
+      "store": "memory/self-mod/graduation-streak.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/self-mod/chinks-latest.json"
+      },
+      "id": "self-mod-chinks",
+      "kind": "state",
+      "producer": "core/self-mod/chink-check.sh",
+      "reader": "generate-proposals-juno.sh / DSIC (proposal genesis)",
+      "reader_rhythm": "head of every proposal cycle + nightly consolidation",
+      "semantics": "merge",
+      "sla_seconds": 691200,
+      "store": "memory/self-mod/chinks-latest.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/provenance/patches.jsonl"
+      },
+      "id": "provenance-log",
+      "kind": "log",
+      "producer": "core/provenance/log-provenance.sh",
+      "reader": "DSIC audit / rollback-learning",
+      "reader_rhythm": "daily",
+      "semantics": "append",
+      "sla_seconds": 90000,
+      "store": "memory/provenance/"
+    },
+    {
+      "evidence": {
+        "path": "memory/snapshots"
+      },
+      "id": "snapshots",
+      "kind": "state",
+      "producer": "core/snapshot/snapshot.sh",
+      "reader": "core/snapshot divergence-check / deploy-proposal.sh / rollback.sh",
+      "reader_rhythm": "every pipeline/deploy run",
+      "semantics": "merge",
+      "sla_seconds": 90000,
+      "store": "memory/snapshots"
+    },
+    {
+      "evidence": {
+        "path": "memory/agent-sessions"
+      },
+      "id": "agent-sessions",
+      "kind": "log",
+      "producer": "core/agent-loop/agent-loop.sh",
+      "reader": "Juno (agent-loop continuation)",
+      "reader_rhythm": "per spawn task",
+      "semantics": "append",
+      "sla_seconds": 90000,
+      "store": "memory/agent-sessions"
+    },
+    {
+      "evidence": {
+        "path": "THALAMUS_STATE.md"
+      },
+      "id": "state-faces",
+      "kind": "face",
+      "producer": "skills/*/scripts/sync-state.sh (+ sync-core.sh for HIPPOCAMPUS_CORE.md)",
+      "reader": "DSIC organ digest + invariant patrol freshness.state_faces + Dither",
+      "reader_rhythm": "helm-drain renders thalamus/heartbeat faces every 15 min; all faces daily",
+      "semantics": "merge",
+      "sla_seconds": 93600,
+      "store": "*_STATE.md + HIPPOCAMPUS_CORE.md (workspace root)"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/glymphatic-state.json"
+      },
+      "id": "glymphatic-state",
+      "producer": "glymphatic-memory/clearance-sweep.sh",
+      "reader": "helm-drain",
+      "semantics": "merge",
+      "sla_seconds": 93600,
+      "store": "memory/glymphatic-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/clearance-ledger.jsonl"
+      },
+      "id": "clearance-ledger",
+      "producer": "glymphatic-memory/clearance-sweep.sh",
+      "reader": "invariant-patrol",
+      "semantics": "append",
+      "sla_seconds": 691200,
+      "store": "memory/clearance-ledger.jsonl"
+    },
+    {
+      "evidence": {
+        "path": "memory/clearance-archive/"
+      },
+      "id": "clearance-archive",
+      "producer": "glymphatic-memory/clearance-sweep.sh",
+      "reader": "juno",
+      "semantics": "append",
+      "sla_seconds": 2592000,
+      "store": "memory/clearance-archive/"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/hypothalamus-state.json"
+      },
+      "id": "hypothalamus-state",
+      "producer": "hypothalamus-memory/regulate.sh",
+      "reader": "helm-drain",
+      "semantics": "merge",
+      "sla_seconds": 93600,
+      "store": "memory/hypothalamus-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/homeostasis-ledger.jsonl"
+      },
+      "id": "homeostasis-ledger",
+      "producer": "hypothalamus-memory/regulate.sh",
+      "reader": "invariant-patrol",
+      "semantics": "append",
+      "sla_seconds": 691200,
+      "store": "memory/homeostasis-ledger.jsonl"
+    },
+    {
+      "evidence": {
+        "field": "lastConsultedAt",
+        "path": "memory/claustrum-state.json"
+      },
+      "id": "claustrum-state",
+      "producer": "claustrum-memory/bind.sh",
+      "reader": "helm-drain",
+      "semantics": "merge",
+      "sla_seconds": 93600,
+      "store": "memory/claustrum-state.json"
+    },
+    {
+      "evidence": {
+        "path": "memory/binding-ledger.jsonl"
+      },
+      "id": "binding-ledger",
+      "producer": "claustrum-memory/bind.sh",
+      "reader": "invariant-patrol",
+      "semantics": "append",
+      "sla_seconds": 691200,
+      "store": "memory/binding-ledger.jsonl"
+    },
+    {
+      "id": "pending-emotions",
+      "producer": "amygdala-memory/scripts/encode-pipeline.sh",
+      "reader": "amygdala-memory encode-emotions (agent phase)",
+      "semantics": "merge",
+      "sla_seconds": 86400,
+      "store": "memory/pending-emotions.json"
+    }
+  ],
+  "internal_stores": [
+    "*.lock",
+    "*.tmp",
+    "*.tmp.*",
+    ".helm.lock",
+    ".spawn.lock",
+    ".signal-limit",
+    ".basal-ganglia-signal-limit",
+    "*.backup.json",
+    "index.backup.json",
+    "habit-state.backup.json",
+    "memory/daemon-pids/",
+    "memory/dashboard-fragments/",
+    "memory/locks/",
+    "memory/.signal-checkpoints/",
+    "memory/llm-results/",
+    "memory/relationship/",
+    "memory/user/",
+    "memory/world/",
+    "memory/self/growth.md",
+    "memory/acc-watcher-watermark.json",
+    "memory/social-watermark.json",
+    "memory/spawn-queue.watermark",
+    "memory/daemon-job-output.log",
+    "memory/pending-errors-*-analyzed.json",
+    "memory/self-mod/backups/",
+    "memory/self-mod/pipeline-runs/",
+    "memory/self-mod/juno-raw/",
+    "memory/self-mod/llm-raw/",
+    "memory/self-mod/*.err",
+    "memory/self-mod/*.out",
+    "memory/self-mod/last-deferral.json",
+    "memory/self-mod/last-juno-proposal.json",
+    "brain-dashboard.html",
+    "brain-dashboard.html.lock",
+    {
+      "evidence_note": "computed snapshot from acc-error calibrate-decisions.sh (pfc+acc state); no in-skill reader per organ inventory 2026-11-20; pre-registered so first write is not an orphan",
+      "pattern": "memory/acc-calibration.json"
+    },
+    {
+      "evidence_note": "hippocampus extract-patterns.sh output; no in-skill reader per organ inventory 2026-11-20; pre-registered so first write is not an orphan",
+      "pattern": "memory/semantic-state.json"
+    },
+    {
+      "evidence_note": "snapshot ledger appended by hippocampus snapshot-tick.sh; snapshots consumed by core/snapshot restore paths; pre-registered",
+      "pattern": "memory/snapshots/index.jsonl"
+    }
+  ],
+  "purpose": "Flow registry for the ONE GATED INGRESS (Gated-Ingress Refactor, 2026-11-20). Every producer -> store/queue -> reader rhythm in Juno's substrate is registered here. Registration REQUIRES reader + sla_seconds + semantics (append|merge; overwrite is not a registrable value). The gate refuses envelopes for unregistered destinations (I1); the invariant patrol FAILs on stores present but unregistered (I2) and WARNs when a flow's reader evidence is older than its SLA (I2). Evidence = the file/field the reader rhythm stamps: lastConsultedAt inside organ state files (helm-drain 2c pattern, I6), the gate checkpoint, or the helm health epoch.",
+  "version": 1
+}

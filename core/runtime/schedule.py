@@ -28,9 +28,9 @@ class Job:
     days: str = "*"  # "*" or comma-separated weekday ints, Python convention:
                       # 0=Monday .. 6=Sunday (datetime.weekday()). "*" = every day.
     spawn_max_steps: int = 8   # per-job override for agent-loop MAX_STEPS
-    thinking_model: bool = False  # when True, auto-append a no-reasoning
-                                   # prompt suffix so the model skips chain-of-
-                                   # thought and produces tool calls directly
+    direct_reply: bool = False  # when True, auto-append a direct-reply
+                                   # prompt suffix so Juno answers with tool
+                                   # calls or a final answer immediately
     last_fired_key: Optional[str] = field(default=None, repr=False)
 
 

@@ -12,7 +12,7 @@
 set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 TIERS_FILE="$SELF_DIR/autonomy-tiers.json"
 STATE_FILE="$WORKSPACE/memory/self-mod/autonomy-tiers-state.json"
 GRAD_FILE="$WORKSPACE/memory/self-mod/graduation-streak.json"

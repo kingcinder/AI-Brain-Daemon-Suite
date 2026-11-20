@@ -13,7 +13,7 @@ set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SELF_DIR/../.." && pwd)"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SUITE_ROOT="$ROOT"
 STATUS="queued"
 TOP_K=""

@@ -1,4 +1,4 @@
-# Proposal Templates for Self-Mod LLM Generator
+# Proposal Templates for the Juno Proposal Generator
 # Each template is a fill-in pattern the model can use instead of inventing
 # changes from scratch. Reduces hallucination and ensures common patterns
 # are applied consistently.
@@ -12,11 +12,11 @@
 # Add to generate-dashboard.sh: show the metric with trend arrow
 ```
 
-## Template: Add LLM-Summarized Signal
-**When:** A skill should use LLM to summarize or classify incoming signals
+## Template: Add Juno-Summarized Signal
+**When:** A skill should have Juno summarize or classify incoming signals
 **Pattern:**
 ```bash
-# Add to encode-pipeline.sh: read pending signals, call llm-call.sh for summary
+# Add to encode-pipeline.sh: read pending signals, call juno-ask.sh for Juno's summary
 # Update the skill's state file with summarized results
 # Add to generate-dashboard.sh: show summarized signal count
 ```
@@ -27,7 +27,7 @@
 ```bash
 # Add route entry to thalamus-memory/scripts/route-signals.sh
 # Add signal consumer in the target skill's encode-pipeline.sh
-# Test with: echo '{"event":"test_signal","source":"skill_a"}' >> ~/.hermes/workspace/memory/brain-signals.jsonl
+# Test with: echo '{"event":"test_signal","source":"skill_a"}' >> ~/.juno-brain/workspace/memory/brain-signals.jsonl
 ```
 
 ## Template: Add Dashboard Fragment
@@ -48,10 +48,10 @@
 # Or:     VAR="${VAR:-default_value}"
 ```
 
-## Template: Add Timeout to LLM Call
-**When:** A script calls llm-call.sh and needs a timeout
+## Template: Add Timeout to a Juno Ask
+**When:** A script calls juno-ask.sh and needs a timeout
 **Pattern:**
 ```bash
-# Set LLM_TIMEOUT env var before calling llm-call.sh
-# Example: LLM_TIMEOUT=30 bash llm-call.sh --system "..." --user "..."
+# Set JUNO_TIMEOUT env var before calling juno-ask.sh
+# Example: JUNO_TIMEOUT=30 bash juno-ask.sh --system "..." --user "..."
 ```

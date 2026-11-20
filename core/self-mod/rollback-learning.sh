@@ -1,6 +1,6 @@
 #!/bin/bash
 # rollback-learning.sh — Rollback Learning: reads rollback history and produces
-# a structured lessons-learned summary that can be injected into the LLM
+# a structured lessons-learned summary that can be injected into Juno's
 # proposal generator prompt. This closes the feedback loop so the model
 # learns from past failures instead of repeating them.
 #
@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 LIMIT=10
 JSON=0
 
@@ -90,7 +90,7 @@ MODULE_COUNTS=$(echo "$LESSONS" | jq -c '
   }) | sort_by(-.rollbacks)
 ' 2>/dev/null || echo '[]')
 
-# Build the lessons text for LLM injection
+# Build the lessons text for Juno's prompt
 if [ "$JSON" -eq 1 ]; then
   jq -nc \
     --argjson lessons "$LESSONS" \

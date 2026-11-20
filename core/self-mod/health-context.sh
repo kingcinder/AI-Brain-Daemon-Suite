@@ -25,12 +25,12 @@
 #   health-context.sh [--workspace PATH]
 #
 # Env:
-#   WORKSPACE   defaults to $HOME/.hermes/workspace
+#   WORKSPACE   defaults to $HOME/.openclaw/workspace
 
 set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --workspace) WORKSPACE="$2"; shift 2 ;;

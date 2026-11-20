@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-WS="${WORKSPACE:-$HOME/.hermes/workspace}"
+WS="${WORKSPACE:-$HOME/.openclaw/workspace}"
 YES=""
 while [[ $# -gt 0 ]]; do
   case "$1" in

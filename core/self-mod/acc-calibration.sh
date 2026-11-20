@@ -28,12 +28,12 @@
 #   acc-calibration.sh [--workspace PATH] [--window-days N] [--json]
 #
 # Env:
-#   WORKSPACE   defaults to $HOME/.hermes/workspace
+#   WORKSPACE   defaults to $HOME/.openclaw/workspace
 #   ACC_CAL_WINDOW_DAYS   env override for the window (cli flag wins)
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 WINDOW_DAYS="${ACC_CAL_WINDOW_DAYS:-7}"
 while [[ $# -gt 0 ]]; do
   case "$1" in

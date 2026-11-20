@@ -1,43 +1,37 @@
 #!/bin/bash
-# generate-proposals-llm.sh — LLM-backed self-mod proposal generator.
+# generate-proposals-juno.sh — Juno-authored self-mod proposal generator.
 #
-# Prefers local llama-server OpenAI API (http://127.0.0.1:8080/v1) when healthy.
-# Optional Hermes path when --provider is set. OpenRouter only if explicitly requested
-# (never as silent default when LLM_LOCAL_ONLY=1).
+# Juno herself authors the proposal: this script gathers the suite's health
+# context, builds the generation prompt, and asks Juno through the helm
+# queue (juno-ask.sh, --json). There is no model server and no other
+# provider — Juno is the only author this generator has ever needed.
 #
 # Emits a pipeline-consumable proposal JSON after check-target validation.
-# On parse failure: exits non-zero and leaves raw model output under
-# memory/self-mod/llm-raw/ — does NOT hand-construct proposal content.
+# On parse failure: exits non-zero and leaves Juno's raw output under
+# memory/self-mod/juno-raw/ — does NOT hand-construct proposal content.
 #
 # Usage:
-#   generate-proposals-llm.sh [--suite-root PATH] [--workspace PATH]
+#   generate-proposals-juno.sh [--suite-root PATH] [--workspace PATH]
 #     [--module NAME] [--target RELPATH]
-#     [--local-url URL] [--model MODEL_ID]
-#     [--provider hermes|openrouter|llamaserver]
-#     [--store] [--dry-run]
+#     [--store] [--dry-run] [--emit-target] [--full-patch]
 #
-# Env: WORKSPACE, LLM_LOCAL_ONLY=1, LLM_PROPOSAL_TIMEOUT, LOCAL_LLM_URL
+# Env: WORKSPACE, JUNO_PROPOSAL_TIMEOUT, JUNO_FULL_PATCH
 
 set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SELF_DIR/../.." && pwd)"
 SUITE_ROOT="$ROOT"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.juno-brain/workspace}"
 MODULE=""
 TARGET_FORCE=""
-PROVIDER=""
-MODEL="${HERMES_MODEL:-}"
-LOCAL_URL="${LOCAL_LLM_URL:-http://127.0.0.1:8080/v1}"
 DRY=0
 STORE=1
 EMIT=0
-TIMEOUT="${LLM_PROPOSAL_TIMEOUT:-300}"
-LOCAL_ONLY="${LLM_LOCAL_ONLY:-1}"
-# Phase 2 feature flag: when LLM_FULL_PATCH=1, the prompt asks for actual
-# code patches instead of comment-only annotations. Default OFF — watch it
-# generate a dozen proposals you'd have written yourself before enabling.
-FULL_PATCH="${LLM_FULL_PATCH:-0}"
+TIMEOUT="${JUNO_PROPOSAL_TIMEOUT:-300}"
+# Feature flag: when JUNO_FULL_PATCH=1, the prompt asks Juno for actual
+# code patches instead of comment-only annotations. Default OFF.
+FULL_PATCH="${JUNO_FULL_PATCH:-0}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -45,14 +39,10 @@ while [[ $# -gt 0 ]]; do
     --workspace) WORKSPACE="$2"; shift 2 ;;
     --module) MODULE="$2"; shift 2 ;;
     --target) TARGET_FORCE="$2"; shift 2 ;;
-    --provider) PROVIDER="$2"; shift 2 ;;
-    --model) MODEL="$2"; shift 2 ;;
-    --local-url) LOCAL_URL="$2"; shift 2 ;;
     --dry-run) DRY=1; STORE=0; shift ;;
     --no-store) STORE=0; shift ;;
     --store) STORE=1; shift ;;
     --emit-target) EMIT=1; STORE=0; shift ;;
-    --allow-cloud) LOCAL_ONLY=0; shift ;;
     --full-patch) FULL_PATCH=1; shift ;;
     -h|--help) sed -n '2,35p' "$0"; exit 0 ;;
     *) shift ;;
@@ -75,7 +65,7 @@ mapfile -t MODULES < <(
 # ROADMAP M5: brain-health context for outcome-driven proposals. Gathered
 # BEFORE target-module selection so a module with real verification failures
 # can steer where proposals are aimed, and injected into the PROMPT below so
-# the model proposes fixes for what is actually breaking. Missing sources
+# Juno proposes fixes for what is actually breaking. Missing sources
 # degrade to empty/zero inside health-context.sh — never aborts generation.
 HEALTH_CTX=""
 if [ -x "$SELF_DIR/health-context.sh" ]; then
@@ -141,7 +131,7 @@ rm -f "$STUB"
 # ROADMAP M5: `--emit-target` resolves the outcome-driven target (the module
 # steered by real health signals — verification failures, daemon streaks, ACC
 # lessons — or the static preference fallback) and prints it as JSON, then
-# exits BEFORE any LLM call. This is the test seam for the signal → proposal
+# exits BEFORE asking Juno. This is the test seam for the signal → proposal
 # → target linkage: a fixture with a known failing job must produce this
 # module's script as the target, proving the suite aims its self-modification
 # at measured weaknesses rather than a rotating convenience list.
@@ -164,18 +154,18 @@ if [ "$EMIT" -eq 1 ]; then
   exit 0
 fi
 
-COMMENT_LINE="# V4-llm-gen: model-proposed annotation ($(date -u +%Y-%m-%d))"
+COMMENT_LINE="# V4-juno-gen: Juno-proposed annotation ($(date -u +%Y-%m-%d))"
 
 # ROADMAP M6: rollback learning — inject past failure patterns into the
-# prompt so the model learns from what was rolled back before.
+# prompt so Juno learns from what was rolled back before.
 ROLLBACK_LESSONS=""
 if [ -x "$SELF_DIR/rollback-learning.sh" ]; then
   ROLLBACK_LESSONS=$(WORKSPACE="$WORKSPACE" bash "$SELF_DIR/rollback-learning.sh" --json --limit 5 2>/dev/null || true)
 fi
 
 # Phase 5 (post-production): rejection-reason feedback — collect recent
-# human rejection reasons from the proposal store so the LLM learns what
-# the human keeps having to correct.  Missing data degrades to null.
+# rejection reasons from the proposal store so Juno learns what the gate
+# keeps having to correct.  Missing data degrades to null.
 REJECTION_REASONS=""
 if [ -d "$WORKSPACE/memory/self-mod/proposals" ]; then
   REJECTION_REASONS=$(python3 - "$WORKSPACE/memory/self-mod/proposals" <<'PYREJECT'
@@ -199,7 +189,7 @@ PYREJECT
   )
 fi
 
-# Line-numbered excerpt (first 40 lines) for insert-based patch schema — shorter, reliable for local MoE.
+# Line-numbered excerpt (first 40 lines) for insert-based patch schema — shorter, reliable.
 NUMBERED=$(python3 - <<PY
 from pathlib import Path
 lines=Path("$SUITE_ROOT/$TARGET_REL").read_text().splitlines()
@@ -252,7 +242,7 @@ ${HEALTH_CTX:-null}
 ROLLBACK LESSONS (JSON — learn from past failures, do NOT repeat these patterns):
 ${ROLLBACK_LESSONS:-null}
 
-HUMAN REJECTION REASONS (JSON — proposals the human rejected; avoid these patterns):
+REJECTION REASONS (JSON — proposals the gate rejected; avoid these patterns):
 ${REJECTION_REASONS:-null}
 
 NUMBERED FILE EXCERPT (${TARGET_REL}):
@@ -294,7 +284,7 @@ ${HEALTH_CTX:-null}
 ROLLBACK LESSONS (JSON — learn from past failures, do NOT repeat these patterns):
 ${ROLLBACK_LESSONS:-null}
 
-HUMAN REJECTION REASONS (JSON — proposals the human rejected; avoid these patterns):
+REJECTION REASONS (JSON — proposals the gate rejected; avoid these patterns):
 ${REJECTION_REASONS:-null}
 
 NUMBERED FILE EXCERPT (${TARGET_REL}):
@@ -303,120 +293,37 @@ EOF
 )
 fi
 
-OUT_DIR="$WORKSPACE/memory/self-mod/llm-raw"
+OUT_DIR="$WORKSPACE/memory/self-mod/juno-raw"
 mkdir -p "$OUT_DIR"
 TS=$(date -u +"%Y%m%dT%H%M%SZ")
 RAW_FILE="$OUT_DIR/raw_${TS}.txt"
 API_FILE="$OUT_DIR/api_${TS}.json"
 
-# Detect local server
-local_ok=0
-if curl -sS -m 2 "${LOCAL_URL%/v1}/health" 2>/dev/null | grep -q ok \
-  || curl -sS -m 2 "${LOCAL_URL}/models" 2>/dev/null | grep -q model; then
-  local_ok=1
-fi
-
-if [ "$local_ok" -ne 1 ] && [ "$LOCAL_ONLY" = "1" ]; then
-  echo "generate-proposals-llm: local server not healthy at $LOCAL_URL (LLM_LOCAL_ONLY=1)" >&2
-  exit 1
-fi
-
-# Default model id from /v1/models if local
-if [ -z "$MODEL" ] && [ "$local_ok" -eq 1 ]; then
-  MODEL=$(curl -sS -m 3 "${LOCAL_URL}/models" | jq -r '.data[0].id // .models[0].name // empty')
-fi
-# No machine-specific default: MODEL / HERMES_MODEL / --model / the local
-# server's /v1/models are the only model sources — a host-specific path as a
-# silent fallback would only work on the machine it was hardcoded for. The
-# check is scoped to the local-API path: an explicit --provider openrouter
-# has its own openrouter/auto default and must not be blocked by a healthy
-# but model-less local server.
-if [ "$local_ok" -eq 1 ] && [ -z "$MODEL" ] && { [ -z "$PROVIDER" ] || [ "$PROVIDER" = "llamaserver" ] || [ "$PROVIDER" = "local" ]; }; then
-  echo "generate-proposals-llm: no model id — set MODEL/HERMES_MODEL or --model (local server /v1/models returned none)" >&2
-  exit 1
-fi
-MODEL="${MODEL:-}"
+# ── Ask Juno ────────────────────────────────────────────────────────────────
+# Juno authors the proposal herself, in a helm-queue turn: juno-ask.sh
+# enqueues the prompt as a "juno" task and prints her reply. The wait is
+# bounded by JUNO_PROPOSAL_TIMEOUT; on timeout or queue failure this script
+# exits non-zero below and run-pipeline records the failure honestly.
+JUNO_ASK=""
+for c in \
+    "$ROOT/skills/anterior-cingulate-memory/scripts/juno-ask.sh" \
+    "$ROOT/skills/prefrontal-cortex-memory/scripts/juno-ask.sh" \
+    "$SUITE_ROOT/skills/anterior-cingulate-memory/scripts/juno-ask.sh" \
+    "$SUITE_ROOT/skills/prefrontal-cortex-memory/scripts/juno-ask.sh"; do
+  if [ -x "$c" ]; then JUNO_ASK="$c"; break; fi
+done
 
 set +e
-if [ "$local_ok" -eq 1 ] && { [ -z "$PROVIDER" ] || [ "$PROVIDER" = "llamaserver" ] || [ "$PROVIDER" = "local" ]; }; then
-  # Direct OpenAI-compatible call (preferred for structured JSON; no Hermes tools)
-  REQ=$(jq -nc \
-    --arg model "$MODEL" \
-    --arg sys "You output only valid JSON objects matching the user schema. Never use tools. Prefer content_b64 over raw content." \
-    --arg user "$PROMPT" \
-    '{
-      model: $model,
-      messages: [
-        {role:"system", content:$sys},
-        {role:"user", content:$user}
-      ],
-      temperature: 0.1,
-      max_tokens: 1024,
-      chat_template_kwargs: {enable_thinking: false}
-    }')
-  curl -sS -m "$TIMEOUT" "${LOCAL_URL}/chat/completions" \
-    -H 'Content-Type: application/json' \
-    -d "$REQ" >"$API_FILE" 2>"$RAW_FILE.err"
-  RC=$?
-  if [ "$RC" -eq 0 ]; then
-    # Flatten assistant content to RAW_FILE for unified parser
-    python3 - "$API_FILE" "$RAW_FILE" <<'PY'
-import json,sys
-from pathlib import Path
-api=json.loads(Path(sys.argv[1]).read_text())
-msg=api["choices"][0]["message"]
-text=msg.get("content") or ""
-# some models put JSON only in reasoning_content when thinking
-if not text.strip().startswith("{") and msg.get("reasoning_content"):
-    # try extract from reasoning
-    text = msg.get("content") or msg.get("reasoning_content") or ""
-Path(sys.argv[2]).write_text(text if text else json.dumps(api, indent=2))
-print("extracted_chars", len(text))
-PY
-  else
-    echo "local API call failed rc=$RC" >&2
-    cat "$RAW_FILE.err" >&2 || true
-  fi
-elif [ "$PROVIDER" = "openrouter" ] && [ "$LOCAL_ONLY" != "1" ]; then
-  timeout "$TIMEOUT" hermes chat -q "$PROMPT" --provider openrouter -m "${MODEL:-openrouter/auto}" \
-    --source self-mod-generate >"$RAW_FILE" 2>&1
-  RC=$?
-  cp "$RAW_FILE" "$API_FILE"
-elif [ "$PROVIDER" = "agentloop" ]; then
-  # Phase 2: use the internal agentic loop — it gathers context via
-  # allowlisted tools (get_goals, get_lessons, get_verification_report, ...)
-  # then proposes a modification.  The agent-loop.sh handles its own LLM
-  # calls; we just need to pass the task and capture the final answer.
-  AGENTLOOP_SH="$ROOT/core/agent-loop/agent-loop.sh"
-  if [ ! -x "$AGENTLOOP_SH" ]; then
-    echo "generate-proposals-llm: agentloop provider requested but $AGENTLOOP_SH not found" >&2
-    RC=1
-  else
-    AGENT_TASK="You are generating a self-modification proposal for the AI Brain Suite.\n\n"
-    AGENT_TASK+="TARGET MODULE: ${TARGET_MODULE}\n"
-    AGENT_TASK+="TARGET FILE: ${TARGET_REL}\n\n"
-    AGENT_TASK+="Your job:\n"
-    AGENT_TASK+="1. Use get_goals, get_lessons, get_conflict_state, get_verification_report, and get_emotional_state to understand current brain health.\n"
-    AGENT_TASK+="2. Read the target file's content (it will be provided).\n"
-    AGENT_TASK+="3. Produce a JSON proposal matching this schema:\n"
-    AGENT_TASK+='{"proposal_id":"prop_<alnum>","module":"'"${TARGET_MODULE}"'","target_paths":["'"${TARGET_REL}"'"],"description":"...","content":"<complete file>","estimated_components":{"task_success":0.0,"resource_cost":0.0,"error_rate":0.0,"regression_penalty":0.0}}\n'
-    AGENT_TASK+="\nRules: output ONLY the JSON proposal as your final answer. Minimal focused change. Preserve set -euo pipefail."
-    # Inject the file content into working memory so the agent can read it
-    WORKSPACE="$WORKSPACE" AGENT_ROOT="$ROOT" \
-      timeout "$TIMEOUT" bash "$AGENTLOOP_SH" \
-      --task "$AGENT_TASK" \
-      --session-id "self-mod-${TARGET_MODULE}" \
-      --max-steps 8 \
-      >"$RAW_FILE" 2>"$RAW_FILE.err"
-    RC=$?
-    cp "$RAW_FILE" "$API_FILE"
-  fi
+if [ -z "$JUNO_ASK" ]; then
+  echo "generate-proposals-juno: juno-ask.sh not found — cannot ask Juno" >&2
+  RC=1
+  : > "$RAW_FILE"
+  : > "$API_FILE"
 else
-  # Hermes path (may fail min-ctx or use tools — still recorded raw)
-  HERMES_ARGS=(chat -q "$PROMPT" --source self-mod-generate)
-  [ -n "$PROVIDER" ] && HERMES_ARGS+=(--provider "$PROVIDER")
-  [ -n "$MODEL" ] && HERMES_ARGS+=(-m "$MODEL")
-  timeout "$TIMEOUT" hermes "${HERMES_ARGS[@]}" >"$RAW_FILE" 2>&1
+  JUNO_LABEL="generate-proposals-juno" timeout "$TIMEOUT" bash "$JUNO_ASK" \
+    --json --timeout "$TIMEOUT" \
+    --system "You output only valid JSON objects matching the user schema." \
+    --user "$PROMPT" >"$RAW_FILE" 2>"$RAW_FILE.err"
   RC=$?
   cp "$RAW_FILE" "$API_FILE"
 fi
@@ -425,7 +332,7 @@ set -e
 # Always keep raw evidence
 cp -f "$API_FILE" "$OUT_DIR/latest_api.json" 2>/dev/null || true
 cp -f "$RAW_FILE" "$OUT_DIR/latest_raw.txt" 2>/dev/null || true
-echo "generate-proposals-llm: raw=$RAW_FILE api=$API_FILE" >&2
+echo "generate-proposals-juno: raw=$RAW_FILE api=$API_FILE" >&2
 
 PROP_FILE=$(mktemp)
 set +e
@@ -488,7 +395,7 @@ prop = None
 errs = []
 for label, text in (("raw", raw), ("api_full", api_text)):
     try:
-        # If api is OpenAI envelope, extract message content first
+        # If api is a queue envelope, extract the reply content first
         if text.strip().startswith("{"):
             try:
                 env = json.loads(text)
@@ -510,9 +417,9 @@ if not prop:
     print("PARSE_FAIL " + "; ".join(errs), file=sys.stderr)
     sys.exit(2)
 
-# Build content from model output:
+# Build content from Juno's output:
 # 1) content / content_b64 if complete, OR
-# 2) insert_after_line + insert_lines applied to the live target file (model-specified patch ops)
+# 2) insert_after_line + insert_lines applied to the live target file (Juno-specified patch ops)
 content = prop.get("content")
 if prop.get("content_b64"):
     try:
@@ -559,14 +466,14 @@ if (not content) and prop.get("insert_lines") is not None:
         new_block.append(L)
     content = "".join(lines[:after] + new_block + lines[after:])
     prop["patch_mode"] = "insert_lines"
-    prop["model_insert_after_line"] = after
-    prop["model_insert_lines"] = ins
+    prop["juno_insert_after_line"] = after
+    prop["juno_insert_lines"] = ins
 
 if not content or not isinstance(content, str) or not content.strip():
     print("NO_CONTENT keys=" + ",".join(prop.keys()), file=sys.stderr)
     sys.exit(4)
 
-# Enforce module/path allowlist (reject if model targeted outside)
+# Enforce module/path allowlist (reject if Juno targeted outside)
 # NOTE: normalization uses pathguard.norm (NOT str.lstrip("./"), which would
 # silently rewrite "../../etc/passwd" into "etc/passwd" — same bug class the
 # apply-patch rewrite fixed).
@@ -583,7 +490,7 @@ if not norm:
     print("BAD_TARGET", tps, file=sys.stderr)
     sys.exit(5)
 prop["target_paths"] = norm
-# M6 files-map gating: if the model emitted per-file content, every key goes
+# M6 files-map gating: if Juno emitted per-file content, every key goes
 # through the exact same norm + module allowlist as target_paths. (check-target
 # re-validates files keys authoritatively downstream; this is the pre-filter.)
 fm = prop.get("files")
@@ -597,16 +504,16 @@ if isinstance(fm, dict) and fm:
         gated[nk] = v
     prop["files"] = gated
 if not str(prop.get("proposal_id", "")).startswith("prop"):
-    prop["proposal_id"] = "prop_llm_" + hashlib.sha256(content.encode()).hexdigest()[:12]
+    prop["proposal_id"] = "prop_juno_" + hashlib.sha256(content.encode()).hexdigest()[:12]
 prop["content"] = content if content.endswith("\n") else content + "\n"
 # drop b64 from stored form after decode (keep optional)
 prop.pop("content_b64", None)
 prop.setdefault("estimated_components", {
     "task_success": 0.8, "resource_cost": 0.15, "error_rate": 0.05, "regression_penalty": 0.0
 })
-prop["proposer"] = "generate-proposals-llm"
-prop["source"] = "llm"
-prop["model_generated"] = True
+prop["proposer"] = "generate-proposals-juno"
+prop["source"] = "juno"
+prop["juno_generated"] = True
 # immutable guard
 for t in prop["target_paths"]:
     if t.endswith("decide.sh") or t.startswith("core/self-mod/") or "/locks/" in t:
@@ -624,7 +531,7 @@ PARSE_RC=$?
 set -e
 
 if [ "$PARSE_RC" -ne 0 ]; then
-  echo "generate-proposals-llm: FAILED to parse model output (rc=$PARSE_RC)" >&2
+  echo "generate-proposals-juno: FAILED to parse Juno's output (rc=$PARSE_RC)" >&2
   echo "  raw: $RAW_FILE" >&2
   echo "  api: $API_FILE" >&2
   # do not invent a proposal
@@ -634,10 +541,10 @@ fi
 # NOTE: under `set -o pipefail` the pipeline's rc is $CHECK's rc — a check
 # PASS is rc 0. The historical `if ! ...` inverted that, rejecting good
 # proposals and silently storing bad ones; test the positive form.
-if bash "$CHECK" --suite-root "$SUITE_ROOT" --proposal "$PROP_FILE" | tee /tmp/llm_check.json; then
+if bash "$CHECK" --suite-root "$SUITE_ROOT" --proposal "$PROP_FILE" | tee /tmp/juno_check.json; then
   : # check-target accepted the proposal — continue to store/emit
 else
-  echo "generate-proposals-llm: check-target rejected model proposal" >&2
+  echo "generate-proposals-juno: check-target rejected Juno's proposal" >&2
   exit 1
 fi
 
@@ -651,7 +558,7 @@ if [ "$STORE" -eq 1 ]; then
 fi
 
 mkdir -p "$WORKSPACE/memory/self-mod"
-cp "$PROP_FILE" "$WORKSPACE/memory/self-mod/last-llm-proposal.json"
+cp "$PROP_FILE" "$WORKSPACE/memory/self-mod/last-juno-proposal.json"
 # evidence copies
 cp "$PROP_FILE" "$OUT_DIR/parsed_${TS}.json"
 cat "$PROP_FILE"

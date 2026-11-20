@@ -46,7 +46,7 @@ def _suite_root() -> Path:
 class CodypcMemoryStore(MemoryStore):
     def __init__(self, workspace: Path | str | None = None):
         ws = workspace or os.environ.get("WORKSPACE",
-                                         str(Path.home() / ".hermes" / "workspace"))
+                                         str(Path.home() / ".juno-brain" / "workspace"))
         self.root = Path(ws).resolve()
 
     def _resolve(self, relpath: str) -> Path:
@@ -154,7 +154,7 @@ class CodypcMind(Mind):
                  provider: str | None = None):
         self.suite_root = Path(suite_root or _suite_root()).resolve()
         self.workspace = str(workspace or os.environ.get(
-            "WORKSPACE", str(Path.home() / ".hermes" / "workspace")))
+            "WORKSPACE", str(Path.home() / ".juno-brain" / "workspace")))
         self.provider = (provider or os.environ.get("SPAWN_PROVIDER",
                                                     "agentloop")).strip().lower()
         self.shim = self.suite_root / "core" / "spawn" / "spawn-provider.sh"

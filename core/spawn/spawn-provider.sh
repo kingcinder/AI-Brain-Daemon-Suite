@@ -1,34 +1,39 @@
 #!/bin/bash
-# spawn-provider.sh — ROADMAP M3: provider abstraction for daemon spawn jobs.
+# spawn-provider.sh — ROADMAP M3, Juno-direct (2026-11-20 scrub): the sole
+# spawn provider is Juno herself.
 #
-# Dispatches a spawn job's task text to `hermes` (the external harness), the
-# suite's own local OpenAI-compatible inference (llm-call.sh), or the internal
-# agentic loop (core/agent-loop/agent-loop.sh — tool use + session memory),
-# selected by SPAWN_PROVIDER=hermes|local|agentloop. The daemon keeps its
-# pidfd/timeout/lock machinery intact; this script is the exec boundary, so
-# the pid the daemon tracks is the real worker (uses `exec`, never a detached
-# child — a timeout SIGKILL therefore reaches the actual worker process).
+# Dispatches a spawn job's task text to Juno's internal agentic loop
+# (core/agent-loop/agent-loop.sh — tool use + session memory), which asks
+# Juno through the helm queue (juno-ask.sh). There is no other provider:
+# no external harness and no model server exists in this suite. The daemon
+# keeps its pidfd/timeout/lock machinery intact; this script is the exec
+# boundary, so the pid the daemon tracks is the real worker (uses `exec`,
+# never a detached child — a timeout SIGKILL therefore reaches the actual
+# worker process).
 #
 # USAGE:
-#   SPAWN_PROVIDER=hermes|local|agentloop spawn-provider.sh --task '<task text>' [--yolo]
+#   SPAWN_PROVIDER=juno spawn-provider.sh --task '<task text>' [--yolo]
+#   (--yolo is accepted for daemon call compatibility and ignored: Juno's
+#   loop has no approval gate to bypass.)
 #
 # ENV:
-#   SPAWN_PROVIDER   hermes (default) | local | agentloop
-#   WORKSPACE        suite workspace (for deployed llm-call.sh resolution)
-#   LLM_BASE_URL / LLM_MODEL / LLM_TIMEOUT / LLM_RETRIES
-#                    passed through to llm-call.sh in local/agentloop mode
-#   AGENT_STUB_LLM   (agentloop) stub responder for deterministic tests
+#   SPAWN_PROVIDER   juno (default, and the only provider)
+#   WORKSPACE        suite workspace
+#   AGENT_STUB_JUNO  stub responder for deterministic tests (loop tests)
+#   AGENT_MAX_STEPS  per-job step budget for the loop
+#   AGENT_DIRECT_REPLY  when 1, append a direct-reply instruction so Juno's
+#                    loop turns answer with a tool call or a final answer
+#                    immediately, in the loop's JSON protocol
 #
 # EXIT: 0 on completion, non-zero on failure. Never daemonizes.
-#  2  --task missing           3  hermes requested but not in PATH
-#  4  local/agentloop requested but llm-call.sh not found
-#  5  unknown provider          6  agentloop requested but agent-loop.sh not found
+#  2  --task missing           5  unknown provider
+#  6  Juno loop (agent-loop.sh) not found
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PROVIDER="${SPAWN_PROVIDER:-hermes}"
+PROVIDER="${SPAWN_PROVIDER:-juno}"
 TASK=""
 YOLO=false
 
@@ -43,60 +48,30 @@ done
 [ -n "$TASK" ] || { echo "spawn-provider: --task is required" >&2; exit 2; }
 
 case "$PROVIDER" in
-  hermes)
-    if ! command -v hermes >/dev/null 2>&1; then
-      echo "spawn-provider: provider=hermes but hermes not in PATH" >&2
-      exit 3
-    fi
-    if [ "$YOLO" = true ]; then
-      exec hermes chat -q "$TASK" --source daemon --accept-hooks --yolo
-    else
-      exec hermes chat -q "$TASK" --source daemon
-    fi
-    ;;
-  local)
-    WS="${WORKSPACE:-$HOME/.hermes/workspace}"
-    LLM_CALL=""
-    for c in \
-        "$ROOT/skills/anterior-cingulate-memory/scripts/llm-call.sh" \
-        "$ROOT/skills/prefrontal-cortex-memory/scripts/llm-call.sh" \
-        "$WS/skills/anterior-cingulate-memory/scripts/llm-call.sh" \
-        "$WS/skills/prefrontal-cortex-memory/scripts/llm-call.sh"; do
-      if [ -x "$c" ]; then LLM_CALL="$c"; break; fi
-    done
-    if [ -z "$LLM_CALL" ]; then
-      echo "spawn-provider: provider=local but llm-call.sh not found anywhere" >&2
-      exit 4
-    fi
-    exec bash "$LLM_CALL" \
-      --system "You are the daemon agent for the AI Brain Suite. Execute the scheduled spawn job described in the user message. Follow the instructions precisely and report what you did. Be concise." \
-      --user "$TASK"
-    ;;
-  agentloop)
-    # AUDIT Gap 2 follow-on: the internal agentic loop — tool use + session
-    # memory against the local LLM. Requires llm-call.sh (the loop resolves it
-    # itself) but never hermes. `exec` keeps the tracked pid the real worker.
+  juno)
+    # Juno's internal agentic loop — tool use + session memory, asking Juno
+    # via the helm queue. `exec` keeps the tracked pid the real worker.
     LOOP="$ROOT/core/agent-loop/agent-loop.sh"
     if [ ! -f "$LOOP" ]; then
-      echo "spawn-provider: provider=agentloop but core/agent-loop/agent-loop.sh not found" >&2
+      echo "spawn-provider: provider=juno but core/agent-loop/agent-loop.sh not found" >&2
       exit 6
     fi
     # Per-job step budget: AGENT_MAX_STEPS overrides the loop's default
     # (set by deep-brain-kernel.py from job.spawn_max_steps).
     STEPS="${AGENT_MAX_STEPS:-8}"
-    # Thinking-model suppression: when AGENT_THINKING_MODEL=1, append a
-    # no-reasoning suffix to the task so thinking models (Carnice 35B)
-    # skip chain-of-thought and produce tool calls / answers directly.
+    # Direct-reply instruction: when AGENT_DIRECT_REPLY=1, append a suffix
+    # asking Juno to respond immediately with a tool call (using
+    # run_suite_script) or a final answer, in the loop's JSON protocol.
     EFFECTIVE_TASK="$TASK"
-    if [ "${AGENT_THINKING_MODEL:-0}" = "1" ]; then
-      EFFECTIVE_TASK=$(printf '%s\n\nIMPORTANT: Do NOT think step by step or show reasoning. Respond immediately with a tool call (using run_suite_script) or a final answer. Keep your response concise.' "$TASK")
+    if [ "${AGENT_DIRECT_REPLY:-0}" = "1" ]; then
+      EFFECTIVE_TASK=$(printf '%s\n\nIMPORTANT: Respond immediately with a tool call (using run_suite_script) or a final answer. Keep your response concise.' "$TASK")
     fi
-    # The loop resolves llm-call.sh itself (its own exit 4 covers a missing
-    # local caller) and honors AGENT_STUB_LLM for deterministic tests.
+    # The loop resolves juno-ask.sh itself (its own exit 4 covers a missing
+    # Juno caller) and honors AGENT_STUB_JUNO for deterministic tests.
     exec bash "$LOOP" --task "$EFFECTIVE_TASK" --max-steps "$STEPS"
     ;;
   *)
-    echo "spawn-provider: unknown SPAWN_PROVIDER '$PROVIDER' (expected hermes|local|agentloop)" >&2
+    echo "spawn-provider: unknown SPAWN_PROVIDER '$PROVIDER' (expected juno — Juno is the only provider)" >&2
     exit 5
     ;;
 esac

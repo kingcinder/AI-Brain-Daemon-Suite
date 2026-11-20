@@ -18,7 +18,7 @@ set -euo pipefail
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SELF_DIR/../.." && pwd)"
 SUITE_ROOT="$ROOT"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 PROPOSAL=""
 TIMEOUT="${SANDBOX_TIMEOUT:-180}"
 THRESH="$SELF_DIR/thresholds.json"
@@ -248,14 +248,14 @@ fi
 # rule), but this guards that path too. Runs AFTER the elapsed measurement so
 # the gate's ~1s overhead never skews the latency rule (candidate vs
 # sweep-only baseline). --check is read-only; WORKSPACE=$SB/suite makes
-# SKILLS_DIR resolve the patched scripts. hermes presence is a host concern a
+# SKILLS_DIR resolve the patched scripts. Juno-shim presence is a host concern
 # proposal can't fix, so skip it — same semantics as the CI gate.
 CK_RC=0
 CK_OUT=""
 if [ -f "$SB/suite/deep-brain-kernel.py" ]; then
   echo "evaluate-proposal: job-table gate: deep-brain-kernel.py --check" >&2
   set +e
-  CK_OUT=$(cd "$SB/suite" && WORKSPACE="$SB/suite" DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1 python3 deep-brain-kernel.py --check 2>&1)
+  CK_OUT=$(cd "$SB/suite" && WORKSPACE="$SB/suite" DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1 python3 deep-brain-kernel.py --check 2>&1)
   CK_RC=$?
   set -e
 else
@@ -286,11 +286,23 @@ fi
 
 # Derive post metrics
 # task_success: 1.0 if tests pass else 0.0 (binary for harness)
-# resource_cost: normalize elapsed vs 60s cap
+# resource_cost: relative to the measured baseline workload (see RC_COST)
 # error_rate: 1 if fail else 0
 # regression_penalty: 1 if fail else 0
 TS=$( [ "$REG_FAIL" -eq 0 ] && echo 1.0 || echo 0.0 )
-RC_COST=$(python3 -c "print(min(1.0, max(0.0, float('$ELAPSED_SEC')/60.0)))")
+# Resource cost, like-for-like (fix 2026-11-19, Juno): the old absolute
+# elapsed/60s cap predated the full verification-sweep gate (~160s), so every
+# sweep-gated candidate scored RC=1.0 while baseline U was computed with a
+# flat RC=0.2 — no candidate could ever beat baseline U and the graduation
+# gate was mathematically unpassable. Now: a candidate that costs the
+# baseline workload's own measured time scores the baseline's own 0.2;
+# slower costs more, faster costs less. Falls back to the 60s cap when no
+# measured baseline latency exists.
+if [ -n "${BASE_LAT_SEC:-}" ] && [ "$BASE_LAT_SEC" != "null" ] && python3 -c "import sys; sys.exit(0 if float('$BASE_LAT_SEC')>0 else 1)" 2>/dev/null; then
+  RC_COST=$(python3 -c "print(min(1.0, max(0.0, float('$ELAPSED_SEC')/float('$BASE_LAT_SEC')*0.2)))")
+else
+  RC_COST=$(python3 -c "print(min(1.0, max(0.0, float('$ELAPSED_SEC')/60.0)))")
+fi
 ER=$( [ "$REG_FAIL" -eq 0 ] && echo 0.0 || echo 1.0 )
 RP=$( [ "$REG_FAIL" -eq 0 ] && echo 0.0 || echo 1.0 )
 

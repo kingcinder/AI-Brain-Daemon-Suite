@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-WS="${WORKSPACE:-$HOME/.hermes/workspace}"
+WS="${WORKSPACE:-$HOME/.openclaw/workspace}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --workspace) WS="$2"; shift 2 ;;

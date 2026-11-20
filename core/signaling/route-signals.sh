@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 
 # ── Routing Table ───────────────────────────────────────────────────────
 # Format: source_module | source_signal | target_module | target_script | arg_template

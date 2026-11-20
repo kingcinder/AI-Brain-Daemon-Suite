@@ -6,8 +6,8 @@ Version `0.1.0`. Status: **proposal** (branch `refactor/runtime-contract`).
 
 The suite's cognitive architecture (scheduled jobs, memory encode/decay/
 consolidate/reflect cycles, bounded self-modification) is currently welded to
-one substrate: a Linux host with systemd --user, a loopback LLM endpoint, and
-a `$HOME/.hermes` workspace layout (see `REFACTOR_SURVEY.md`). This contract
+one substrate: a Linux host with systemd --user, Juno's helm queue as the
+reasoning seat, and a `$HOME/.juno-brain` workspace layout (see `REFACTOR_SURVEY.md`). This contract
 extracts the *architecture* from the *substrate* so the same patterns run on
 heterogeneous runtimes — the groundwork for multi-node operation (Stage 2).
 

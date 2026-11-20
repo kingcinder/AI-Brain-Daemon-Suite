@@ -95,7 +95,7 @@ MDEOF
 # install.sh — Auto-generated skill installer
 if [ "${1:-}" = "--uninstall" ]; then
     THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
-    WS="${WORKSPACE:-$HOME/.hermes/workspace}"
+    WS="${WORKSPACE:-$HOME/.openclaw/workspace}"
     for CAND in "$THIS_DIR/../../core/skill-init/skill-cleanup.sh" \
                 "$THIS_DIR/../../../core/skill-init/skill-cleanup.sh"; do
         if [ -x "$CAND" ]; then
@@ -106,7 +106,7 @@ if [ "${1:-}" = "--uninstall" ]; then
     exit 1
 fi
 set -euo pipefail
-WS="${WORKSPACE:-$HOME/.hermes/workspace}"
+WS="${WORKSPACE:-$HOME/.openclaw/workspace}"
 mkdir -p "$WS/memory"
 chmod +x "$(dirname "$0")/scripts/"*.sh 2>/dev/null || true
 echo "✅ $NAME initialized."

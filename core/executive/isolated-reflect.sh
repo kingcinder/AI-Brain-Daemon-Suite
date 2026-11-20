@@ -13,14 +13,14 @@
 # Usage:
 #   isolated-reflect.sh [--workspace PATH] [--out PATH] [--with-inference]
 # Env:
-#   WORKSPACE  default ~/.hermes/workspace
+#   WORKSPACE  default ~/.juno-brain/workspace
 #
 # Exit 0 on success; prints path to reflection JSON on stdout last line.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 OUT_DIR=""
 WITH_INFERENCE=0
 
@@ -110,7 +110,7 @@ if [ "$WITH_INFERENCE" -eq 1 ]; then
     WITH_INFERENCE=0
   else
     # Offline synthesis only in this phase; release immediately after "reservation"
-    # (full LLM path is Phase 3 / spawn). Holding the slot documents the contract.
+    # (the full Juno path is Phase 3 / spawn). Holding the slot documents the contract.
     semaphore_release_inference || true
     WITH_INFERENCE=0
   fi

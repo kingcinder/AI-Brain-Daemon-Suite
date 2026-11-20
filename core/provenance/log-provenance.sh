@@ -35,7 +35,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.juno-brain/workspace}"
 PROV_DIR="${PROVENANCE_DIR:-$WORKSPACE/memory/provenance}"
 PROV_LOG="$PROV_DIR/patches.jsonl"
 

@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SIGNAL_LOG="$WORKSPACE/memory/brain-signals.jsonl"
 EVENT_LOG="$WORKSPACE/memory/brain-events.jsonl"
 
