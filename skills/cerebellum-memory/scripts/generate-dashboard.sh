@@ -14,7 +14,7 @@ mkdir -p "$FRAGMENTS_DIR"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No cerebellum state found"; exit 1; }
 
 GLOBAL=$(jq -r '.globalCalibration' "$STATE_FILE")
-SKILLS=$(jq -c '[.skills | to_entries | sort_by(-.value.precision) | .[:8] | .[] | {name: .key, precision: .value.precision, smoothness: .value.smoothness, reps: .value.reps}]' "$STATE_FILE")
+SKILLS=$(jq -c '[.skills | to_entries | sort_by(-.value.precision) | .[:8] | .[] | {name: .key, precision: .value.precision, smoothness: .value.smoothness, reps: .value.reps, predictionError: .value.predictionError}]' "$STATE_FILE")
 
 HTML=$(cat << 'HTMLEOF'
         <div class="card">

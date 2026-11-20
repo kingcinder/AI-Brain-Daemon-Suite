@@ -58,9 +58,24 @@ ERROR_PATTERNS=$(read_field "$WORKSPACE/memory/acc-state.json" '(.activePatterns
 # interoceptive_discrepancy; absent → no dampening (decide.sh must work
 # standalone).
 INTERO_DISC=$(read_field "$WORKSPACE/memory/pfc-uncertainty.json" '.interoceptiveDiscrepancy' "0.0")
+# Snapshot habit + semantic state so the scoring below reads a stable
+# copy (Sept behavior, lost in the scrub rewrite): the live files can
+# change mid-run. A missing file means "no adjustment from that signal".
+cp "$WORKSPACE/memory/habit-state.json" /tmp/pfc_habit_state.$$ 2>/dev/null || echo '{"habits":[]}' > /tmp/pfc_habit_state.$$
+cp "$WORKSPACE/memory/semantic-state.json" /tmp/pfc_semantic_state.$$ 2>/dev/null || echo '{"patterns":{"themes":[],"strategies":[],"antipatterns":[]}}' > /tmp/pfc_semantic_state.$$
+HABIT_STATE_FILE="/tmp/pfc_habit_state.$$"
+SEMANTIC_STATE_FILE="/tmp/pfc_semantic_state.$$"
 HABIT_STRENGTH=$(read_field "$WORKSPACE/memory/habit-state.json" '([.habits[].strength] | if length > 0 then (add / length) else 0 end)' "0.0")
 CALIBRATION=$(read_field "$WORKSPACE/memory/cerebellum-state.json" '.globalCalibration' "0.5")
 OPEN_LOOPS=$(read_field "$WORKSPACE/memory/social-state.json" '([.relationships[].openLoops[]?] | length)' "0")
+
+# ── Integrative State Layer: global neuromod ──────────────────────────────────
+NEURO_DA=0.5
+NEURO_CORT=0.5
+if [ -x "$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" ]; then
+    NEURO_DA=$("$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get dopamine 2>/dev/null || echo "0.5")
+    NEURO_CORT=$("$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get cortisol 2>/dev/null || echo "0.5")
+fi
 
 # ── Goals & inhibitions (PFC's own state) ────────────────────────────────────
 GOALS=$(jq -c '[.goals[] | select(.status == "active")]' "$STATE_FILE")
@@ -128,6 +143,10 @@ habit_strength = float('$HABIT_STRENGTH')
 calibration = float('$CALIBRATION')
 open_loops = int('$OPEN_LOOPS')
 intero_disc = float('$INTERO_DISC')
+dopamine = float('$NEURO_DA')
+cortisol = float('$NEURO_CORT')
+habit_state_file = '$HABIT_STATE_FILE'
+semantic_file = '$SEMANTIC_STATE_FILE'
 
 notes = []
 scores = {}
@@ -182,14 +201,14 @@ for opt in options:
         for gm in semantic_goal_matches:
             if gm.get('option_id') == oid:
                 g = goals[gm['goal_index']]
-                score *= (1.0 + g.get('priority', 0.5))
-                notes.append(f\"active goal '{g.get('description')}' boosts {oid} (semantic match)\")
+                score *= (1.0 + g.get('priority', 0.5)) * (0.8 + 0.4 * dopamine)
+                notes.append(f\"active goal '{g.get('description')}' boosts {oid} (semantic match, DA={dopamine:.2f})\")
     else:
         for g in goals:
             desc = g.get('description') or ''
             if desc and overlaps(desc, label):
-                score *= (1.0 + g.get('priority', 0.5))
-                notes.append(f\"active goal '{g.get('description')}' boosts {oid} (heuristic match)\")
+                score *= (1.0 + g.get('priority', 0.5)) * (0.8 + 0.4 * dopamine)
+                notes.append(f\"active goal '{g.get('description')}' boosts {oid} (heuristic match, DA={dopamine:.2f})\")
 
     # Inhibitions suppress matching options entirely (impulse control)
     if using_semantic:
@@ -205,9 +224,26 @@ for opt in options:
                 score *= max(0.0, 1.0 - inh.get('strength', 0.8))
                 notes.append(f\"inhibition '{inh.get('pattern')}' suppresses {oid} (heuristic match)\")
 
-    # Habitual pull: options with above-average habit strength get a light nudge
-    # (well-worn grooves are cheap to act on) — kept small since this is a
-    # coarse suite-wide average, not a per-option lookup.
+    # ── Per-option habit pull (Closed-loop: basal-ganglia → PFC decide) ──
+    # Read the full habit state and match by option label overlap — gives
+    # well-rehearsed behaviors their real pull instead of a coarse global
+    # average that treats all options the same.
+    if habit_state_file:
+        try:
+            habit_state = json.load(open(habit_state_file))
+            habit_entries = habit_state.get('habits', [])
+            for he in habit_entries:
+                h_label = (he.get('label') or he.get('description') or '').lower()
+                if h_label and (overlaps(h_label, label) or overlaps(h_label, oid)):
+                    h_strength = float(he.get('strength', 0.5))
+                    # Per-option habit pull: well-worn grooves are cheap to act on
+                    score *= (0.9 + 0.2 * h_strength)
+                    notes.append(f\"habit '{he.get('label','')[:40]}' pull {h_strength:.2f} on {oid}\")
+                    break
+        except Exception:
+            pass
+
+    # Legacy global habit pull (fallback when no per-option match above)
     if habit_strength > 0.6 and high_effort:
         score *= 1.1
 
@@ -224,6 +260,27 @@ for opt in options:
         score *= (1.0 + min(open_loops, 5) * 0.08)
         notes.append(f'{open_loops} open loop(s) favor social_interaction')
 
+    # ── Insula gutSignal → PFC inhibition (Closed-loop) ───────────────────
+    # High gut signal (a somatic bad feeling) applies inhibition strength to
+    # options whose label overlaps any active inhibition pattern — the body's
+    # alarm system gates executive decisions.
+    if gut_signal > 0.5:
+        for inh in inhibitions:
+            pat = inh.get('pattern') or ''
+            if pat and (overlaps(pat, label) or overlaps(pat, oid)):
+                # Gut signal amplifies the inhibition: stronger body alarm = stronger block
+                inh_power = inh.get('strength', 0.6) * (0.7 + 0.3 * gut_signal)
+                score *= max(0.05, 1.0 - inh_power)
+                notes.append(f\"gutSignal={gut_signal:.2f} amplifies inhibition '{pat[:30]}' on {oid}\")
+
+    # Somatic bias: under acute stress (cortisol > 0.6), options that look
+    # uncertain/novel get dampened — prefer the known over the unknown.
+    if cortisol > 0.6:
+        UNCERTAINTY_MARKERS = ('maybe', 'uncertain', 'try', 'experiment', 'new', 'explore')
+        if any(m in label for m in UNCERTAINTY_MARKERS):
+            score *= (1.0 - 0.2 * cortisol)
+            notes.append(f\"stress (cortisol={cortisol:.2f}) dampens uncertain option {oid}\")
+
     # Insula interoceptive discrepancy → PFC confidence (Closed-loop)
     # High body-level prediction error (Craig's predictive-coding insula;
     # Critchley's decision-confidence extension) lowers executive confidence:
@@ -232,6 +289,29 @@ for opt in options:
         damp = 1.0 - 0.3 * min(intero_disc, 1.0)
         score *= damp
         notes.append(f\"interoceptive discrepancy {intero_disc:.2f} dampens all options (confidence {damp:.2f})\")
+
+    # ── Semantic knowledge boost (Initiative 7) ─────────────────────────
+    # Options whose label overlaps an extracted theme or strategy from
+    # the episodic store get a light nudge — the brain has learned
+    # that this kind of thing works.
+    if semantic_file:
+        try:
+            sem_state = json.load(open(semantic_file))
+            patterns = sem_state.get('patterns', {})
+            semantic_labels = []
+            for th in patterns.get('themes', []):
+                semantic_labels.append(th.get('label', ''))
+            for s in patterns.get('strategies', []):
+                summary = s.get('summary', '')
+                if summary:
+                    semantic_labels.append(summary)
+            for sl in semantic_labels:
+                if sl and (overlaps(sl, label) or overlaps(sl, oid)):
+                    score *= 1.08  # +8% boost for semantic match
+                    notes.append(f\"semantic match '{sl[:40]}' boosts {oid}\")
+                    break
+        except Exception:
+            pass
 
     scores[oid] = round(score, 3)
 
@@ -247,7 +327,7 @@ else:
 ")
 
 echo "$RESULT"
-rm -f /tmp/pfc_options.$$ /tmp/pfc_goals.$$ /tmp/pfc_inhibitions.$$ /tmp/pfc_semantic_goals.$$ /tmp/pfc_semantic_inhibitions.$$
+rm -f /tmp/pfc_options.$$ /tmp/pfc_goals.$$ /tmp/pfc_inhibitions.$$ /tmp/pfc_semantic_goals.$$ /tmp/pfc_semantic_inhibitions.$$ /tmp/pfc_habit_state.$$ /tmp/pfc_semantic_state.$$
 
 # Log the decision (best-effort, never block the caller on this).
 # flock-guarded via safe-write.sh: this file is written on every decide.sh

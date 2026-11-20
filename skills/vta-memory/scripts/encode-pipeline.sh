@@ -54,6 +54,10 @@ fi
 echo ""
 echo "🔄 Step 3: Scoring reward signals..."
 
+# Integrative State Layer: reward-starved dopamine (< 0.4) amplifies intensity
+NEURO_DA=$("$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get dopamine 2>/dev/null || echo "0.5")
+export NEURO_DA
+
 python3 << 'PYTHON'
 import json
 import os
@@ -164,6 +168,9 @@ for sig in signals:
         continue
     
     intensity = estimate_intensity(text, rewards)
+    dopamine = float(os.environ.get('NEURO_DA', '0.5'))
+    if dopamine < 0.4:
+        intensity *= 1.15   # reward-starved: small wins feel bigger
     
     pending.append({
         "id": sig_id,
@@ -238,3 +245,24 @@ fi
 
 echo ""
 echo "✅ Pipeline phase 1 complete. Juno will handle reward detection."
+
+# Closed-loop: accomplishment rewards that overlap active PFC goals ⇒
+# close the goal as success (ROADMAP M4 feedback arc).
+if [ -x "$SKILL_DIR/../../core/executive/record-goal-outcome.sh" ]; then
+    PFC="$WORKSPACE/memory/pfc-state.json"
+    if [ -f "$PFC" ] && [ -f "$PENDING_FILE" ]; then
+        ACTIVE_GOALS=$(jq -r '[.goals[]? | select(.status == "active") | .description] | join("\n")' "$PFC" 2>/dev/null || echo "")
+        if [ -n "$ACTIVE_GOALS" ]; then
+            while IFS= read -r goal; do
+                [ -z "$goal" ] && continue
+                # Check if any pending reward text overlaps this goal
+                OVERLAP=$(jq -r --arg g "$goal" '[.pending[]? | select(.detected_rewards | contains(["accomplishment","competence"])) | .text] | join(" ")' "$PENDING_FILE" 2>/dev/null)
+                if [ -n "$OVERLAP" ]; then
+                    for word in $goal; do
+                        case "$OVERLAP" in *"$word"*) bash "$SKILL_DIR/../../core/executive/record-goal-outcome.sh" outcome --goal-description "$goal" --outcome success --job vta_encode --evidence "VTA reward detection: accomplishment"; break ;; esac
+                    done
+                fi
+            done <<< "$ACTIVE_GOALS"
+        fi
+    fi
+fi

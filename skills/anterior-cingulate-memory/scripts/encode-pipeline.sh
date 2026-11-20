@@ -31,7 +31,19 @@ fi
 EXCHANGES=$("$SKILL_DIR/scripts/preprocess-exchanges.sh")
 EXCHANGE_COUNT=$(echo "$EXCHANGES" | jq 'length' 2>/dev/null || echo 0)
 
-if [ "$EXCHANGE_COUNT" -lt 2 ]; then
+# Integrative State Layer: under acute stress (stressIndex > 0.6) conflicts
+# are flagged on thinner evidence — exchange threshold drops 2 -> 1.
+# NOTE: this file uses jq only (no bc anywhere in it) — use jq for the
+# comparison, not bc, to avoid introducing a new dependency in this file.
+MIN_EXCHANGES=2
+if [ -x "$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" ]; then
+    STRESS_INDEX=$("$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" --composite stressIndex 2>/dev/null || echo "0.5")
+    if jq -e --argjson s "$STRESS_INDEX" '$s > 0.6' /dev/null > /dev/null 2>&1; then
+        MIN_EXCHANGES=1
+    fi
+fi
+
+if [ "$EXCHANGE_COUNT" -lt "$MIN_EXCHANGES" ]; then
   echo "⚡ encode-pipeline: insufficient exchanges ($EXCHANGE_COUNT) — skipping."
   exit 0
 fi
@@ -163,6 +175,23 @@ else
     '.stats.encodingRuns = (.stats.encodingRuns // 0) + 1 | .lastUpdated = $now' \
     "$STATE_FILE")
   echo "$UPDATED" > "$STATE_FILE"
+fi
+
+# ── Closed-loop: flag uncertainty zones for VTA anticipation ──────────────
+# Uncertainty is the brain's "I don't understand this yet" signal —
+# flag those topics for the VTA's anticipatory reward system so the brain
+# learns to seek resolution of what it doesn't understand.
+if [ "$ZONE_COUNT" -gt 0 ]; then
+    ANTICIPATE_SCRIPT="$SKILL_DIR/../vta-memory/scripts/anticipate.sh"
+    if [ -x "$ANTICIPATE_SCRIPT" ]; then
+        while IFS= read -r zone; do
+            [ -z "$zone" ] && continue
+            TOPIC=$(echo "$zone" | jq -r '.topic // empty' 2>/dev/null)
+            [ -z "$TOPIC" ] && continue
+            REASON=$(echo "$zone" | jq -r '.reason // "ACC-flagged uncertainty"' 2>/dev/null)
+            "$ANTICIPATE_SCRIPT" --topic "$TOPIC" --reason "$REASON" --source "acc_encode" 2>/dev/null || true
+        done < <(echo "$ZONES" | jq -c '.[]')
+    fi
 fi
 
 # ── Log event ─────────────────────────────────────────────────────────────────
