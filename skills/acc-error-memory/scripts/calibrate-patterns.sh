@@ -1,7 +1,7 @@
 #!/bin/bash
 # ACC Pattern Calibration — Self-improving regex system
-# Samples exchanges, sends to LLM, compares against regex coverage.
-# Learns new patterns from gaps between regex and LLM classification.
+# Samples exchanges, asks Juno, compares against regex coverage.
+# Learns new patterns from gaps between regex and Juno's classification.
 #
 # Usage:
 #   calibrate-patterns.sh <pending-errors.json>
@@ -9,12 +9,12 @@
 #
 # Output: Stats to stderr, updates learned-patterns.json in place
 
-set -euo pipefail
+set -e
 
 INPUT_FILE="${1:?Usage: calibrate-patterns.sh <pending-errors.json> [sample_rate]}"
 SAMPLE_RATE="${2:-0.15}"
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 LEARNED_FILE="$WORKSPACE/memory/learned-patterns.json"
 CALIBRATION_STATE="$WORKSPACE/memory/calibration-state.json"
 
@@ -23,8 +23,7 @@ if [ ! -f "$INPUT_FILE" ]; then
     exit 0
 fi
 
-ACC_MODELS="${ACC_MODELS:-claude --model haiku -p,claude --model sonnet -p}"
-export INPUT_FILE SAMPLE_RATE LEARNED_FILE CALIBRATION_STATE ACC_MODELS
+export INPUT_FILE SAMPLE_RATE LEARNED_FILE CALIBRATION_STATE
 
 python3 << 'PYTHON'
 import json
@@ -109,7 +108,7 @@ sample = random.sample(all_exchanges, sample_size)
 
 print(f"CALIBRATION: Sampling {sample_size}/{len(all_exchanges)} exchanges ({sample_rate*100:.0f}%)", file=sys.stderr)
 
-# --- LLM classification (bypass regex, send raw to LLM) ---
+# --- Juno classification (bypass regex, ask Juno directly) ---
 
 CLASSIFY_PROMPT = """You are classifying a conversation exchange. The user message follows an assistant message.
 
@@ -121,36 +120,53 @@ User replied:
 
 Is the user's message a correction, complaint, or expression of frustration with the assistant? Answer YES or NO only."""
 
-# Parse models from ACC_MODELS env var (comma-separated CLI commands)
-acc_models_str = os.environ.get('ACC_MODELS', 'claude --model haiku -p,claude --model sonnet -p')
-MODELS = []
-for i, cmd_str in enumerate(acc_models_str.split(',')):
-    cmd_parts = cmd_str.strip().split()
-    if cmd_parts:
-        model_name = f"model_{i+1}" if len(MODELS) > 0 else cmd_parts[0]
-        MODELS.append((model_name, cmd_parts))
+# Juno is the classifier: resolve juno-ask.sh once (env override, then the
+# workspace's copies in prefrontal-cortex-memory / anterior-cingulate-memory).
+def find_juno_ask():
+    env = os.environ.get('JUNO_ASK', '')
+    if env and os.access(env, os.X_OK):
+        return env
+    candidates = []
+    ws_env = os.environ.get('WORKSPACE', '')
+    if ws_env:
+        candidates += [
+            os.path.join(ws_env, 'skills/prefrontal-cortex-memory/scripts/juno-ask.sh'),
+            os.path.join(ws_env, 'skills/anterior-cingulate-memory/scripts/juno-ask.sh'),
+        ]
+    home_ws = os.path.expanduser('~/.juno-brain/workspace')
+    candidates += [
+        os.path.join(home_ws, 'skills/prefrontal-cortex-memory/scripts/juno-ask.sh'),
+        os.path.join(home_ws, 'skills/anterior-cingulate-memory/scripts/juno-ask.sh'),
+    ]
+    for c in candidates:
+        if os.access(c, os.X_OK):
+            return c
+    return None
 
-def llm_classify(assistant_text, user_text):
-    """Classify via LLM. Returns True if error, False if not, None if failed."""
+JUNO_ASK = find_juno_ask()
+
+def juno_classify(assistant_text, user_text):
+    """Classify via Juno. Returns True if error, False if not, None if failed."""
     prompt = CLASSIFY_PROMPT.format(
         assistant_text=assistant_text[:500],
         user_text=user_text[:500]
     )
-    for model_name, cmd_prefix in MODELS:
-        try:
-            result = subprocess.run(
-                cmd_prefix + [prompt],
-                capture_output=True, text=True, timeout=45
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                return 'YES' in result.stdout.strip().upper()
-        except (subprocess.TimeoutExpired, Exception):
-            continue
+    if not JUNO_ASK:
+        return None
+    try:
+        result = subprocess.run(
+            ['bash', JUNO_ASK, '--user', prompt, '--timeout', '120'],
+            capture_output=True, text=True, timeout=150
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return 'YES' in result.stdout.strip().upper()
+    except (subprocess.TimeoutExpired, Exception):
+        return None
     return None
 
 # Classify each sample exchange
-llm_errors = []      # LLM says YES
-llm_non_errors = []  # LLM says NO
+juno_errors = []      # Juno says YES
+juno_non_errors = []  # Juno says NO
 
 for exchange in sample:
     user_text = exchange.get('user_text', '')
@@ -158,28 +174,28 @@ for exchange in sample:
     if not user_text:
         continue
 
-    is_error = llm_classify(assistant_text, user_text)
+    is_error = juno_classify(assistant_text, user_text)
     if is_error is None:
-        print(f"  LLM failed on exchange, skipping", file=sys.stderr)
+        print(f"  Juno failed on exchange, skipping", file=sys.stderr)
         continue
     if is_error:
-        llm_errors.append(exchange)
+        juno_errors.append(exchange)
     else:
-        llm_non_errors.append(exchange)
+        juno_non_errors.append(exchange)
 
-print(f"CALIBRATION: LLM classified {len(llm_errors)} errors, {len(llm_non_errors)} non-errors from {sample_size} samples", file=sys.stderr)
+print(f"CALIBRATION: Juno classified {len(juno_errors)} errors, {len(juno_non_errors)} non-errors from {sample_size} samples", file=sys.stderr)
 
-# --- Find regex misses (LLM found error but regex wouldn't catch it) ---
+# --- Find regex misses (Juno found error but regex wouldn't catch it) ---
 
 all_patterns = get_all_patterns()
 regex_misses = []
 
-for exchange in llm_errors:
+for exchange in juno_errors:
     user_text = exchange.get('user_text', '')
     if not regex_would_catch(user_text, all_patterns):
         regex_misses.append(exchange)
 
-print(f"CALIBRATION: {len(regex_misses)} regex misses (LLM caught but regex missed)", file=sys.stderr)
+print(f"CALIBRATION: {len(regex_misses)} regex misses (Juno caught but regex missed)", file=sys.stderr)
 
 # --- Extract patterns from misses ---
 
@@ -265,7 +281,7 @@ for exchange in regex_misses:
             continue
 
         # Validate against non-errors
-        if not validate_pattern(candidate, llm_non_errors):
+        if not validate_pattern(candidate, juno_non_errors):
             print(f"  REJECTED (false positives): {candidate}", file=sys.stderr)
             continue
 
@@ -302,11 +318,11 @@ with open(calibration_state_file, 'w') as f:
     f.write('\n')
 
 # --- Save confirmed errors for pipeline to use ---
-# This allows calibration runs to skip Haiku screening
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
+# This allows calibration runs to skip Juno screening
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
 calib_errors_file = os.path.join(workspace, 'memory', 'calibration-errors.json')
 with open(calib_errors_file, 'w') as f:
-    json.dump(llm_errors, f, indent=2)
+    json.dump(juno_errors, f, indent=2)
     f.write('\n')
 
 # --- Report ---
@@ -314,7 +330,7 @@ with open(calib_errors_file, 'w') as f:
 print(f"", file=sys.stderr)
 print(f"CALIBRATION COMPLETE:", file=sys.stderr)
 print(f"  Samples analyzed: {len(sample)}", file=sys.stderr)
-print(f"  LLM errors found: {len(llm_errors)}", file=sys.stderr)
+print(f"  Juno errors found: {len(juno_errors)}", file=sys.stderr)
 print(f"  Regex misses: {len(regex_misses)}", file=sys.stderr)
 print(f"  New patterns learned: {new_patterns_added}", file=sys.stderr)
 print(f"  Total learned patterns: {len(learned_data['patterns'])}", file=sys.stderr)

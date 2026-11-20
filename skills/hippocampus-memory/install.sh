@@ -1,20 +1,4 @@
 #!/bin/bash
-# ── Standardized lifecycle contract (Initiative 9) ──────────────────────────
-#   install.sh              → initialize state files (defaults)
-#   install.sh --uninstall  → remove exactly the state files this skill's
-#                             manifest declares (delegates to skill-cleanup.sh)
-if [ "${1:-}" = "--uninstall" ]; then
-    THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
-    WS_UN="${WORKSPACE:-$HOME/.hermes/workspace}"
-    for CAND in "$THIS_DIR/../../core/skill-init/skill-cleanup.sh" \
-                "$THIS_DIR/../../../core/skill-init/skill-cleanup.sh"; do
-        if [ -x "$CAND" ]; then
-            exec "$CAND" --skill "$THIS_DIR" --workspace "$WS_UN" "${2:-}"
-        fi
-    done
-    echo "uninstall: skill-cleanup.sh not found — nothing removed." >&2
-    exit 1
-fi
 # Hippocampus Skill Installer
 # Sets up memory directories, index.json, and optionally cron jobs
 #
@@ -34,7 +18,7 @@ fi
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 WITH_CRON=false
@@ -46,10 +30,23 @@ for arg in "$@"; do
     case $arg in
         --with-cron) WITH_CRON=true ;;
         --with-agent) WITH_AGENT=true ;;
+        --whole) WHOLE_HISTORY=true ;;
+        --signals)
+            # Next arg will be the number
+            ;;
+        [0-9]*)
+            # Check if previous arg was --signals
+            install_all_args=("$@")
+            second_last_arg="${install_all_args[-2]:-}"
+            if [[ "$second_last_arg" == "--signals" ]] || [[ "$prev_arg" == "--signals" ]]; then
+                SIGNAL_LIMIT=$arg
+            fi
+            ;;
     esac
+    prev_arg=$arg
 done
 
-# Parse --signals N and --whole properly
+# Parse --signals N properly
 while [[ $# -gt 0 ]]; do
     case $1 in
         --signals)
@@ -108,7 +105,7 @@ echo "$SIGNAL_LIMIT" > "$WORKSPACE/memory/.signal-limit"
 if [ "$WHOLE_HISTORY" = true ]; then
     echo "whole" > "$WORKSPACE/memory/.signal-limit"
 fi
-echo "   ✅ Signal limit set: $(cat "$WORKSPACE/memory/.signal-limit")"
+echo "   ✅ Signal limit set: $(cat $WORKSPACE/memory/.signal-limit)"
 
 # 4. Make scripts executable
 echo "🔧 Making scripts executable..."
@@ -121,20 +118,26 @@ if [ "$WITH_CRON" = true ]; then
     echo "⏰ Setting up cron jobs..."
     
     # Check if openclaw is available
-    if ! command -v hermes &> /dev/null; then
-        echo "   ⚠️  'hermes' not in PATH. Printing commands instead:"
+    if ! command -v openclaw &> /dev/null; then
+        echo "   ⚠️  'openclaw' not in PATH. Printing commands instead:"
         echo ""
         echo "# Daily decay at 3 AM"
-        echo "hermes cron create '0 3 * * *' '🧠 Run decay: ~/.hermes/workspace/skills/hippocampus-memory/scripts/decay.sh' --name hippocampus-decay"
+        echo "openclaw cron add --name hippocampus-decay --cron '0 3 * * *' --session isolated --agent-turn '🧠 Run decay: ~/.openclaw/workspace/skills/hippocampus-memory/scripts/decay.sh'"
         echo ""
-        echo "# Encoding every 3 hours with LLM summarization"
-        echo "hermes cron create '0 0,3,6,9,12,15,18,21 * * *' 'Run hippocampus encoding with summarization...' --name hippocampus-encoding"
+        echo "# Encoding every 3 hours with Juno summarization"
+        echo "openclaw cron add --name hippocampus-encoding --cron '0 0,3,6,9,12,15,18,21 * * *' --session isolated --agent-turn 'Run hippocampus encoding with summarization...'"
     else
         echo "   Creating hippocampus-decay..."
-        hermes cron create '0 3 * * *' "🧠 Run memory decay:\n\n1. Run: ~/.hermes/workspace/skills/hippocampus-memory/scripts/decay.sh\n2. Report any memories below 0.2 threshold\n3. Confirm decay complete" --name hippocampus-decay 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+        openclaw cron add --name hippocampus-decay \
+            --cron '0 3 * * *' \
+            --session isolated \
+            --agent-turn "🧠 Run memory decay:\n\n1. Run: ~/.openclaw/workspace/skills/hippocampus-memory/scripts/decay.sh\n2. Report any memories below 0.2 threshold\n3. Confirm decay complete" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
         
         echo "   Creating hippocampus-encoding..."
-        hermes cron create '0 0,3,6,9,12,15,18,21 * * *' "Run hippocampus encoding with LLM summarization:\n\n1. Run the encoding pipeline:\n\`\`\`bash\nWORKSPACE=\"\$HOME/.hermes/workspace\" ~/.hermes/workspace/skills/hippocampus-memory/scripts/encode-pipeline.sh --no-spawn\n\`\`\`\n\n2. Check pending memories:\n\`\`\`bash\ncat ~/.hermes/workspace/memory/pending-memories.json 2>/dev/null | head -20\n\`\`\`\n\n3. If pending exist, summarize each to ~100 chars\n4. Update index.json with summaries\n5. Delete pending-memories.json\n6. Sync core: ~/.hermes/workspace/skills/hippocampus-memory/scripts/sync-core.sh\n7. Report results" --name hippocampus-encoding 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+        openclaw cron add --name hippocampus-encoding \
+            --cron '0 0,3,6,9,12,15,18,21 * * *' \
+            --session isolated \
+            --agent-turn "Run hippocampus encoding with Juno summarization:\n\n1. Run the encoding pipeline:\n\`\`\`bash\nWORKSPACE=\"\$HOME/.openclaw/workspace\" ~/.openclaw/workspace/skills/hippocampus-memory/scripts/encode-pipeline.sh --no-spawn\n\`\`\`\n\n2. Check pending memories:\n\`\`\`bash\ncat ~/.openclaw/workspace/memory/pending-memories.json 2>/dev/null | head -20\n\`\`\`\n\n3. If pending exist, summarize each to ~100 chars\n4. Update index.json with summaries\n5. Delete pending-memories.json\n6. Sync core: ~/.openclaw/workspace/skills/hippocampus-memory/scripts/sync-core.sh\n7. Report results" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
     fi
     echo ""
 fi
@@ -144,9 +147,7 @@ if [ "$WITH_AGENT" = true ]; then
     echo ""
     echo "🤖 Agent configuration..."
     echo ""
-    echo "Legacy sub-agent config (OpenClaw openclaw.json agents.list)."
-    echo "Hermes Agent instead reads AGENTS.md project rules — point the main"
-    echo "agent at this skill's agentdir via AGENTS.md if you want this role."
+    echo "Add this to your openclaw.json agents.list:"
     echo ""
     cat << EOF
 {
@@ -160,14 +161,15 @@ if [ "$WITH_AGENT" = true ]; then
 }
 EOF
     echo ""
-    echo "And add 'hippocampus' to main agent's subagents.allowAgents (OpenClaw only)"
+    echo "And add 'hippocampus' to main agent's subagents.allowAgents"
     echo ""
 fi
 
 # 7. Add extraPaths for HIPPOCAMPUS_CORE.md
 echo ""
-echo "📚 Config recommendation (legacy OpenClaw openclaw.json memorySearch.extraPaths):"
+echo "📚 OpenClaw config recommendation:"
 echo ""
+echo "Add to memorySearch.extraPaths in openclaw.json:"
 echo '  "extraPaths": ["HIPPOCAMPUS_CORE.md"]'
 echo ""
 
@@ -184,12 +186,12 @@ echo ""
 echo "┌─────────────────────────────────────────────────────────┐"
 echo "│  🧠 View your agent's MEMORIES in the Brain Dashboard  │"
 echo "│                                                         │"
-echo "│  open ~/.hermes/workspace/brain-dashboard.html        │"
+echo "│  open ~/.openclaw/workspace/brain-dashboard.html        │"
 echo "└─────────────────────────────────────────────────────────┘"
 echo ""
 echo "Next steps:"
 echo "  1. Run first encoding: $SKILL_DIR/scripts/encode-pipeline.sh"
-echo "  2. The encoding will process the last $([ "$WHOLE_HISTORY" = true ] && echo 'ALL' || echo "$SIGNAL_LIMIT") signals"
+echo "  2. The encoding will process the last $([ "$WHOLE_HISTORY" = true ] && echo 'ALL' || echo $SIGNAL_LIMIT) signals"
 echo "  3. Add memory/index.json to .gitignore (contains personal data)"
 echo "  4. Test loading: $SKILL_DIR/scripts/load-core.sh"
 echo ""

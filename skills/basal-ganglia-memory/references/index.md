@@ -8,4 +8,4 @@ Progressive-disclosure links. Load this index via `skill_view("basal-ganglia-mem
 | `../ARCHITECTURE.md` | Technical design: habit state, cue-routine-reward, decay |
 | `../CHANGELOG.md` | Version history and behavioral changes |
 | `../skill-card.md` | Compact summary card for quick recall |
-| `../prompts/encode-habits.md` | LLM prompt for habit classification |
+| `../prompts/encode-habits.md` | Juno's prompt for habit classification |

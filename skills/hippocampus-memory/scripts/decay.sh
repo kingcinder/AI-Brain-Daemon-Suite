@@ -4,11 +4,11 @@
 # Based on Stanford Generative Agents paper (Park et al., 2023)
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="${SKILL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 INDEX="$WORKSPACE/memory/index.json"
 BACKUP="$WORKSPACE/memory/index.backup.json"
@@ -31,8 +31,7 @@ echo "Decay rate: $DECAY_RATE per day"
 echo ""
 
 # Check if decay was already run today
-LAST_DECAY=$(INDEX="$INDEX" python3 -c "import os
-import json; print(json.load(open(os.environ['INDEX'])).get('decayLastRun', 'never'))" 2>/dev/null || echo "never")
+LAST_DECAY=$(python3 -c "import json; print(json.load(open('$INDEX')).get('decayLastRun', 'never'))" 2>/dev/null || echo "never")
 if [ "$LAST_DECAY" = "$TODAY" ]; then
     echo "⏸️  Decay already ran today ($LAST_DECAY). Skipping."
     exit 0
@@ -41,15 +40,14 @@ fi
 # Process each memory
 echo "Processing memories..."
 
-INDEX="$INDEX" DECAY_RATE="$DECAY_RATE" ARCHIVE_THRESHOLD="$ARCHIVE_THRESHOLD" python3 << 'PYTHON'
+python3 << PYTHON
 import json
-import os
 import sys
 from datetime import datetime, date
 
-INDEX_PATH = os.environ['INDEX']
-DECAY_RATE = float(os.environ['DECAY_RATE'])
-ARCHIVE_THRESHOLD = float(os.environ['ARCHIVE_THRESHOLD'])
+INDEX_PATH = "$INDEX"
+DECAY_RATE = 0.99
+ARCHIVE_THRESHOLD = 0.2
 TODAY = date.today()
 
 with open(INDEX_PATH, 'r') as f:
@@ -107,7 +105,7 @@ PYTHON
 echo ""
 echo "Done. Backup saved to: $BACKUP"
 
-# Sync core memories to markdown for Hermes Agent indexing
+# Sync core memories to markdown for OpenClaw indexing
 SYNC_SCRIPT="$SKILL_DIR/scripts/sync-core.sh"
 if [ -x "$SYNC_SCRIPT" ]; then
     echo ""

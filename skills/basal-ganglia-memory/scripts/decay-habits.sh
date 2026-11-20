@@ -11,18 +11,15 @@
 # Runs at most once per day (checks decayLastRun).
 #
 # Environment:
-#   WORKSPACE - Hermes workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 BACKUP="$WORKSPACE/memory/habit-state.backup.json"
 TODAY=$(date -u +%Y-%m-%d)
-
-exec 200>"$STATE_FILE.lock"
-flock 200
 
 if [ ! -f "$STATE_FILE" ]; then
     echo "❌ habit-state.json not found at $STATE_FILE"
@@ -39,20 +36,17 @@ echo "Habit/procedure decay: 3% per day inactive"
 echo "Suppression decay:     0.5% per day since last reinforced"
 echo ""
 
-LAST_DECAY=$(STATE_FILE="$STATE_FILE" python3 -c "import os
-import json; print(json.load(open(os.environ['STATE_FILE'])).get('decayLastRun') or 'never')" 2>/dev/null || echo "never")
+LAST_DECAY=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('decayLastRun') or 'never')" 2>/dev/null || echo "never")
 if [ "$LAST_DECAY" = "$TODAY" ]; then
     echo "⏸️  Decay already ran today ($LAST_DECAY). Skipping."
     exit 0
 fi
 
-STATE_FILE="$STATE_FILE" \
-python3 << 'PYTHON'
+python3 << PYTHON
 import json
-import os
 from datetime import datetime, date, timezone
 
-STATE_FILE = os.environ["STATE_FILE"]
+STATE_FILE = "$STATE_FILE"
 HABIT_DECAY = 0.97       # 3%/day
 SUPPRESSION_DECAY = 0.995  # 0.5%/day
 PRUNE_THRESHOLD = 0.2

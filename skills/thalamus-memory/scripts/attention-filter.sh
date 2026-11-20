@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 
 # The scoring semantics mirror gate.sh's _score_signal() (the canonical
 # implementation) — re-implemented here to keep this script standalone

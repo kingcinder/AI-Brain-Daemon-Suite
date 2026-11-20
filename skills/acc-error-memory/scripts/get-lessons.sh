@@ -7,15 +7,10 @@
 #   get-lessons.sh --pattern "name"   # Get specific lesson
 #   get-lessons.sh --json             # Output raw JSON
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
-
-if [ ! -f "$STATE_FILE" ]; then
-    echo "No acc-state.json found"
-    exit 0
-fi
 
 PATTERN=""
 JSON_MODE=false
@@ -35,7 +30,7 @@ import json
 import os
 import sys
 
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
 state_file = os.path.join(workspace, 'memory', 'acc-state.json')
 pattern_filter = os.environ.get('PATTERN', '')
 json_mode = os.environ.get('JSON_MODE', 'false') == 'true'

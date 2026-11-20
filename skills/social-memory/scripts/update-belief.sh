@@ -2,8 +2,8 @@
 # update-belief.sh — Theory of mind: record what we think this person/agent
 # believes, wants, or feels. Free-form key/value.
 # Usage: update-belief.sh --id <id> --key "wants" --value "to ship before Friday"
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

@@ -8,9 +8,9 @@
 #   ./preprocess-exchanges.sh <transcript_file> [--max-exchanges N]
 #   Output: JSON to stdout
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 TRANSCRIPT="${1:-}"
@@ -40,26 +40,24 @@ WATERMARK=$("$SKILL_DIR/scripts/update-watermark.sh" --get)
 
 # ── Extract exchanges ─────────────────────────────────────────────────────────
 # Handle both JSON array of messages and JSONL formats
-if TRANSCRIPT="$TRANSCRIPT" python3 -c "import os
-import json, sys; json.load(open(os.environ['TRANSCRIPT']))" 2>/dev/null; then
+if python3 -c "import json, sys; json.load(open('$TRANSCRIPT'))" 2>/dev/null; then
   # JSON array format
-  MAX_EXCHANGES="$MAX_EXCHANGES" TRANSCRIPT="$TRANSCRIPT" WATERMARK="$WATERMARK" python3 << 'PYEOF'
-import os
+  python3 << PYEOF
 import json, sys
 
-with open(os.environ['TRANSCRIPT']) as f:
+with open('$TRANSCRIPT') as f:
     data = json.load(f)
 
 # Support top-level array or {messages: [...]}
 messages = data if isinstance(data, list) else data.get('messages', [])
 
 # Apply watermark
-start = int(os.environ['WATERMARK'])
+start = int('$WATERMARK')
 messages = messages[start:]
 
 # Extract up to max_exchanges, focusing on human+assistant pairs
 exchanges = []
-for msg in messages[:int(os.environ['MAX_EXCHANGES'])]:
+for msg in messages[:int('$MAX_EXCHANGES')]:
     role = msg.get('role', msg.get('type', 'unknown'))
     content = msg.get('content', msg.get('text', ''))
     if isinstance(content, list):
@@ -73,14 +71,13 @@ print(json.dumps(exchanges))
 PYEOF
 else
   # JSONL format
-  MAX_EXCHANGES="$MAX_EXCHANGES" TRANSCRIPT="$TRANSCRIPT" WATERMARK="$WATERMARK" python3 << 'PYEOF'
-import os
+  python3 << PYEOF
 import json, sys
 
 exchanges = []
-start = int(os.environ['WATERMARK'])
+start = int('$WATERMARK')
 line_num = 0
-with open(os.environ['TRANSCRIPT']) as f:
+with open('$TRANSCRIPT') as f:
     for line in f:
         line = line.strip()
         if not line:
@@ -99,7 +96,7 @@ with open(os.environ['TRANSCRIPT']) as f:
         except Exception:
             pass
         line_num += 1
-        if len(exchanges) >= int(os.environ['MAX_EXCHANGES']):
+        if len(exchanges) >= int('$MAX_EXCHANGES'):
             break
 
 print(json.dumps(exchanges))

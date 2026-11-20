@@ -28,7 +28,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 CORE_DIR="$(cd "$SKILL_DIR/../../core" && pwd)"
@@ -53,6 +53,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --process)    MODE="process"; shift ;;
         --stdin)      MODE="stdin"; shift ;;
+        --envelope)   MODE="envelope"; shift ;;
         --status)     MODE="status"; shift ;;
         --boost-goal) MODE="boost"; BOOST_GOAL="$2"; shift 2 ;;
         --feedback)   MODE="feedback"; FEEDBACK_KIND="$2"; FEEDBACK_TARGET="$3"; shift 3 ;;
@@ -587,10 +588,63 @@ _boost() {
     echo "🚦 Boosted attention for goal: $BOOST_GOAL"
 }
 
+# ── Gated ingress: envelope validation + routing (Phase B, 2026-11-20) ────
+# The ONE gated ingress (design invariant I1/I5): an information unit
+# enters the substrate as an envelope with mandatory fields, validated
+# against the flow registry (core/gate/flows.json) by core/gate/
+# envelope.py. Invalid → exit 3, nothing routed. Valid → ingress appends
+# it to the signal bus, critical units bound for the helm decision queue
+# are enqueued there immediately, and the envelope is scored/dispatched
+# through the same relevance machinery as legacy signals.
+_envelope() {
+    _init_state
+    _ensure_relay
+    local tmp_env
+    tmp_env=$(mktemp)
+    cat > "$tmp_env"
+    if [[ ! -s "$tmp_env" ]]; then
+        echo '{"rejected":true,"reasons":["empty envelope"]}' >&2
+        rm -f "$tmp_env"
+        exit 3
+    fi
+    local gate_lib="$CORE_DIR/gate/envelope.py"
+    if [[ ! -f "$gate_lib" ]]; then
+        echo '{"rejected":true,"reasons":["gate library missing: core/gate/envelope.py"]}' >&2
+        rm -f "$tmp_env"
+        exit 3
+    fi
+    local receipt
+    if ! receipt=$(WORKSPACE="$WORKSPACE" BRAIN_WORKSPACE="$WORKSPACE" python3 "$gate_lib" ingress "$tmp_env"); then
+        rm -f "$tmp_env"
+        exit 3
+    fi
+    local source_id etype urgency intensity
+    source_id=$(jq -r '.source_id' "$tmp_env")
+    etype=$(jq -r '.type' "$tmp_env")
+    urgency=$(jq -r '.urgency' "$tmp_env")
+    case "$urgency" in
+        critical) intensity="0.95" ;;
+        elevated) intensity="0.7" ;;
+        *)        intensity="0.4" ;;
+    esac
+    local legacy
+    legacy=$(jq -c --arg src "$source_id" --arg sig "$etype" --argjson inten "$intensity" \
+        '{source:$src, signal:$sig, intensity:$inten, type:"envelope", payload:{}}' "$tmp_env")
+    rm -f "$tmp_env"
+    local scored action gate_score
+    scored=$(_score_signal "$legacy")
+    action=$(echo "$scored" | jq -r '.action' 2>/dev/null || echo "suppress")
+    gate_score=$(echo "$scored" | jq -r '.gateScore' 2>/dev/null || echo "0")
+    _update_stats "$action"
+    _dispatch "$source_id" "$etype" "$action" "$intensity" "$gate_score" "$legacy"
+    echo "$scored" | jq -c --argjson receipt "$receipt" '. + {ingress: $receipt}'
+}
+
 # ── Dispatch ────────────────────────────────────────────────────────────
 case "$MODE" in
     process) _process ;;
     stdin)   _stdin_process ;;
+    envelope) _envelope ;;
     status)  _status ;;
     boost)   _boost ;;
     feedback) _feedback ;;

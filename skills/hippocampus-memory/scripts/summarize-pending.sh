@@ -1,5 +1,5 @@
 #!/bin/bash
-# summarize-pending.sh — Memory summarization (sub-agent task)
+# summarize-pending.sh — Memory summarization (Juno's task, in her drain turn)
 #
 # Processes pending signals in BATCHES to avoid context overflow.
 # Each run processes up to BATCH_SIZE signals, then re-runs if more remain.
@@ -9,17 +9,18 @@
 # Environment:
 #   BATCH_SIZE - Signals per batch (default: 30)
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 PENDING_FILE="$WORKSPACE/memory/pending-memories.json"
 INDEX_FILE="$WORKSPACE/memory/index.json"
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BATCH_SIZE="${BATCH_SIZE:-30}"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --batch-size) BATCH_SIZE="$2"; [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]] || { echo "❌ --batch-size must be an integer"; exit 1; }; shift 2 ;;
+        --batch-size) BATCH_SIZE="$2"; shift 2 ;;
         *) shift ;;
     esac
 done
@@ -30,14 +31,14 @@ if [ ! -f "$PENDING_FILE" ]; then
 fi
 
 # Extract batch and prepare for processing
-WORKSPACE="$WORKSPACE" PENDING_FILE="$PENDING_FILE" INDEX_FILE="$INDEX_FILE" BATCH_SIZE="$BATCH_SIZE" python3 << 'PYTHON'
+python3 << PYTHON
 import json
 import os
 
-WORKSPACE = os.environ["WORKSPACE"]
-PENDING_FILE = os.environ["PENDING_FILE"]
-INDEX_FILE = os.environ["INDEX_FILE"]
-BATCH_SIZE = int(os.environ["BATCH_SIZE"])
+WORKSPACE = os.environ.get("WORKSPACE", "$WORKSPACE")
+PENDING_FILE = "$PENDING_FILE"
+INDEX_FILE = "$INDEX_FILE"
+BATCH_SIZE = $BATCH_SIZE
 
 with open(PENDING_FILE, 'r') as f:
     data = json.load(f)
@@ -115,8 +116,7 @@ PYTHON
 # Python's exit(0) above only exits the python3 subprocess, not this script —
 # check explicitly whether there was anything to summarize before printing
 # task instructions for a batch that doesn't exist.
-PENDING_COUNT=$(PENDING_FILE="$PENDING_FILE" python3 -c "import os
-import json; print(len(json.load(open(os.environ['PENDING_FILE'])).get('pending', [])))" 2>/dev/null || echo "0")
+PENDING_COUNT=$(python3 -c "import json; print(len(json.load(open('$PENDING_FILE')).get('pending', [])))" 2>/dev/null || echo "0")
 if [ "$PENDING_COUNT" -eq 0 ]; then
     exit 0
 fi

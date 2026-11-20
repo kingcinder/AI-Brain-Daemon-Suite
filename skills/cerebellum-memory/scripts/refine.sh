@@ -1,7 +1,7 @@
 #!/bin/bash
 # refine.sh — Recompute global calibration from tracked skills (periodic, cron)
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

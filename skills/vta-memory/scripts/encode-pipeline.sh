@@ -1,21 +1,22 @@
 #!/bin/bash
-# encode-pipeline.sh — VTA reward encoding with LLM detection
+# encode-pipeline.sh — VTA reward encoding; Juno does the detection
 #
 # Pipeline:
 # 1. Preprocess transcript → reward-signals.jsonl
 # 2. Rule-based reward scoring
-# 3. Prepare for LLM semantic reward detection
+# 3. Prepare pending signals for Juno's semantic reward detection
 #
 # Usage: ./encode-pipeline.sh [--no-spawn]
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace (default: ~/.openclaw/workspace)
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SIGNALS_FILE="$WORKSPACE/memory/reward-signals.jsonl"
+STATE_FILE="$WORKSPACE/memory/reward-state.json"
 PENDING_FILE="$WORKSPACE/memory/pending-rewards.json"
 NO_SPAWN="${1:-}"
 
@@ -48,14 +49,10 @@ if [ "$SIGNAL_COUNT" -eq 0 ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# STEP 3: Rule-based reward scoring + prepare for LLM
+# STEP 3: Rule-based reward scoring + prepare for Juno
 # ═══════════════════════════════════════════════════════════════
 echo ""
 echo "🔄 Step 3: Scoring reward signals..."
-
-# Integrative State Layer: reward-starved dopamine (< 0.4) amplifies intensity
-NEURO_DA=$("$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get dopamine 2>/dev/null || echo "0.5")
-export NEURO_DA
 
 python3 << 'PYTHON'
 import json
@@ -63,7 +60,7 @@ import os
 import re
 from datetime import datetime
 
-WORKSPACE = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
+WORKSPACE = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
 SIGNALS_FILE = f"{WORKSPACE}/memory/reward-signals.jsonl"
 STATE_FILE = f"{WORKSPACE}/memory/reward-state.json"
 PENDING_FILE = f"{WORKSPACE}/memory/pending-rewards.json"
@@ -167,9 +164,6 @@ for sig in signals:
         continue
     
     intensity = estimate_intensity(text, rewards)
-    dopamine = float(os.environ.get('NEURO_DA', '0.5'))
-    if dopamine < 0.4:
-        intensity *= 1.15   # reward-starved: small wins feel bigger
     
     pending.append({
         "id": sig_id,
@@ -180,11 +174,39 @@ for sig in signals:
         "timestamp": sig.get('timestamp', today)
     })
 
-# Save pending for LLM analysis
-with open(PENDING_FILE, 'w') as f:
-    json.dump({"pending": pending, "created": today}, f, indent=2)
+# Save pending for Juno's analysis — MERGE via the shared conservation
+# writer (I3, Gated-Ingress Refactor 2026-11-20): the unconsumed backlog
+# is carried over and new entries dedupe by id. This block previously
+# dumped a fresh list over pending-rewards.json — the same overwrite
+# class that dropped ~3,578 hippocampus signals on 2026-11-20; a live
+# 133-entry backlog was in the file when this fix landed.
+import subprocess, tempfile
+_ws = os.path.dirname(os.path.dirname(os.path.abspath(PENDING_FILE)))
+_writer = os.path.join(_ws, 'core', 'gate', 'store_write.py')
+if os.path.exists(_writer):
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as _tf:
+        json.dump(pending, _tf)
+        _items = _tf.name
+    subprocess.run(['python3', _writer, 'merge-list', '--store', PENDING_FILE,
+                    '--list-field', 'pending', '--key', 'id',
+                    '--items', _items, '--writer', 'vta-memory/encode-pipeline.sh'],
+                   check=True, capture_output=True)
+    os.unlink(_items)
+    pending = json.load(open(PENDING_FILE)).get('pending', [])
+else:
+    # Fallback (sandbox trees without the gate library): inline merge.
+    _existing = []
+    if os.path.exists(PENDING_FILE):
+        try:
+            _existing = json.load(open(PENDING_FILE)).get('pending', []) or []
+        except Exception:
+            _existing = []
+    _seen = {e.get('id') for e in _existing if isinstance(e, dict)}
+    pending = _existing + [e for e in pending if e.get('id') not in _seen]
+    with open(PENDING_FILE, 'w') as f:
+        json.dump({"pending": pending, "created": today}, f, indent=2)
 
-print(f"   Pending for LLM analysis: {len(pending)}")
+print(f"   Pending for Juno analysis: {len(pending)}")
 print(f"   Skipped (no clear reward): {skipped}")
 
 # Show sample
@@ -195,12 +217,11 @@ if pending:
 PYTHON
 
 # Check if we have pending rewards
-PENDING_COUNT=$(PENDING_FILE="$PENDING_FILE" python3 -c "import os
-import json; d=json.load(open(os.environ['PENDING_FILE'])); print(len(d.get('pending',[])))" 2>/dev/null || echo "0")
+PENDING_COUNT=$(python3 -c "import json; d=json.load(open('$PENDING_FILE')); print(len(d.get('pending',[])))" 2>/dev/null || echo "0")
 
 if [ "$PENDING_COUNT" -eq 0 ]; then
     echo ""
-    echo "✅ No reward signals need LLM analysis. Updating watermark..."
+    echo "✅ No reward signals need Juno analysis. Updating watermark..."
     "$SKILL_DIR/scripts/update-watermark.sh" --from-signals
     # Sync state
     "$SKILL_DIR/scripts/sync-motivation.sh" 2>/dev/null || true
@@ -208,7 +229,7 @@ if [ "$PENDING_COUNT" -eq 0 ]; then
 fi
 
 echo ""
-echo "📝 $PENDING_COUNT signals pending LLM reward analysis"
+echo "📝 $PENDING_COUNT signals pending Juno reward analysis"
 
 if [ "$NO_SPAWN" = "--no-spawn" ]; then
     echo "⏭️  Skipping spawn (--no-spawn flag)"
@@ -216,25 +237,4 @@ if [ "$NO_SPAWN" = "--no-spawn" ]; then
 fi
 
 echo ""
-echo "✅ Pipeline phase 1 complete. Sub-agent will handle reward detection."
-
-# Closed-loop: accomplishment rewards that overlap active PFC goals ⇒
-# close the goal as success (ROADMAP M4 feedback arc).
-if [ -x "$SKILL_DIR/../../core/executive/record-goal-outcome.sh" ]; then
-    PFC="$WORKSPACE/memory/pfc-state.json"
-    if [ -f "$PFC" ] && [ -f "$PENDING_FILE" ]; then
-        ACTIVE_GOALS=$(jq -r '[.goals[]? | select(.status == "active") | .description] | join("\n")' "$PFC" 2>/dev/null || echo "")
-        if [ -n "$ACTIVE_GOALS" ]; then
-            while IFS= read -r goal; do
-                [ -z "$goal" ] && continue
-                # Check if any pending reward text overlaps this goal
-                OVERLAP=$(jq -r --arg g "$goal" '[.pending[]? | select(.detected_rewards | contains(["accomplishment","competence"])) | .text] | join(" ")' "$PENDING_FILE" 2>/dev/null)
-                if [ -n "$OVERLAP" ]; then
-                    for word in $goal; do
-                        case "$OVERLAP" in *"$word"*) bash "$SKILL_DIR/../../core/executive/record-goal-outcome.sh" outcome --goal-description "$goal" --outcome success --job vta_encode --evidence "VTA reward detection: accomplishment"; break ;; esac
-                    done
-                fi
-            done <<< "$ACTIVE_GOALS"
-        fi
-    fi
-fi
+echo "✅ Pipeline phase 1 complete. Juno will handle reward detection."

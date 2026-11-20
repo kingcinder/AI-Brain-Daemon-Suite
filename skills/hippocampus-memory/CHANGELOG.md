@@ -2,6 +2,11 @@
 
 All notable changes to the Hippocampus Memory skill.
 
+## [2026-11-20] Juno-direct scrub
+
+- Transcript bridge is Juno's own session files: export-transcripts.sh reads Juno's session JSONL (or a JUNO_SESSION_EXPORT command) and writes juno-sessions.jsonl; the external `sessions export` dependency is gone.
+- Summarization/reinforcement wording is Juno-direct: Juno is the reasoner; memory/*.json data untouched.
+
 ## [3.8.6] - 2026-02-05
 
 ### Changed

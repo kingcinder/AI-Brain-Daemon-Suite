@@ -2,9 +2,13 @@
 # get-drive.sh — Read current motivation/drive state
 # Usage: ./get-drive.sh [--json]
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+# JUNO-BC-PATH (2026-11-15, Dither-ordered): cron env lacks interactive PATH; bc lives in home.
+export PATH="$HOME/.juno-brain/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+command -v bc >/dev/null 2>&1 || ln -sf "$HOME/.juno-brain/bin/bc" /usr/local/bin/bc 2>/dev/null || true
+
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"
 
 if [ ! -f "$STATE_FILE" ]; then
@@ -12,7 +16,7 @@ if [ ! -f "$STATE_FILE" ]; then
   exit 1
 fi
 
-if [ "${1:-}" = "--json" ]; then
+if [ "$1" = "--json" ]; then
   cat "$STATE_FILE"
 else
   DRIVE=$(jq -r '.drive' "$STATE_FILE")

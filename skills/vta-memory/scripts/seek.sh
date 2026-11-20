@@ -4,20 +4,15 @@
 #        ./seek.sh --remove "creative work"
 #        ./seek.sh --list
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"
 
 if [ ! -f "$STATE_FILE" ]; then
   echo "❌ No reward state found"
   exit 1
 fi
-
-# Serialize read-modify-write against the other reward-state.json writers
-# (encoding spawn job, route dispatches, manual seek/anticipate/log-reward).
-exec 200>"$STATE_FILE.lock"
-flock 200
 
 ACTION=""
 ITEM=""
@@ -58,8 +53,8 @@ case $ACTION in
     fi
     jq --arg item "$ITEM" --arg now "$NOW" \
        '.seeking = (.seeking + [$item] | unique) | .lastUpdated = $now' \
-       "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+       "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "⭐ Now seeking: $ITEM"
     ;;
     
@@ -70,8 +65,8 @@ case $ACTION in
     fi
     jq --arg item "$ITEM" --arg now "$NOW" \
        '.seeking = [.seeking[] | select(. != $item)] | .lastUpdated = $now' \
-       "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+       "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "⭐ No longer seeking: $ITEM"
     ;;
     
@@ -87,8 +82,8 @@ case $ACTION in
     ;;
     
   clear)
-    jq --arg now "$NOW" '.seeking = [] | .lastUpdated = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+    jq --arg now "$NOW" '.seeking = [] | .lastUpdated = $now' "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "⭐ Cleared all seeking"
     ;;
     

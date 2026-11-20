@@ -8,12 +8,12 @@
 #   load-habits.sh --format json   # Raw JSON of chunked+active items
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 #   THRESHOLD - Minimum strength for "active" inclusion (default: 0.4)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 THRESHOLD="${THRESHOLD:-0.4}"
 
@@ -95,6 +95,12 @@ PYTHON
 
 # Best-effort staleness tracking: record that this state was actually read,
 # separate from lastUpdated (write path). Never blocks or fails the output above.
-exec 200>"$STATE_FILE.lock"
-flock 200
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
+
+# Best-effort staleness tracking: record that this state was actually read,
+# separate from lastUpdated (write path). Never blocks or fails the output above.
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
+
+# Best-effort staleness tracking: record that this state was actually read,
+# separate from lastUpdated (write path). Never blocks or fails the output above.
 { jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true

@@ -17,7 +17,7 @@
 #   snapshot-tick.sh --keep N   # override retention (default 14)
 #
 # Env:
-#   WORKSPACE        Defaults to $HOME/.hermes/workspace
+#   WORKSPACE        Defaults to $HOME/.openclaw/workspace
 #   SNAPSHOT_KEEP    Retention count (default 14)
 #
 # Exit code: 0 on success, 1 if the snapshot itself fails (a prune hiccup is
@@ -25,7 +25,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KEEP="${SNAPSHOT_KEEP:-14}"
 # Honor SNAPSHOT_ROOT exactly like snapshot.sh does, so the ledger + prune

@@ -17,9 +17,13 @@
 #   intent        — Ambiguous user intent
 #   knowledge_gap — Agent's knowledge insufficient to proceed
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
+# JUNO-BC-PATH (2026-11-15, Dither-ordered): cron env lacks interactive PATH; bc lives in home.
+export PATH="$HOME/.juno-brain/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+command -v bc >/dev/null 2>&1 || ln -sf "$HOME/.juno-brain/bin/bc" /usr/local/bin/bc 2>/dev/null || true
+
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 
@@ -61,12 +65,6 @@ if [[ ! -f "$STATE_FILE" ]]; then
   echo "ERROR: conflict-state.json not found. Run ./install.sh first." >&2; exit 1
 fi
 
-# ── Serialize the read-modify-write against concurrent writers ────────────────
-# (encode-pipeline spawn job, decay job, manual resolve) — same lock
-# safe-write.sh takes for this state file.
-exec 200>"$STATE_FILE.lock"
-flock 200
-
 # ── Derive intensity from severity if not explicitly set ──────────────────────
 if [[ -z "$INTENSITY" ]]; then
   case "$SEVERITY" in
@@ -89,13 +87,16 @@ NEW_LOAD=$(echo "if ($CURRENT_LOAD + $BOOST > 1.0) 1.0 else ($CURRENT_LOAD + $BO
 NEW_LOAD=$(printf "%.4f" "$NEW_LOAD")
 
 # ── Write to state ────────────────────────────────────────────────────────────
+RESOLUTION_HINT_ESCAPED=$(echo "$RESOLUTION_HINT" | sed 's/"/\\"/g')
+DESCRIPTION_ESCAPED=$(echo "$DESCRIPTION" | sed 's/"/\\"/g')
+
 UPDATED=$(jq \
   --arg id "$CONFLICT_ID" \
   --arg type "$TYPE" \
   --arg severity "$SEVERITY" \
   --argjson intensity "$INTENSITY" \
-  --arg description "$DESCRIPTION" \
-  --arg hint "$RESOLUTION_HINT" \
+  --arg description "$DESCRIPTION_ESCAPED" \
+  --arg hint "$RESOLUTION_HINT_ESCAPED" \
   --arg now "$NOW" \
   --argjson newLoad "$NEW_LOAD" \
   '
@@ -113,8 +114,7 @@ UPDATED=$(jq \
   .stats.totalConflictsLogged += 1
   ' "$STATE_FILE")
 
-echo "$UPDATED" > "$STATE_FILE.tmp.$$"
-mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+echo "$UPDATED" > "$STATE_FILE"
 
 # ── Sync inject file ──────────────────────────────────────────────────────────
 "$SKILL_DIR/scripts/sync-state.sh" --quiet

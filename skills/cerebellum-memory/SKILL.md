@@ -1,13 +1,10 @@
 ---
 name: cerebellum-memory
-description: "Procedural precision and smoothness — HOW something is executed, not WHAT to do. Tracks per-skill calibration via exponential moving average across repetitions. log-execution.sh now records a Wolpert/Miall/Kawato forward-model prediction error when --predicted is supplied: PE = |predicted − actual| is tracked per skill, and accurate predictions gate faster learning (teaching signal). Part of the AI Brain series. See NEUROSCIENCE_MAPPING.md."
+description: "Procedural precision and smoothness — HOW something is executed, not WHAT to do. Tracks per-skill calibration via exponential moving average across repetitions. Part of the AI Brain series."
 metadata:
-  hermes:
-    emoji: "🎚️"
-    tags: ["memory", "procedural", "ai-brain", "calibration"]
   openclaw:
     emoji: "🎚️"
-    version: "1.1.0"
+    version: "1.0.0"
     author: "ImpKind"
     repo: "https://github.com/ImpKind/cerebellum-memory"
     requires:
@@ -21,15 +18,6 @@ metadata:
 **Procedural refinement: how well something gets executed, not what to do.** Part of the AI Brain series.
 
 `basal-ganglia-memory` tracks *which* habit or procedure to run for a given cue. Cerebellum tracks *how well* the execution itself has been going — precision (closeness to the target outcome) and smoothness (consistency, not just average quality) for any named skill or task, refined over repetitions.
-
-## When to Use
-
-Use this skill when:
-- You want to track how well you execute a named skill or task over repetitions (`log-execution.sh`)
-- You want per-skill calibration and a global "how dialed-in is execution" number
-- You want to notice drift or regression in execution quality before it becomes a habit
-
-Not for: deciding *which* routine to run (that's `basal-ganglia-memory`), or one-shot quality judgments with no history.
 
 ## Status: ✅ Live
 

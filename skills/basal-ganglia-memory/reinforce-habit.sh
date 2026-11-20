@@ -33,18 +33,15 @@
 #       meant to stick.
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 # reinforce-habit.sh lives at the skill root (alongside log-event.sh),
 # with the pipeline internals one level down in scripts/.
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-exec 200>"$STATE_FILE.lock"
-flock 200
 
 if [ ! -f "$STATE_FILE" ]; then
     echo "❌ No habit state found at $STATE_FILE"

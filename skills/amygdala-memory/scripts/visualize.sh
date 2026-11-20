@@ -3,9 +3,13 @@
 #
 # Usage: ./visualize.sh
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+# JUNO-BC-PATH (2026-11-15, Dither-ordered): cron env lacks interactive PATH; bc lives in home.
+export PATH="$HOME/.juno-brain/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+command -v bc >/dev/null 2>&1 || ln -sf "$HOME/.juno-brain/bin/bc" /usr/local/bin/bc 2>/dev/null || true
+
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"
 
 if [ ! -f "$STATE_FILE" ]; then
@@ -38,10 +42,8 @@ bar() {
     local width=20
     
     # Normalize to 0-1
-    local normalized
-    normalized=$(echo "scale=2; ($value - $min) / ($max - $min)" | bc)
-    local filled
-    filled=$(echo "scale=0; $normalized * $width / 1" | bc)
+    local normalized=$(echo "scale=2; ($value - $min) / ($max - $min)" | bc)
+    local filled=$(echo "scale=0; $normalized * $width / 1" | bc)
     
     # Ensure filled is within bounds
     [ "$filled" -lt 0 ] && filled=0
@@ -60,10 +62,8 @@ mood_emoji() {
     local v=$1
     local a=$2
     
-    local vi
-    vi=$(echo "$v * 100" | bc | cut -d. -f1)
-    local ai
-    ai=$(echo "$a * 100" | bc | cut -d. -f1)
+    local vi=$(echo "$v * 100" | bc | cut -d. -f1)
+    local ai=$(echo "$a * 100" | bc | cut -d. -f1)
     
     if [ "$vi" -gt 60 ] && [ "$ai" -gt 60 ]; then echo "😄"
     elif [ "$vi" -gt 60 ] && [ "$ai" -le 40 ]; then echo "😌"
@@ -80,13 +80,13 @@ emoji=$(mood_emoji "$valence" "$arousal")
 echo ""
 echo "🎭 Emotional State  $emoji"
 echo "═══════════════════════════════════════════════"
-printf "Valence:      $(bar "$valence" -1 1)  %+.2f\n" "$valence"
-printf "Arousal:      $(bar "$arousal" 0 1)   %.2f\n" "$arousal"
-printf "Connection:   $(bar "$connection" 0 1)   %.2f  💕\n" "$connection"
-printf "Curiosity:    $(bar "$curiosity" 0 1)   %.2f  🔍\n" "$curiosity"
-printf "Energy:       $(bar "$energy" 0 1)   %.2f  ⚡\n" "$energy"
-printf "Trust:        $(bar "$trust" 0 1)   %.2f  🤝\n" "$trust"
-printf "Anticipation: $(bar "$anticipation" 0 1)   %.2f  ✨\n" "$anticipation"
+printf "Valence:      $(bar $valence -1 1)  %+.2f\n" "$valence"
+printf "Arousal:      $(bar $arousal 0 1)   %.2f\n" "$arousal"
+printf "Connection:   $(bar $connection 0 1)   %.2f  💕\n" "$connection"
+printf "Curiosity:    $(bar $curiosity 0 1)   %.2f  🔍\n" "$curiosity"
+printf "Energy:       $(bar $energy 0 1)   %.2f  ⚡\n" "$energy"
+printf "Trust:        $(bar $trust 0 1)   %.2f  🤝\n" "$trust"
+printf "Anticipation: $(bar $anticipation 0 1)   %.2f  ✨\n" "$anticipation"
 echo "═══════════════════════════════════════════════"
 
 if [ "$recent_label" != "none" ] && [ "$recent_label" != "null" ]; then

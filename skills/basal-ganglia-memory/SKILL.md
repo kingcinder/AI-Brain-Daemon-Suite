@@ -1,13 +1,10 @@
 ---
 name: basal-ganglia-memory
-description: "Habit formation and procedural learning for AI agents. Develops preferences and shortcuts through repetition. Tracks cue-routine-reward loops, chunked procedures, and active suppressions. action-select.sh arbitrates competing candidates (Frank's BG models; Mink's gating framework) — habit-biased scoring, epsilon-greedy exploration, loser suppression, and an optional selection threshold that holds sub-threshold actions behind a no-go gate. Part of the AI Brain series. See NEUROSCIENCE_MAPPING.md."
+description: "Habit formation and procedural learning for AI agents. Develops preferences and shortcuts through repetition. Tracks cue-routine-reward loops, chunked procedures, and active suppressions. Part of the AI Brain series."
 metadata:
-  hermes:
-    emoji: "🎯"
-    tags: ["memory", "habits", "procedural", "ai-brain"]
   openclaw:
     emoji: "🎯"
-    version: "0.3.0"
+    version: "0.2.2"
     author: "ImpKind"
     requires:
       os: ["darwin", "linux"]
@@ -20,16 +17,6 @@ metadata:
 **Habit formation and procedural learning for AI agents.** Part of the AI Brain series.
 
 The basal ganglia is the brain region responsible for chunking repeated behaviors into automatic routines — turning deliberate actions into effortless habits. This skill brings the same mechanism to AI agents: patterns that appear repeatedly crystallize into habits, multi-step workflows compact into procedures, and corrections that stick become suppressions.
-
-## When to Use
-
-Use this skill when:
-- A behavior or workflow has repeated successfully and should become an automatic routine
-- You've been corrected on a pattern and want a suppression so it stops recurring
-- You want session-start injection of established habits (`load-habits.sh`)
-- You're integrating with the AI Brain Suite and want `acc-error-memory` corrections to close into suppressions
-
-Not for: one-off tasks, or execution quality tracking (that's `cerebellum-memory`).
 
 ---
 
@@ -122,7 +109,7 @@ basal-ganglia-memory/
 ├── log-event.sh                ← Append to brain-events.jsonl (type: basal-ganglia)
 ├── update-watermark.sh         ← Advance signal watermark
 ├── prompts/
-│   └── encode-habits.md        ← LLM prompt for habit classification
+│   └── encode-habits.md        ← Juno's prompt for habit classification
 └── scripts/
     ├── preprocess-habits.sh    ← Transcript → habit-signals.jsonl
     ├── encode-pipeline.sh      ← Full encoding orchestration
@@ -139,15 +126,15 @@ The encoding pipeline runs on a schedule (or manually) and follows these steps:
 
 1. **Preprocess** — Scan conversation transcripts for habit signals; output `memory/habit-signals.jsonl`
 2. **Score** — Apply heuristics to score signals (explicit instructions score high, single observations score low)
-3. **Prepare** — Write `memory/pending-habits.json` with signals that need LLM classification
-4. **Sub-agent** — LLM reads `pending-habits.json` and `prompts/encode-habits.md`, then calls `reinforce-habit.sh` for each signal
+3. **Prepare** — Write `memory/pending-habits.json` with signals that need Juno's classification
+4. **Juno** — Juno reads `pending-habits.json` and `prompts/encode-habits.md`, then calls `reinforce-habit.sh` for each signal
 5. **Watermark** — Advance `lastProcessedSignal` so we don't re-process old signals
 6. **Sync** — Regenerate `BASAL_GANGLIA_STATE.md` and `brain-dashboard.html`
 
 ### Manual Encoding
 
 ```bash
-# Run the full pipeline (spawns sub-agent for LLM step)
+# Run the full pipeline (Juno does the classification step)
 ./scripts/encode-pipeline.sh
 
 # Run without spawning (useful for testing)
@@ -159,8 +146,8 @@ The encoding pipeline runs on a schedule (or manually) and follows these steps:
 Staggered 30 minutes after the hour to avoid collisions with other suite crons:
 
 ```bash
-30 0,3,6,9,12,15,18,21 * * *  ~/.hermes/workspace/skills/basal-ganglia-memory/scripts/encode-pipeline.sh
-0 4 * * *                       ~/.hermes/workspace/skills/basal-ganglia-memory/scripts/decay-habits.sh
+30 0,3,6,9,12,15,18,21 * * *  ~/.openclaw/workspace/skills/basal-ganglia-memory/scripts/encode-pipeline.sh
+0 4 * * *                       ~/.openclaw/workspace/skills/basal-ganglia-memory/scripts/decay-habits.sh
 ```
 
 Install with `./install.sh --with-cron` to register both.
@@ -248,13 +235,13 @@ Suppressions (actively avoid these patterns):
 
 ## Data Files
 
-All data lives under `$WORKSPACE/memory/` (default: `~/.hermes/workspace/memory/`):
+All data lives under `$WORKSPACE/memory/` (default: `~/.openclaw/workspace/memory/`):
 
 | File | Description |
 |------|-------------|
 | `habit-state.json` | Central state: habits, procedures, suppressions |
 | `habit-signals.jsonl` | Preprocessed signals from transcripts |
-| `pending-habits.json` | Signals awaiting LLM classification |
+| `pending-habits.json` | Signals awaiting Juno classification |
 | `brain-events.jsonl` | Append-only event log |
 
 The sync script also writes:
@@ -322,13 +309,13 @@ Full Brain Suite startup order — run all installed modules in sequence:
 
 ```markdown
 ## Every Session
-1. 🧠 Load memories: `~/.hermes/workspace/skills/hippocampus/scripts/load-core.sh`
-2. 🎭 Load emotional state: `~/.hermes/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
-3. ⭐ Load motivation: `~/.hermes/workspace/skills/vta-memory/scripts/load-motivation.sh`
-4. 🎯 Load habits: `~/.hermes/workspace/skills/basal-ganglia-memory/load-habits.sh`
-5. 🌡️ Load felt sense: `~/.hermes/workspace/skills/insula-memory/scripts/load-sense.sh`
-6. ⚡ Load conflict state: `~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
-7. 🔴 Load error patterns: `~/.hermes/workspace/skills/acc-error-memory/scripts/load-state.sh`
+1. 🧠 Load memories: `~/.openclaw/workspace/skills/hippocampus/scripts/load-core.sh`
+2. 🎭 Load emotional state: `~/.openclaw/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
+3. ⭐ Load motivation: `~/.openclaw/workspace/skills/vta-memory/scripts/load-motivation.sh`
+4. 🎯 Load habits: `~/.openclaw/workspace/skills/basal-ganglia-memory/load-habits.sh`
+5. 🌡️ Load felt sense: `~/.openclaw/workspace/skills/insula-memory/scripts/load-sense.sh`
+6. ⚡ Load conflict state: `~/.openclaw/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
+7. 🔴 Load error patterns: `~/.openclaw/workspace/skills/acc-error-memory/scripts/load-state.sh`
 ```
 
 ---

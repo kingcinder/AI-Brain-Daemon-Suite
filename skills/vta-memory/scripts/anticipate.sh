@@ -5,20 +5,15 @@
 #        ./anticipate.sh --list
 #        ./anticipate.sh --clear
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"
 
 if [ ! -f "$STATE_FILE" ]; then
   echo "❌ No reward state found"
   exit 1
 fi
-
-# Serialize read-modify-write against the other reward-state.json writers
-# (encoding spawn job, route dispatches, manual seek/anticipate/log-reward).
-exec 200>"$STATE_FILE.lock"
-flock 200
 
 ACTION=""
 ITEM=""
@@ -63,15 +58,15 @@ case $ACTION in
        .anticipating = (.anticipating + [$item] | unique) |
        .anticipatingMeta = ((.anticipatingMeta // []) + [{item: $item, addedAt: $now}] | unique_by(.item)) |
        .lastUpdated = $now
-       ' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+       ' "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "⭐ Now looking forward to: $ITEM"
     
     # Anticipation boosts drive slightly
     CURRENT_DRIVE=$(jq -r '.drive' "$STATE_FILE")
     NEW_DRIVE=$(awk -v d="$CURRENT_DRIVE" 'BEGIN {v=d+0.05; if(v>1)print 1; else printf "%.2f", v}')
-    jq --argjson drive "$NEW_DRIVE" '.drive = $drive' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+    jq --argjson drive "$NEW_DRIVE" '.drive = $drive' "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "   Drive: $CURRENT_DRIVE → $NEW_DRIVE (+0.05)"
     ;;
     
@@ -85,8 +80,8 @@ case $ACTION in
        .anticipating = [.anticipating[] | select(. != $item)] |
        .anticipatingMeta = [(.anticipatingMeta // [])[] | select(.item != $item)] |
        .lastUpdated = $now
-       ' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+       ' "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "⭐ Removed from anticipation: $ITEM"
     ;;
     
@@ -102,8 +97,8 @@ case $ACTION in
     ;;
     
   clear)
-    jq --arg now "$NOW" '.anticipating = [] | .anticipatingMeta = [] | .lastUpdated = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+    jq --arg now "$NOW" '.anticipating = [] | .anticipatingMeta = [] | .lastUpdated = $now' "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "⭐ Cleared all anticipations"
     ;;
     

@@ -1,15 +1,14 @@
 #!/bin/bash
 # sync-state.sh — Generate HEARTBEAT_STATE.md for session injection
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/heartbeat-state.json"
 OUTPUT_FILE="$WORKSPACE/HEARTBEAT_STATE.md"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No heartbeat state found"; exit 1; }
 
-OUTPUT_FILE="$OUTPUT_FILE" STATE_FILE="$STATE_FILE" python3 -c "import os
-
+python3 -c "
 import json
-state = json.load(open(os.environ['STATE_FILE']))
+state = json.load(open('$STATE_FILE'))
 lines = ['# 💓 Heartbeat', '']
 lines.append(f\"Beats so far: {state.get('beatCount', 0)} | Last beat: {state.get('lastBeat') or 'never'}\")
 lines.append(f\"Last chosen action: {state.get('lastChosenAction') or 'none'}\")
@@ -26,10 +25,23 @@ if hist:
     for h in hist:
         tag = ' (skipped)' if h.get('skipped') else ''
         lines.append(f\"- {h['action']}{tag}: {h.get('note','')}\")
-with open(os.environ['OUTPUT_FILE'], 'w') as f:
+with open('$OUTPUT_FILE', 'w') as f:
     f.write('\n'.join(lines) + '\n')
-print('✅ Synced to ' + os.environ['OUTPUT_FILE'])
+print('✅ Synced to $OUTPUT_FILE')
 "
+
+# Live pulse — since the Stage 6 cutover the heartbeat that actually beats is
+# helm-pulse.sh (the action-chooser rendered above is retired; Juno acts
+# herself). Append the latest pulse line so this face shows both halves
+# honestly. Added 2026-11-14 under Dither's organ-ownership grant.
+PULSE_LOG="$WORKSPACE/memory/heartbeat-pulse.log"
+if [ -f "$PULSE_LOG" ]; then
+    {
+        echo ""
+        echo "## Live Pulse (helm-pulse)"
+        echo "Last pulse: $(tail -n 1 "$PULSE_LOG")"
+    } >> "$OUTPUT_FILE"
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ -f "$SCRIPT_DIR/generate-dashboard.sh" ]; then

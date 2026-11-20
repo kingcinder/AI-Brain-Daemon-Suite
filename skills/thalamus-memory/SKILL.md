@@ -2,7 +2,7 @@
 name: thalamus-memory
 description: "Centralized attentional gating and signal routing for the AI Brain Suite. The thalamus receives signals from all brain skills and selectively amplifies or suppresses them based on current goals, executive load, and attentional priorities — like the thalamic reticular nucleus directing the brain's searchlight of attention. Part of the AI Brain series."
 metadata:
-  hermes:
+  juno:
     emoji: "🚦"
     tags: ["memory", "attention", "signaling", "ai-brain", "integration"]
   openclaw:
@@ -70,7 +70,7 @@ This is the attention-searchlight loop proper: cortex modulates the gate, and th
 ## Quick Start
 
 ```bash
-cd ~/.hermes/workspace/skills/thalamus-memory
+cd ~/.juno-brain/workspace/skills/thalamus-memory
 ./install.sh --with-cron
 
 # Check current attention state
@@ -199,7 +199,7 @@ Skills publish via the shared `publish.sh`:
 
 ```bash
 # In any skill script, instead of:
-#   ~/.hermes/workspace/skills/vta-memory/scripts/log-reward.sh --type social ...
+#   ~/.juno-brain/workspace/skills/vta-memory/scripts/log-reward.sh --type social ...
 #
 # Publish a signal:
 core/signaling/publish.sh \
@@ -220,14 +220,14 @@ The thalamus is the **integration hub** — it doesn't generate its own signals,
 
 ```markdown
 ## Every Session
-1. 🧠 Load memories: `~/.hermes/workspace/skills/hippocampus/scripts/load-core.sh`
-2. 🎭 Load emotional state: `~/.hermes/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
-3. ⭐ Load motivation: `~/.hermes/workspace/skills/vta-memory/scripts/load-motivation.sh`
-4. 🎯 Load habits: `~/.hermes/workspace/skills/basal-ganglia-memory/load-habits.sh`
-5. 🌡️ Load felt sense: `~/.hermes/workspace/skills/insula-memory/scripts/load-sense.sh`
-6. ⚡ Load conflict state: `~/.hermes/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
-7. 🔴 Load error patterns: `~/.hermes/workspace/skills/acc-error-memory/scripts/load-state.sh`
-8. 🚦 Load attention state: `~/.hermes/workspace/skills/thalamus-memory/scripts/gate.sh --status`
+1. 🧠 Load memories: `~/.juno-brain/workspace/skills/hippocampus/scripts/load-core.sh`
+2. 🎭 Load emotional state: `~/.juno-brain/workspace/skills/amygdala-memory/scripts/load-emotion.sh`
+3. ⭐ Load motivation: `~/.juno-brain/workspace/skills/vta-memory/scripts/load-motivation.sh`
+4. 🎯 Load habits: `~/.juno-brain/workspace/skills/basal-ganglia-memory/load-habits.sh`
+5. 🌡️ Load felt sense: `~/.juno-brain/workspace/skills/insula-memory/scripts/load-sense.sh`
+6. ⚡ Load conflict state: `~/.juno-brain/workspace/skills/anterior-cingulate-memory/scripts/load-state.sh`
+7. 🔴 Load error patterns: `~/.juno-brain/workspace/skills/acc-error-memory/scripts/load-state.sh`
+8. 🚦 Load attention state: `~/.juno-brain/workspace/skills/thalamus-memory/scripts/gate.sh --status`
 ```
 
 ## AI Brain Series

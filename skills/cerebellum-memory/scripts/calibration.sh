@@ -1,13 +1,13 @@
 #!/bin/bash
 # get-calibration.sh — Usage: get-calibration.sh [--skill <name>] [--json]
 # V4-verify: calibration lookup is read-primary (2026-07-20)
-# V4-llm-gen: model-proposed annotation (2026-08-08) — calibration lookup is read-primary with health context awareness
-# V4-llm-gen: model-proposed annotation (2999-12-01) — calibration lookup is health-aware; system stable (no recent failures/conflicts)
-# V4-llm-gen: model-proposed annotation (2026-08-08) — calibration lookup is read-primary with health context awareness
-# V4-llm-gen: model-proposed annotation (2026-08-08) — calibration lookup is read-primary with health context awareness
-# V4-llm-gen: model-proposed annotation (2026-08-08) — calibration lookup is read-primary; system healthy (clean_streak=22, no recent failures/conflicts)
+# V4-juno-gen: Juno-proposed annotation (2026-08-08) — calibration lookup is read-primary with health context awareness
+# V4-juno-gen: Juno-proposed annotation (2999-12-01) — calibration lookup is health-aware; system stable (no recent failures/conflicts)
+# V4-juno-gen: Juno-proposed annotation (2026-08-08) — calibration lookup is read-primary with health context awareness
+# V4-juno-gen: Juno-proposed annotation (2026-08-08) — calibration lookup is read-primary with health context awareness
+# V4-juno-gen: Juno-proposed annotation (2026-08-08) — calibration lookup is read-primary; system healthy (clean_streak=22, no recent failures/conflicts)
 set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

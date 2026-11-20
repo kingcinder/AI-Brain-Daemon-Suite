@@ -7,9 +7,13 @@
 #
 # Lists active conflicts if run with no arguments.
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
+# JUNO-BC-PATH (2026-11-15, Dither-ordered): cron env lacks interactive PATH; bc lives in home.
+export PATH="$HOME/.juno-brain/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+command -v bc >/dev/null 2>&1 || ln -sf "$HOME/.juno-brain/bin/bc" /usr/local/bin/bc 2>/dev/null || true
+
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 
@@ -46,12 +50,8 @@ if [[ -z "$CONFLICT_ID" && "$RESOLVE_ALL" == false ]]; then
   exit 0
 fi
 
-# Serialize read-modify-write against the other conflict-state.json writers
-# (log-conflict, flag-attention, decay-load, encode-pipeline).
-exec 200>"$STATE_FILE.lock"
-flock 200
-
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EPOCH=$(date +%s)
 
 resolve_one() {
   local ID="$1"
@@ -73,9 +73,11 @@ resolve_one() {
   NEW_LOAD=$(echo "if ($CURRENT_LOAD - $REDUCTION < $BASELINE) $BASELINE else ($CURRENT_LOAD - $REDUCTION)" | bc -l)
   NEW_LOAD=$(printf "%.4f" "$NEW_LOAD")
 
+  RESOLUTION_ESCAPED=$(echo "$RESOLUTION_TEXT" | sed 's/"/\\"/g')
+
   UPDATED=$(jq \
     --arg id "$ID" \
-    --arg resolution "$RESOLUTION_TEXT" \
+    --arg resolution "$RESOLUTION_ESCAPED" \
     --arg now "$NOW" \
     --argjson newLoad "$NEW_LOAD" \
     '
@@ -90,13 +92,10 @@ resolve_one() {
     .stats.totalResolved += 1
     ' "$STATE_FILE")
 
-  echo "$UPDATED" > "$STATE_FILE.tmp.$$"
-  mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+  echo "$UPDATED" > "$STATE_FILE"
 
-  local DELTA
-  DELTA=$(echo "$NEW_LOAD - $CURRENT_LOAD" | bc -l)
-  local DELTA_FMT
-  DELTA_FMT=$(printf "%.4f" "$DELTA")
+  local DELTA=$(echo "$NEW_LOAD - $CURRENT_LOAD" | bc -l)
+  local DELTA_FMT=$(printf "%.4f" "$DELTA")
 
   echo "⚡ Conflict resolved!"
   echo "   ID:    $ID"

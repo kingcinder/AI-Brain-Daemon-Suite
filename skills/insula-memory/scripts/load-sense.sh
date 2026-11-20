@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # load-sense.sh — Human-readable state for session context injection
 set -euo pipefail
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 [ ! -f "$STATE_FILE" ] && echo "🌡️ Insula: not installed" && exit 0
 python3 - "$STATE_FILE" << 'PYTHON'
@@ -35,6 +35,12 @@ PYTHON
 
 # Best-effort staleness tracking: record that this state was actually read,
 # separate from lastUpdated (write path). Never blocks or fails the output above.
-exec 200>"$STATE_FILE.lock"
-flock 200
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
+
+# Best-effort staleness tracking: record that this state was actually read,
+# separate from lastUpdated (write path). Never blocks or fails the output above.
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
+
+# Best-effort staleness tracking: record that this state was actually read,
+# separate from lastUpdated (write path). Never blocks or fails the output above.
 { jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true

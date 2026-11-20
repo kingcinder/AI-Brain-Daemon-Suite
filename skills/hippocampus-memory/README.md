@@ -3,7 +3,7 @@
 [![GitHub](https://img.shields.io/badge/GitHub-ImpKind%2Fhippocampus--skill-blue?logo=github)](https://github.com/ImpKind/hippocampus-skill)
 [![ClawdHub](https://img.shields.io/badge/ClawdHub-hippocampus-purple)](https://www.clawhub.ai/skills/hippocampus)
 
-A living memory system for Hermes Agent with importance scoring, time-based decay, and automatic reinforcement—just like a real brain.
+A living memory system for OpenClaw agents with importance scoring, time-based decay, and automatic reinforcement—just like a real brain.
 
 ## The Concept
 
@@ -11,7 +11,7 @@ A living memory system for Hermes Agent with importance scoring, time-based deca
 
 Your main agent is busy having conversations—it can't constantly stop to decide what to remember. That's what the hippocampus does. It operates as a separate process:
 
-1. **Background encoding**: A cron job extracts signals, scores them, and uses LLM to create concise summaries
+1. **Background encoding**: A cron job extracts signals, scores them, and Juno creates concise summaries
 2. **Automatic decay**: Unused memories fade over time (daily cron)
 3. **Semantic reinforcement**: When similar topics come up again, existing memories strengthen automatically
 
@@ -21,15 +21,15 @@ The main agent doesn't "think about" memory—it just recalls what it needs, and
 
 - **Importance Scoring**: Memories rated 0.0-1.0 based on signal type
 - **Time-Based Decay**: Unused memories fade (0.99^days)
-- **Semantic Reinforcement**: LLM detects similar topics → reinforces existing memories
-- **LLM Summarization**: Raw messages → concise facts (via sub-agent)
+- **Semantic Reinforcement**: Juno detects similar topics → reinforces existing memories
+- **Juno Summarization**: Raw messages → concise facts (by Juno herself)
 - **Fresh Install Friendly**: Defaults to last 100 signals (not entire history)
 - **OpenClaw Integration**: Bridges with memory_search via HIPPOCAMPUS_CORE.md
 
 ## Installation
 
 ```bash
-cd ~/.hermes/workspace/skills/hippocampus-memory
+cd ~/.openclaw/workspace/skills/hippocampus-memory
 ./install.sh                    # Basic (last 100 signals)
 ./install.sh --with-cron        # With encoding + decay cron jobs
 ./install.sh --signals 50       # Custom signal limit
@@ -76,13 +76,13 @@ Visual dashboard showing all installed brain skills.
 **Option 3: Open in browser**
 ```bash
 # macOS
-open ~/.hermes/workspace/brain-dashboard.html
+open ~/.openclaw/workspace/brain-dashboard.html
 
 # Linux
-xdg-open ~/.hermes/workspace/brain-dashboard.html
+xdg-open ~/.openclaw/workspace/brain-dashboard.html
 
 # Or open directly in browser:
-# file:///home/USER/.hermes/workspace/brain-dashboard.html
+# file:///home/USER/.openclaw/workspace/brain-dashboard.html
 ```
 
 ### Features
@@ -99,7 +99,7 @@ xdg-open ~/.hermes/workspace/brain-dashboard.html
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Preprocess  │────▶│   Score &   │────▶│   LLM       │
+│ Preprocess  │────▶│   Score &   │────▶│   Juno      │
 │  signals    │     │   Filter    │     │  Summarize  │
 └─────────────┘     └─────────────┘     └──────┬──────┘
                                                │
@@ -135,16 +135,22 @@ xdg-open ~/.hermes/workspace/brain-dashboard.html
 The encoding cron does:
 1. Extract signals from conversation
 2. Score by importance
-3. LLM compares to existing memories (semantic matching)
+3. Juno compares to existing memories (semantic matching)
 4. **Similar topic** → Reinforce existing memory
 5. **New topic** → Create concise summary
 
 ```bash
 # Encoding every 3 hours
-hermes cron create "0 0,3,6,9,12,15,18,21 * * *" "Run hippocampus encoding..." --name hippocampus-encoding
+openclaw cron add --name hippocampus-encoding \
+  --cron "0 0,3,6,9,12,15,18,21 * * *" \
+  --session isolated \
+  --agent-turn "Run hippocampus encoding..."
 
 # Daily decay at 3 AM
-hermes cron create "0 3 * * *" "Run decay.sh..." --name hippocampus-decay
+openclaw cron add --name hippocampus-decay \
+  --cron "0 3 * * *" \
+  --session isolated \
+  --agent-turn "Run decay.sh..."
 ```
 
 ## Requirements

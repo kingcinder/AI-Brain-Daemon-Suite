@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
 EVENTS_FILE="$WORKSPACE/memory/brain-events.jsonl"
 
 EVENT="${1:-unknown}"

@@ -5,9 +5,9 @@
 #        ./update-state.sh --dimension <name> --delta <+/-value>
 #        ./update-state.sh --dimension <name> --set <value>
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"
 LOG_FILE="$WORKSPACE/memory/emotional-log.jsonl"
 
@@ -64,22 +64,14 @@ if [ -n "$DIMENSION" ]; then
   if [ -n "$SET_VALUE" ]; then
     # Clamp between 0 and 1
     NEW_VAL=$(awk -v val="$SET_VALUE" 'BEGIN {if(val<0)print 0; else if(val>1)print 1; else printf "%.2f", val}')
-    # Per-write lock, released before any re-entry — the emotion→dimension
-    # cascade below re-invokes this script as subprocesses which take their
-    # own locks; holding the lock across the cascade would deadlock.
-    exec 200>"$STATE_FILE.lock"; flock 200
-    jq ".dimensions.$DIMENSION = $NEW_VAL | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
-    exec 200>&-
+    jq ".dimensions.$DIMENSION = $NEW_VAL | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "✅ Set $DIMENSION = $NEW_VAL"
   elif [ -n "$DELTA" ]; then
-    # Read-modify-write under the lock (read and write must be atomic together).
-    exec 200>"$STATE_FILE.lock"; flock 200
     OLD_VAL=$(jq -r ".dimensions.$DIMENSION" "$STATE_FILE")
     NEW_VAL=$(awk -v old="$OLD_VAL" -v delta="$DELTA" 'BEGIN {v=old+delta; if(v<0)print 0; else if(v>1)print 1; else printf "%.2f", v}')
-    jq ".dimensions.$DIMENSION = $NEW_VAL | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
-    exec 200>&-
+    jq ".dimensions.$DIMENSION = $NEW_VAL | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "✅ $DIMENSION: $OLD_VAL → $NEW_VAL (delta: $DELTA)"
   fi
   exit 0
@@ -98,46 +90,44 @@ if [ -n "$EMOTION" ]; then
     --arg ts "$NOW" \
     '{label: $label, intensity: ($intensity|tonumber), trigger: $trigger, timestamp: $ts}')
   
-  # ── Salience tag (LeDoux dual-pathway; McGaugh consolidation) ──────────
-  # salience = intensity × (0.5 + 0.5·arousal). High-salience events get a
-  # fast threat/importance tag written to salienceTags — the amygdala's
-  # computational output is a TAG that biases how strongly an event gets
-  # encoded downstream (McGaugh's memory-enhancement), not the emotion
-  # itself. Arousal is read before the cascade below adjusts it.
-  AROUSAL=$(jq -r '.dimensions.arousal // 0.5' "$STATE_FILE")
-  SALIENCE=$(awk -v i="$INTENSITY" -v a="$AROUSAL" 'BEGIN {v=i*(0.5+0.5*a); if(v>1)print 1; else printf "%.3f", v}')
-  TAG_JSON="null"
-  if [ "$(awk -v s="$SALIENCE" 'BEGIN {print (s>=0.6)?1:0}')" = "1" ]; then
-    TAG_JSON=$(jq -cn --arg e "$EMOTION" --argjson i "$INTENSITY" --argjson s "$SALIENCE" --arg t "$TRIGGER" --arg ts "$NOW" '{emotion: $e, intensity: $i, salience: $s, trigger: $t, timestamp: $ts}')
-    echo "⚠️ Salience tag: $EMOTION (salience $SALIENCE) — flagged for stronger encoding."
-  fi
-
-  # Add to recent emotions (keep last 10) — lock released before the cascade
-  # subprocesses below re-enter this script.
-  exec 200>"$STATE_FILE.lock"; flock 200
-  jq --argjson tag "$TAG_JSON" ".recentEmotions = ([$ENTRY] + .recentEmotions | .[0:10]) | .salienceTags = (([\$tag] | map(select(. != null))) + (.salienceTags // []) | .[0:20]) | .lastSalience = (\$tag // .lastSalience) | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-  mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
-  exec 200>&-
+  # Add to recent emotions (keep last 10)
+  jq ".recentEmotions = ([$ENTRY] + .recentEmotions | .[0:10]) | .lastUpdated = \"$NOW\"" "$STATE_FILE" > "$STATE_FILE.tmp"
+  mv "$STATE_FILE.tmp" "$STATE_FILE"
   
   # Also log to JSONL
   echo "$ENTRY" >> "$LOG_FILE"
-
-  # ── Publish the salience tag to the signal bus (closed loop) ─────────────
-  # The salience tag is the amygdala's computational output (LeDoux
-  # dual-pathway; McGaugh memory enhancement). Publish it so the hippocampus
-  # route can boost encoding weight for that domain. Only high-salience
-  # events (TAG_JSON != null) publish — a tag that never fired isn't a signal.
-  if [ "$TAG_JSON" != "null" ]; then
+  
+  # Salience tagging (LeDoux dual-pathway threat tag; McGaugh memory
+  # enhancement): salience = intensity x (0.5 + 0.5 * arousal), computed from
+  # the CURRENT arousal before this emotion's own dimension cascade applies.
+  # Events at salience >= 0.6 are tagged in .salienceTags and mirrored to
+  # .lastSalience. Null-safe on pre-audit state files that lack both keys.
+  SALIENCE=$(jq -r --argjson inten "$INTENSITY" \
+    '(($inten * (0.5 + 0.5 * (.dimensions.arousal // 0.5))) * 100 | round) / 100' "$STATE_FILE")
+  SALIENCE_HIT=$(awk -v s="$SALIENCE" 'BEGIN {print (s >= 0.6) ? 1 : 0}')
+  if [ "$SALIENCE_HIT" = "1" ]; then
+    jq --arg emotion "$EMOTION" --argjson salience "$SALIENCE" \
+       --arg trigger "$TRIGGER" --arg ts "$NOW" \
+      '.salienceTags = (((.salienceTags // []) + [{emotion: $emotion, salience: $salience, trigger: $trigger, timestamp: $ts}]) | .[-20:])
+       | .lastSalience = {emotion: $emotion, salience: $salience, trigger: $trigger, timestamp: $ts}' \
+      "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    # Publish the tag to the signal bus (Arc B: amygdala → hippocampus
+    # salience-weighted encoding). route-signals.sh carries salience_tag to
+    # hippocampus note-salience.sh, mapping payload.type → --emotion and the
+    # envelope intensity → --salience. Best-effort, exactly like the VTA's
+    # rpe_logged publish in log-reward.sh: never crash the state update.
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
     PUBLISH_SH="$SCRIPT_DIR/../../../core/signaling/publish.sh"
     if [ -x "$PUBLISH_SH" ]; then
-      "$PUBLISH_SH" --type emotional --source amygdala-memory --signal salience_tag \
-        --intensity "$SALIENCE" \
-        --payload "{\"type\":\"$EMOTION\",\"pattern\":\"salience_tag\"}" \
-        >/dev/null 2>&1 || true
+        "$PUBLISH_SH" --type emotion --source amygdala-memory --signal salience_tag \
+            --intensity "$SALIENCE" \
+            --payload "{\"type\":\"$EMOTION\",\"pattern\":\"salience_tag\"}" \
+            >/dev/null 2>&1 || true
     fi
+    echo "🔖 Salience tag: $EMOTION ($SALIENCE ≥ 0.6)"
   fi
-  
+
   # Map emotion to dimension changes
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
   case $EMOTION in

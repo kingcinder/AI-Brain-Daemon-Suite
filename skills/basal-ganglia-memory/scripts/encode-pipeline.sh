@@ -5,19 +5,19 @@
 # 1. Preprocess transcripts → habit-signals.jsonl
 # 2. Score signals using rule-based heuristics (habit / procedure /
 #    suppression / reinforcement candidates)
-# 3. Write pending-habits.json for LLM classification
+# 3. Write pending-habits.json for Juno's classification
 # 4. Advance the watermark so signals aren't reprocessed
 # 5. Sync state (BASAL_GANGLIA_STATE.md + brain-dashboard.html)
-# 6. Spawn (or print instructions for) the classification sub-agent
+# 6. Hand off to Juno for the classification step
 #
 # Usage: ./scripts/encode-pipeline.sh [--no-spawn]
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace (default: ~/.openclaw/workspace)
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SIGNALS_FILE="$WORKSPACE/memory/habit-signals.jsonl"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
@@ -267,8 +267,37 @@ for sig in signals:
 
     pending.append(entry)
 
-with open(PENDING_FILE, 'w') as f:
-    json.dump({"pending": pending, "created": today}, f, indent=2)
+# Save pending classification — MERGE via the shared conservation
+# writer (I3, Gated-Ingress Refactor 2026-11-20): the unconsumed backlog
+# is carried over and new entries dedupe by signal_id. This block
+# previously dumped a fresh list over pending-habits.json — the same
+# overwrite class that dropped ~3,578 hippocampus signals on
+# 2026-11-20.
+import subprocess, tempfile
+_ws = os.path.dirname(os.path.dirname(os.path.abspath(PENDING_FILE)))
+_writer = os.path.join(_ws, 'core', 'gate', 'store_write.py')
+if os.path.exists(_writer):
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as _tf:
+        json.dump(pending, _tf)
+        _items = _tf.name
+    subprocess.run(['python3', _writer, 'merge-list', '--store', PENDING_FILE,
+                    '--list-field', 'pending', '--key', 'signal_id',
+                    '--items', _items, '--writer', 'basal-ganglia-memory/encode-pipeline.sh'],
+                   check=True, capture_output=True)
+    os.unlink(_items)
+    pending = json.load(open(PENDING_FILE)).get('pending', [])
+else:
+    # Fallback (sandbox trees without the gate library): inline merge.
+    _existing = []
+    if os.path.exists(PENDING_FILE):
+        try:
+            _existing = json.load(open(PENDING_FILE)).get('pending', []) or []
+        except Exception:
+            _existing = []
+    _seen = {e.get('signal_id') for e in _existing if isinstance(e, dict)}
+    pending = _existing + [e for e in pending if e.get('signal_id') not in _seen]
+    with open(PENDING_FILE, 'w') as f:
+        json.dump({"pending": pending, "created": today}, f, indent=2)
 
 print(f"   Total signals:          {len(signals)}")
 print(f"   Pending classification: {len(pending)}")
@@ -291,10 +320,9 @@ echo "🔄 Step 5: Syncing state..."
 WORKSPACE="$WORKSPACE" "$SKILL_DIR/scripts/sync-state.sh" || true
 
 # ═══════════════════════════════════════════════════════════════
-# STEP 6: Report + hand off to classification sub-agent
+# STEP 6: Report + hand off to Juno for classification
 # ═══════════════════════════════════════════════════════════════
-PENDING_COUNT=$(PENDING_FILE="$PENDING_FILE" python3 -c "import os
-import json; d=json.load(open(os.environ['PENDING_FILE'])); print(len(d.get('pending',[])))" 2>/dev/null || echo "0")
+PENDING_COUNT=$(python3 -c "import json; d=json.load(open('$PENDING_FILE')); print(len(d.get('pending',[])))" 2>/dev/null || echo "0")
 
 echo ""
 if [ "$PENDING_COUNT" -eq 0 ]; then
@@ -312,7 +340,7 @@ if [ "$NO_SPAWN" = "--no-spawn" ]; then
 fi
 
 echo ""
-echo "✅ Pipeline phase 1 complete. Sub-agent will classify pending signals."
+echo "✅ Pipeline phase 1 complete. Juno will classify pending signals."
 echo ""
 echo "To complete manually:"
 echo "  1. Read $PENDING_FILE"

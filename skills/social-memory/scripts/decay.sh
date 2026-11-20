@@ -1,20 +1,19 @@
 #!/bin/bash
 # decay.sh — Trust/affinity drift gently toward neutral (0.5) without contact.
 # Models distance, not punishment: only relationships untouched for 7+ days move.
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No social state found"; exit 1; }
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-NOW="$NOW" STATE_FILE="$STATE_FILE" python3 -c "import os
-
+python3 -c "
 import json
 from datetime import datetime, timezone
 
-state = json.load(open(os.environ['STATE_FILE']))
-now = datetime.fromisoformat(os.environ['NOW'].replace('Z', '+00:00'))
+state = json.load(open('$STATE_FILE'))
+now = datetime.fromisoformat('$NOW'.replace('Z', '+00:00'))
 changed = 0
 
 for rid, r in state.get('relationships', {}).items():
@@ -33,8 +32,8 @@ for rid, r in state.get('relationships', {}).items():
         r[field] = round(v + (0.5 - v) * 0.05, 3)
     changed += 1
 
-state['lastUpdated'] = os.environ['NOW']
-with open(os.environ['STATE_FILE'], 'w') as f:
+state['lastUpdated'] = '$NOW'
+with open('$STATE_FILE', 'w') as f:
     json.dump(state, f, indent=2)
 print(f'🫂 Decayed {changed} relationship(s) untouched for 7+ days toward neutral')
 "

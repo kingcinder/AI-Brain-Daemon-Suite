@@ -2,9 +2,9 @@
 # ACC: Load state at session start
 # Shows current error patterns and lessons learned
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
 STATE_MD="$WORKSPACE/ACC_STATE.md"
 
@@ -27,6 +27,12 @@ cat "$STATE_MD"
 
 # Best-effort staleness tracking: record that this state was actually read,
 # separate from lastUpdated (write path). Never blocks or fails the output above.
-exec 200>"$STATE_FILE.lock"
-flock 200
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
+
+# Best-effort staleness tracking: record that this state was actually read,
+# separate from lastUpdated (write path). Never blocks or fails the output above.
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
+
+# Best-effort staleness tracking: record that this state was actually read,
+# separate from lastUpdated (write path). Never blocks or fails the output above.
 { jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true

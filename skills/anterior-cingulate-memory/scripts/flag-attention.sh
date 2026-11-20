@@ -6,9 +6,9 @@
 #   ./flag-attention.sh --remove "topic name"
 #   ./flag-attention.sh --list
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 
@@ -36,11 +36,6 @@ if [[ ! -f "$STATE_FILE" ]]; then
   echo "ERROR: conflict-state.json not found. Run ./install.sh first." >&2; exit 1
 fi
 
-# Serialize read-modify-write against the other conflict-state.json writers
-# (log-conflict, decay-load, resolve-conflict, encode-pipeline).
-exec 200>"$STATE_FILE.lock"
-flock 200
-
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 case "$ACTION" in
@@ -57,16 +52,19 @@ case "$ACTION" in
   add)
     [[ -z "$TOPIC" ]] && { echo "ERROR: topic required with --add" >&2; exit 1; }
 
+    TOPIC_ESCAPED=$(echo "$TOPIC" | sed 's/"/\\"/g')
+    REASON_ESCAPED=$(echo "${REASON:-flagged for attention}" | sed 's/"/\\"/g')
+
     # Check if already flagged
-    EXISTS=$(jq --arg t "$TOPIC" '.attentionFlags[] | select(.topic == $t) // empty' "$STATE_FILE")
+    EXISTS=$(jq --arg t "$TOPIC_ESCAPED" '.attentionFlags[] | select(.topic == $t) // empty' "$STATE_FILE")
     if [[ -n "$EXISTS" ]]; then
       echo "⚡ '$TOPIC' is already flagged for attention."
       exit 0
     fi
 
     UPDATED=$(jq \
-      --arg topic "$TOPIC" \
-      --arg reason "${REASON:-flagged for attention}" \
+      --arg topic "$TOPIC_ESCAPED" \
+      --arg reason "$REASON_ESCAPED" \
       --arg now "$NOW" \
       '
       .attentionFlags += [{topic: $topic, reason: $reason, addedAt: $now}] |
@@ -74,8 +72,7 @@ case "$ACTION" in
       .stats.totalAttentionFlags += 1
       ' "$STATE_FILE")
 
-    echo "$UPDATED" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+    echo "$UPDATED" > "$STATE_FILE"
     "$SKILL_DIR/scripts/sync-state.sh" --quiet
     echo "⚡ Flagged for attention: $TOPIC"
     [[ -n "$REASON" ]] && echo "   Reason: $REASON"
@@ -84,16 +81,17 @@ case "$ACTION" in
   remove)
     [[ -z "$TOPIC" ]] && { echo "ERROR: topic required with --remove" >&2; exit 1; }
 
+    TOPIC_ESCAPED=$(echo "$TOPIC" | sed 's/"/\\"/g')
+
     UPDATED=$(jq \
-      --arg topic "$TOPIC" \
+      --arg topic "$TOPIC_ESCAPED" \
       --arg now "$NOW" \
       '
       .attentionFlags = [.attentionFlags[] | select(.topic != $topic)] |
       .lastUpdated = $now
       ' "$STATE_FILE")
 
-    echo "$UPDATED" > "$STATE_FILE.tmp.$$"
-    mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+    echo "$UPDATED" > "$STATE_FILE"
     "$SKILL_DIR/scripts/sync-state.sh" --quiet
     echo "⚡ Removed attention flag: $TOPIC"
     ;;

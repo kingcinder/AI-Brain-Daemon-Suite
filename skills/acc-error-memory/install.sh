@@ -1,21 +1,5 @@
 #!/bin/bash
-# ── Standardized lifecycle contract (Initiative 9) ──────────────────────────
-#   install.sh              → initialize state files (defaults)
-#   install.sh --uninstall  → remove exactly the state files this skill's
-#                             manifest declares (delegates to skill-cleanup.sh)
-if [ "${1:-}" = "--uninstall" ]; then
-    THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
-    WS_UN="${WORKSPACE:-$HOME/.hermes/workspace}"
-    for CAND in "$THIS_DIR/../../core/skill-init/skill-cleanup.sh" \
-                "$THIS_DIR/../../../core/skill-init/skill-cleanup.sh"; do
-        if [ -x "$CAND" ]; then
-            exec "$CAND" --skill "$THIS_DIR" --workspace "$WS_UN" "${2:-}"
-        fi
-    done
-    echo "uninstall: skill-cleanup.sh not found — nothing removed." >&2
-    exit 1
-fi
-# Install ACC Error Memory skill
+# Install ACC (Anterior Cingulate Memory) skill
 #
 # Usage:
 #   ./install.sh              # Basic install
@@ -23,7 +7,7 @@ fi
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
 WATERMARK_FILE="$WORKSPACE/memory/acc-watcher-watermark.json"
@@ -37,7 +21,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "🔴 Installing ACC Error Memory"
+echo "⚡ Installing ACC (Anterior Cingulate Memory)"
 echo "============================================="
 echo ""
 
@@ -82,7 +66,7 @@ echo "Generating ACC_STATE.md..."
 chmod +x "$SKILL_DIR/scripts/"*.sh 2>/dev/null || true
 
 echo ""
-echo "✅ ACC Error Memory installed!"
+echo "✅ ACC installed!"
 echo ""
 echo "Files created:"
 echo "  - $STATE_FILE"
@@ -95,7 +79,10 @@ if [ "$WITH_CRON" = true ]; then
     echo ""
     echo "Add this cron job (runs 3x daily at 4 AM, 12 PM, 8 PM):"
     echo ""
-    echo "  hermes cron create '0 4,12,20 * * *' 'Run ACC Error Memory analysis: encode-pipeline.sh, analyze exchanges, log errors, update watermark' --name acc-analysis"
+    echo "  openclaw cron add --name acc-analysis \\"
+    echo "    --cron '0 4,12,20 * * *' \\"
+    echo "    --session isolated \\"
+    echo "    --agent-turn 'Run ACC error analysis: encode-pipeline.sh, analyze exchanges, log errors, update watermark'"
     echo ""
 fi
 

@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 MEM="$WORKSPACE/memory"
 WS="$MEM/workspace.json"
 

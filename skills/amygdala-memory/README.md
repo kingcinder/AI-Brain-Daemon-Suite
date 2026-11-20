@@ -59,7 +59,7 @@ Track five emotional dimensions that persist and decay over time:
 | `update-state.sh` | Log emotion or update dimension directly |
 | `load-emotion.sh` | Human-readable state for session context |
 | `decay-emotion.sh` | Return to baseline over time (run via cron) |
-| `encode-pipeline.sh` | LLM-based emotional encoding from transcripts |
+| `encode-pipeline.sh` | Juno-based emotional encoding from transcripts |
 | `preprocess-emotions.sh` | Extract emotional signals from session history |
 | `update-watermark.sh` | Track processed transcript position |
 | `generate-dashboard.sh` | Generate HTML dashboard |
@@ -81,7 +81,7 @@ This:
 
 Set up cron for automatic encoding every 3 hours:
 ```bash
-10 0,3,6,9,12,15,18,21 * * * ~/.hermes/workspace/skills/amygdala-memory/scripts/encode-pipeline.sh
+10 0,3,6,9,12,15,18,21 * * * ~/.openclaw/workspace/skills/amygdala-memory/scripts/encode-pipeline.sh
 ```
 
 ## Visualization (v1.6.0+)
@@ -101,17 +101,17 @@ Connection:   [███████████████████░]   0
 
 **Generated automatically on install and cron runs.**
 
-Access at: `~/.hermes/workspace/brain-dashboard.html`
+Access at: `~/.openclaw/workspace/brain-dashboard.html`
 
 ```bash
 # Generate manually
 ./scripts/generate-dashboard.sh
 
 # Open (macOS)
-open ~/.hermes/workspace/brain-dashboard.html
+open ~/.openclaw/workspace/brain-dashboard.html
 
 # Open (Linux)
-xdg-open ~/.hermes/workspace/brain-dashboard.html
+xdg-open ~/.openclaw/workspace/brain-dashboard.html
 ```
 
 **Shows tabs for all installed brain skills:**
@@ -185,7 +185,7 @@ SESSION START
 
 ```bash
 clawdhub install amygdala-memory
-cd ~/.hermes/workspace/skills/amygdala-memory
+cd ~/.openclaw/workspace/skills/amygdala-memory
 ./install.sh --with-cron
 ```
 
@@ -206,7 +206,7 @@ The install script will:
 
 ```bash
 # Every 6 hours, emotions drift toward baseline
-0 */6 * * * ~/.hermes/workspace/skills/amygdala-memory/scripts/decay-emotion.sh
+0 */6 * * * ~/.openclaw/workspace/skills/amygdala-memory/scripts/decay-emotion.sh
 ```
 
 ## AI Brain Series

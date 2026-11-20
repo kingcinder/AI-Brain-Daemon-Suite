@@ -5,7 +5,7 @@
 # state yet) so the 🚦 tab appears; the JS renders a "gate not yet run" state.
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"
 STATE_FILE="$WORKSPACE/memory/thalamus-state.json"

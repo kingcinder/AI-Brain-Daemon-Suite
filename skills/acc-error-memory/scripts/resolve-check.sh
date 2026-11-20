@@ -2,15 +2,10 @@
 # ACC: Check for patterns that should be resolved (30+ days without occurrence)
 # Run as part of daily analysis
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
-
-if [ ! -f "$STATE_FILE" ]; then
-    echo "No acc-state.json found"
-    exit 0
-fi
 
 python3 << 'PYTHON'
 import json
@@ -18,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import os
 
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
 state_file = Path(workspace) / 'memory' / 'acc-state.json'
 
 with open(state_file) as f:

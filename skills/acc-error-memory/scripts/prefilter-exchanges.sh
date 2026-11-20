@@ -1,6 +1,6 @@
 #!/bin/bash
 # ACC Pre-filter — Cost optimization for error analysis pipeline
-# Filters exchanges to only those containing error signals before sending to LLM
+# Filters exchanges to only those containing error signals before Juno screening
 #
 # Usage:
 #   prefilter-exchanges.sh <pending-errors.json>
@@ -9,7 +9,7 @@
 # Output: Filtered JSON array to stdout
 # Expects input: array of {assistant_text, user_text, timestamp, ...}
 
-set -euo pipefail
+set -e
 
 INPUT_FILE="${1:?Usage: prefilter-exchanges.sh <pending-errors.json>}"
 
@@ -18,7 +18,7 @@ if [ ! -f "$INPUT_FILE" ]; then
     exit 0
 fi
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 LEARNED_FILE="$WORKSPACE/memory/learned-patterns.json"
 
 export INPUT_FILE LEARNED_FILE

@@ -1,8 +1,8 @@
 #!/bin/bash
 # upsert-relationship.sh — Create or update a relationship's basic info
 # Usage: upsert-relationship.sh --id <id> --name "..." [--type human|ai_agent] [--platform "..."]
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

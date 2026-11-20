@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/neuromod-state.json"
 
 exec 200>"$STATE_FILE.lock"
@@ -40,6 +40,9 @@ elif [[ "$1" = "--composite" ]]; then
     exit 0
 elif [[ "$1" = "--json" ]]; then
     if [[ -f "$STATE_FILE" ]]; then
+        # Full-state read = consultation: stamp lastConsultedAt (best-effort,
+        # never blocks the read). Added 2026-11-13, full-integration order.
+        { jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
         cat "$STATE_FILE"
     else
         printf '%s' '{"version":1,"modulators":{},"composites":{"arousal":0.5,"valence":0.5,"stressIndex":0.5},"missingSources":[]}'

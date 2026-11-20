@@ -1,6 +1,6 @@
 # Insula Sense Encoding Prompt
 
-> **Note:** The insula encoding pipeline is rule-based and does not require LLM analysis for standard operation. `encode-pipeline.sh` handles signal detection automatically using regex pattern matching.
+> **Note:** The insula encoding pipeline is rule-based and does not require a Juno ask for standard operation. `encode-pipeline.sh` handles signal detection automatically using regex pattern matching.
 >
 > This prompt is used only for **edge-case calibration** when the pipeline flags exchanges that need semantic review.
 
@@ -12,7 +12,7 @@ You are analyzing exchanges flagged by the insula preprocess script for interoce
 
 ## Your Input
 
-Read: `~/.hermes/workspace/memory/pending-sense.json`
+Read: `~/.openclaw/workspace/memory/pending-sense.json`
 
 Each entry has:
 ```json
@@ -52,10 +52,10 @@ For each flagged exchange, confirm or correct the detected signal.
 
 For each exchange that needs correction, call:
 ```bash
-~/.hermes/workspace/skills/insula-memory/scripts/update-state.sh \
+~/.openclaw/workspace/skills/insula-memory/scripts/update-state.sh \
   --signal <corrected_signal> \
   --intensity <0.3-0.9> \
-  --source "LLM calibration: <brief reason>"
+  --source "Juno calibration: <brief reason>"
 ```
 
 Only call update-state.sh where the auto-detected signal is clearly wrong. If it looks right, skip it.

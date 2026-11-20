@@ -11,11 +11,11 @@
 #   get-habits.sh --category workflow   # Filter by category
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 
 if [ ! -f "$STATE_FILE" ]; then

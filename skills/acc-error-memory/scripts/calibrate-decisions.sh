@@ -33,7 +33,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.juno-brain/workspace}"
 PFC="$WORKSPACE/memory/pfc-state.json"
 ACC="$WORKSPACE/memory/acc-state.json"
 OUT="$WORKSPACE/memory/acc-calibration.json"

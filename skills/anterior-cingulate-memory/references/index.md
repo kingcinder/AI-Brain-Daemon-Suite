@@ -6,5 +6,5 @@ Progressive-disclosure links. Load this index via `skill_view("anterior-cingulat
 |------|--------------|
 | `../README.md` | Human-oriented setup, usage, and troubleshooting |
 | `../skill-card.md` | Compact summary card for quick recall |
-| `../prompts/` | LLM prompts for conflict encoding |
+| `../prompts/` | Prompts for Juno: conflict encoding |
 | `../scripts/encode-pipeline.sh` | Automatic conflict detection from transcripts |

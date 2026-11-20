@@ -6,5 +6,5 @@ Progressive-disclosure links. Load this index via `skill_view("acc-error-memory"
 |------|--------------|
 | `../README.md` | Human-oriented setup, usage, and troubleshooting |
 | `../skill-card.md` | Compact summary card for quick recall |
-| `../prompts/` | LLM prompts for error screening/calibration |
+| `../prompts/` | Prompts for Juno: error screening/calibration |
 | `../scripts/encode-pipeline.sh` | Full preprocessing pipeline |

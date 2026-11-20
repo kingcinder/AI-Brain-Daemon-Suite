@@ -1,7 +1,7 @@
 #!/bin/bash
 # sync-state.sh — Regenerate THALAMUS_STATE.md and dashboard fragment.
 set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/thalamus-state.json"
 OUTPUT="$WORKSPACE/THALAMUS_STATE.md"

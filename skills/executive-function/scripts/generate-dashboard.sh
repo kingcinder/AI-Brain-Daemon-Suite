@@ -6,7 +6,7 @@
 # in the dashboard; the JS renders a "no data yet" state instead.
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"
 LOAD_FILE="$WORKSPACE/memory/executive-load.json"

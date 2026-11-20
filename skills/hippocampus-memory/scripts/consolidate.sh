@@ -3,15 +3,10 @@
 # Reviews recent daily notes and suggests what to consolidate
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 
-set -euo pipefail
-
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 MEMORY_DIR="$WORKSPACE/memory"
-
-# ── Closed-loop: after consolidation, signal PFC to reflect on what changed ──
-PENDING_REFLECTION="$WORKSPACE/memory/.pending-reflection"
 
 echo "🧠 Memory Consolidation"
 echo "======================="
@@ -47,13 +42,12 @@ echo "  - $MEMORY_DIR/world/*.md"
 
 # ═══════════════════════════════════════════════════════════════════════
 # CLS replay pass (McClelland, McNaughton & O'Reilly; Marr 1971; Buzsáki)
-# The consolidation job actually CONSOLIDATES: it replays a sample of the
-# most recent episodic traces (the fast hippocampal store) and, grouping
-# them by domain/category theme, slowly strengthens a cortical aggregate
+# Ported from mirror consolidate.sh (helm transplant, 2026-11-12):
+# replays a sample of the most recent episodic traces and, grouping them
+# by domain/category theme, slowly strengthens a cortical aggregate
 # (memory/cortical.json) — episodic → semantic transfer via offline replay.
-# Each replayed trace adds a small weight increment to its theme, so
-# repeatedly-replayed themes drift toward stable cortex-level knowledge
-# while the episodic traces themselves are never touched. Purely additive.
+# Each replayed trace adds a small weight increment to its theme.
+# Purely additive; episodic traces themselves are never touched.
 # ═══════════════════════════════════════════════════════════════════════
 INDEX_FILE="$MEMORY_DIR/index.json"
 CORTICAL_FILE="$MEMORY_DIR/cortical.json"
@@ -116,10 +110,3 @@ for theme, t in sorted(themes.items()):
 print(f"   Replayed {replayed} episodic trace(s) → cortical themes strengthened.")
 PYTHON
 fi
-
-# ── Closed-loop: signal PFC that consolidation happened — the next executive
-#    cycle's isolated-reflect.sh will pick up this marker and trigger a
-#    reflection pass over the freshly consolidated memory. ────────────────────
-date -u +"%Y-%m-%dT%H:%M:%SZ" > "$PENDING_REFLECTION"
-# Set marker for the run-cycle.sh wrapper to check
-echo "🧠 Consolidation complete — PFC reflection marker set."

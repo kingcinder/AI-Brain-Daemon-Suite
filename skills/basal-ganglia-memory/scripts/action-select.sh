@@ -10,11 +10,11 @@
 # Output: JSON {chosen, adjusted_scores, losers, method}
 #
 # Environment:
-#   WORKSPACE — defaults to ~/.hermes/workspace
+#   WORKSPACE — defaults to ~/.openclaw/workspace
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 OPTIONS_JSON='[]'
 EPSILON="${EPSILON:-0.1}"
@@ -48,7 +48,7 @@ habit_file = os.environ['HABIT_FILE']
 opt_file = os.environ['OPT_FILE']
 epsilon = float(os.environ['EPSILON'])
 no_record = os.environ.get('NO_RECORD', '0') == '1'
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
 state_file = f"{workspace}/memory/habit-state.json"
 
 with open(opt_file) as f:

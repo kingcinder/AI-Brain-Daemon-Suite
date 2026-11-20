@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/load-state.sh — Human-readable conflict state for session context
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
 STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 
 if [[ ! -f "$STATE_FILE" ]]; then
@@ -64,6 +64,12 @@ fi
 
 # Best-effort staleness tracking: record that this state was actually read,
 # separate from lastUpdated (write path). Never blocks or fails the output above.
-exec 200>"$STATE_FILE.lock"
-flock 200
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
+
+# Best-effort staleness tracking: record that this state was actually read,
+# separate from lastUpdated (write path). Never blocks or fails the output above.
+{ jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true
+
+# Best-effort staleness tracking: record that this state was actually read,
+# separate from lastUpdated (write path). Never blocks or fails the output above.
 { jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastConsultedAt = $now' "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE"; } 2>/dev/null || true

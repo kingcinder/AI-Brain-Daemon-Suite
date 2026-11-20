@@ -2,7 +2,7 @@
 name: verification-memory
 description: "The brain's proprioception — a verification region that runs every other module's declared tests from their capability manifests, reports a green/red felt state onto the signal bus, and feeds failures into the error/emotion systems. Part of the AI Brain series."
 metadata:
-  hermes:
+  juno:
     emoji: "🩺"
     tags: ["memory", "verification", "ai-brain", "testing", "proprioception"]
   openclaw:
@@ -225,7 +225,7 @@ the phase1 harness, so existing evaluation behavior is preserved.
 
 Alongside the sweep, evaluation also runs `deep-brain-kernel.py --check`
 against the patched sandbox suite (`WORKSPACE` pointed at the sandbox suite and
-`DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1`, since hermes presence is a host
+`DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1`, since shim presence is a host
 concern, not a proposal-fixable one) — the daemon JOBS-table gate. A proposal
 that breaks a job target (a script a job references that is missing or
 truncated to empty — `--check` flags MISSING / EXISTS-BUT-EMPTY) is rejected
@@ -254,15 +254,15 @@ PRs), and on demand from the Actions tab, GitHub Actions validates all
 capability manifests (`core/schema/validate-manifest.sh --all`), validates the
 daemon's JOBS table via `deep-brain-kernel.py --check` (minute uniqueness +
 every direct job's script present, executable, and non-empty, with `WORKSPACE`
-pointed at the checkout and `DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1` so the
-runner's missing hermes isn't counted against the gate), runs the per-skill
+pointed at the checkout and `DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1` so the
+runner's missing shim isn't counted against the gate), runs the per-skill
 unit suite (`tests/run_skill_unit_tests.sh`), then executes the
 manifest-driven sweep (`scripts/run-declared-tests.sh --quiet`). A PR that
 breaks any module's declared test — or declares a test path that doesn't
 exist — fails the gate before merge. The same commands run locally as a single command:
 `scripts/ci-gate.sh` replays the gate step-for-step with the exact CI
 environment (`WORKSPACE` pointed at the checkout and
-`DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1` for `--check`, plus an isolated scratch
+`DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1` for `--check`, plus an isolated scratch
 workspace for the sweep, mirroring CI's `runner.temp`), so a green local gate
 is a green CI run; no special CI wiring exists beyond the manifests themselves.
 

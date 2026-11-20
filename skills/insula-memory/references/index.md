@@ -6,5 +6,5 @@ Progressive-disclosure links. Load this index via `skill_view("insula-memory", "
 |------|--------------|
 | `../README.md` | Human-oriented setup, usage, and troubleshooting |
 | `../skill-card.md` | Compact summary card for quick recall |
-| `../prompts/` | LLM prompts for sense encoding |
+| `../prompts/` | Prompts for Juno: sense encoding |
 | `../scripts/encode-pipeline.sh` | Automatic interoceptive encoding from transcripts |

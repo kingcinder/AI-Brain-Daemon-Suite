@@ -7,13 +7,13 @@
 # the basal-ganglia analog of hippocampus's HIPPOCAMPUS_CORE.md.
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 #   CHUNK_THRESHOLD - Minimum strength for "chunked" habits (default: 0.7)
 #   ACTIVE_THRESHOLD - Minimum strength for procedures/suppressions (default: 0.4)
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 OUTPUT="$WORKSPACE/BASAL_GANGLIA_STATE.md"
@@ -25,16 +25,14 @@ if [ ! -f "$STATE_FILE" ]; then
     exit 0
 fi
 
-STATE_FILE="$STATE_FILE" OUTPUT="$OUTPUT" CHUNK_THRESHOLD="$CHUNK_THRESHOLD" ACTIVE_THRESHOLD="$ACTIVE_THRESHOLD" \
-python3 << 'PYTHON'
+python3 << PYTHON
 import json
-import os
 from datetime import datetime, timezone
 
-STATE_FILE = os.environ["STATE_FILE"]
-OUTPUT_PATH = os.environ["OUTPUT"]
-CHUNK_THRESHOLD = float(os.environ["CHUNK_THRESHOLD"])
-ACTIVE_THRESHOLD = float(os.environ["ACTIVE_THRESHOLD"])
+STATE_FILE = "$STATE_FILE"
+OUTPUT_PATH = "$OUTPUT"
+CHUNK_THRESHOLD = $CHUNK_THRESHOLD
+ACTIVE_THRESHOLD = $ACTIVE_THRESHOLD
 
 with open(STATE_FILE) as f:
     state = json.load(f)
@@ -101,17 +99,6 @@ if active_supps:
     for s in active_supps:
         lines.append(f"- Avoid: {s.get('pattern', '?')} — {s.get('reason', 'no reason given')} "
                       f"*(strength {s.get('strength', 0):.2f})*")
-    lines.append("")
-
-gated = state.get('gatedSelections', [])
-if gated:
-    lines.append("## 🚦 Gated Selections (no-go threshold)")
-    lines.append("")
-    for g in gated[-5:]:
-        lines.append(
-            f"- {g.get('at', '?')}: best candidate {g.get('best', 0):.2f} below threshold "
-            f"{g.get('threshold', 0):.2f} — held ({g.get('candidates', 0)} candidates, no release)"
-        )
     lines.append("")
 
 if not (chunked or active or active_procs or active_supps):

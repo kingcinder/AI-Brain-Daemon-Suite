@@ -1,22 +1,26 @@
 #!/bin/bash
 # Daemon entry: scheduled self-mod proposal cycle (ROADMAP M1).
 #
-# Runs core/self-mod/run-pipeline.sh with LLM-backed proposal generation and
-# the M2 autonomy gate (--autonomy-gate): in relaxed_review the pipeline may
-# auto-deploy the top accepted proposal; in full_review it queues for human
-# approval instead. LLM provider failure is non-fatal — run-pipeline records
-# it and continues with whatever is already queued in the store.
+# Runs core/self-mod/run-pipeline.sh with Juno-authored proposal generation and
+# the autonomy gate (--autonomy-gate). M9 (2026-11-13): Juno is the approval
+# gate — the pipeline deploys the top accepted proposal on her approval in
+# any autonomy/review mode; nothing queues for human approval. A Juno
+# generation failure is non-fatal — run-pipeline records it and continues with whatever
+# is already queued in the store.
 #
-# --defer-gate (added with the M8 audit trail): when the refreshed autonomy
-# contract is steward_mode + full_review, the cycle DEFERS the whole run
-# instead of churning through generation/evaluation only to skip the deploy
-# at the end. The deferral is written to pipeline-runs/latest.json and logged
-# as a provenance event (autonomy.gate.deferred), so the weekly cycle's
-# behavior is fully auditable — the human is the operator until they grant
-# auto_mode or relax review.
+# --defer-gate is still passed for flag back-compat; under M9 the pipeline
+# ignores it — the cycle always runs and never defers to the human. The
+# deferral-alert block below is legacy: with no deferrals ever produced, it
+# only clears a stale last-deferral.json marker left by a pre-M9 run.
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+# Day-gating (updated 2026-11-12): the daemon job table now has a days
+# field (brain-daemon.sh), and self_mod_proposal_cycle carries |7 (Sunday,
+# Pacific) there — the scheduler owns the gate, so this tick runs the cycle
+# whenever it is invoked. Previously the tick self-gated to Sundays because
+# the bash job table had no day field (helm port, 2026-11-08).
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -x "$WORKSPACE/core/self-mod/run-pipeline.sh" ]; then
@@ -42,13 +46,23 @@ if [ -f "$KERNEL" ]; then
   WORKSPACE="$WORKSPACE" python3 "$KERNEL" --autonomy >/dev/null 2>&1 || true
 fi
 
+# Chink check (2026-11-13, Dither-ordered): the genesis sensor runs at the
+# head of every cycle, so proposal generation starts from fresh evidence of
+# the gaps — chinks are the nucleation sites proposals crystallize around.
+# Read-only and best-effort: a sensor failure never blocks the cycle.
+CHINK_CHECK="$SUITE_ROOT/core/self-mod/chink-check.sh"
+if [ -x "$CHINK_CHECK" ]; then
+  WORKSPACE="$WORKSPACE" bash "$CHINK_CHECK" --workspace "$WORKSPACE" \
+    >"$WORKSPACE/memory/self-mod/chink-scan.out" 2>/dev/null || true
+fi
+
 # Forward the daemon's TERM/INT (it signals only this tracked PID — Pillar 3)
 # to the pipeline so a timeout-kill can't orphan a running proposal cycle.
 rc=0
 bash "$PIPELINE" \
   --suite-root "$SUITE_ROOT" \
   --workspace "$WORKSPACE" \
-  --generate-llm \
+  --generate-juno \
   --autonomy-gate \
   --defer-gate \
   2>"$WORKSPACE/memory/self-mod/proposal-cycle.err" &
@@ -56,12 +70,11 @@ PIPE_PID=$!
 trap 'kill "$PIPE_PID" 2>/dev/null || true' TERM INT
 wait "$PIPE_PID" || rc=$?
 trap - TERM INT
-# Alert on deferral: a steward who expected the weekly cycle to run must
-# notice it waited. The pipeline's --defer-gate writes pipeline-runs/latest.json
-# with deferred:true (and a provenance event) when steward_mode + full_review.
-# Detect that, publish a brain-events.jsonl signal (the suite-wide event log
-# the other regions write), and bump the daemon status via a last-deferral
-# marker the dashboard's /__daemon + status bar read.
+# Deferral alert (LEGACY, pre-M9): under M9 the pipeline never defers, so
+# latest.json never carries deferred:true and this block's only live effect
+# is the else branch — clearing a stale last-deferral.json marker. The
+# detection branch is retained so a marker written by a pre-M9 build would
+# still be surfaced rather than silently dropped.
 #
 # Gated on the pipeline's own rc: a deferral is a successful no-op (rc=0), and
 # only a genuinely completed run may write or clear the alert. A HARD failure

@@ -2,11 +2,11 @@
 # Preprocess conversation for reward/accomplishment signals
 # Extracts signals about wins, completions, social rewards, etc.
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 AGENT_ID="${AGENT_ID:-main}"
-TRANSCRIPT_DIR="${TRANSCRIPT_DIR:-$HOME/.hermes/sessions}"
+TRANSCRIPT_DIR="$HOME/.openclaw/agents/$AGENT_ID/sessions"
 OUTPUT="$WORKSPACE/memory/reward-signals.jsonl"
 STATE="$WORKSPACE/memory/reward-state.json"
 
@@ -20,7 +20,7 @@ if [ "$FULL_MODE" = false ]; then
     WATERMARK=$(cat "$STATE" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('lastProcessedSignal',''))" 2>/dev/null || echo "")
 fi
 
-SESSION_FILE=$(find "$TRANSCRIPT_DIR" -maxdepth 1 -name '*.jsonl' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+SESSION_FILE=$(ls -t "$TRANSCRIPT_DIR"/*.jsonl 2>/dev/null | head -1)
 
 if [ -z "$SESSION_FILE" ]; then
     echo "No session transcript found"
@@ -31,16 +31,15 @@ echo "Processing: $SESSION_FILE"
 echo "Mode: $([ "$FULL_MODE" = true ] && echo 'FULL' || echo 'incremental')"
 echo "Watermark: ${WATERMARK:-'(none)'}"
 
-FULL_MODE="$FULL_MODE" OUTPUT="$OUTPUT" SESSION_FILE="$SESSION_FILE" WATERMARK="$WATERMARK" python3 -c "import os
-
+python3 -c "
 import sys
 import json
 import re
 
-session_file = os.environ['SESSION_FILE']
-output_file = os.environ['OUTPUT']
-watermark = os.environ['WATERMARK'] if os.environ['WATERMARK'] else None
-full_mode = os.environ['FULL_MODE'] == 'true'
+session_file = '$SESSION_FILE'
+output_file = '$OUTPUT'
+watermark = '$WATERMARK' if '$WATERMARK' else None
+full_mode = '$FULL_MODE' == 'true'
 
 signals = []
 found_watermark = False if watermark else True

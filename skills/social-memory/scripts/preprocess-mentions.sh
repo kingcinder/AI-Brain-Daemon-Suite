@@ -2,10 +2,10 @@
 # preprocess-mentions.sh — Scan transcripts for relationship-relevant signals:
 # new people/agents mentioned, trust/affinity-relevant moments, things promised.
 # Usage: preprocess-mentions.sh [--full]
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 AGENT_ID="${AGENT_ID:-main}"
-TRANSCRIPT_DIR="${TRANSCRIPT_DIR:-$HOME/.hermes/sessions}"
+TRANSCRIPT_DIR="$HOME/.openclaw/agents/$AGENT_ID/sessions"
 OUTPUT="$WORKSPACE/memory/social-signals.jsonl"
 WATERMARK_FILE="$WORKSPACE/memory/social-watermark.json"
 
@@ -17,18 +17,17 @@ if [ "$FULL_MODE" = false ] && [ -f "$WATERMARK_FILE" ]; then
     WATERMARK=$(jq -r '.lastProcessedSignal // empty' "$WATERMARK_FILE" 2>/dev/null || echo "")
 fi
 
-SESSION_FILE=$(find "$TRANSCRIPT_DIR" -maxdepth 1 -name '*.jsonl' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+SESSION_FILE=$(ls -t "$TRANSCRIPT_DIR"/*.jsonl 2>/dev/null | head -1)
 [ -z "$SESSION_FILE" ] && { echo "No session transcript found"; exit 1; }
 
 echo "Processing: $SESSION_FILE"
 
-OUTPUT="$OUTPUT" SESSION_FILE="$SESSION_FILE" WATERMARK="$WATERMARK" python3 -c "import os
-
+python3 -c "
 import json, re
 
-session_file = os.environ['SESSION_FILE']
-output_file = os.environ['OUTPUT']
-watermark = os.environ['WATERMARK'] if os.environ['WATERMARK'] else None
+session_file = '$SESSION_FILE'
+output_file = '$OUTPUT'
+watermark = '$WATERMARK' if '$WATERMARK' else None
 
 signals = []
 found_watermark = False if watermark else True

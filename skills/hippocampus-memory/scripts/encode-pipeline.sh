@@ -1,22 +1,23 @@
 #!/bin/bash
-# encode-pipeline.sh — Hippocampus encoding with sub-agent summarization
+# encode-pipeline.sh — Hippocampus encoding; Juno does the summarization
 #
 # Pipeline:
 # 1. Preprocess transcript → signals.jsonl
 # 2. Score signals using rule-based heuristics
 # 3. Write pending signals to pending-memories.json
-# 4. Spawn sub-agent for LLM summarization
+# 4. Hand pending memories to Juno for summarization
 #
 # Usage: ./encode-pipeline.sh [--no-spawn]
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace (default: ~/.openclaw/workspace)
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SIGNALS_FILE="$WORKSPACE/memory/signals.jsonl"
+INDEX_FILE="$WORKSPACE/memory/index.json"
 PENDING_FILE="$WORKSPACE/memory/pending-memories.json"
 NO_SPAWN="${1:-}"
 
@@ -60,7 +61,7 @@ import os
 import re
 from datetime import datetime
 
-WORKSPACE = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
+WORKSPACE = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
 SIGNALS_FILE = f"{WORKSPACE}/memory/signals.jsonl"
 INDEX_FILE = f"{WORKSPACE}/memory/index.json"
 PENDING_FILE = f"{WORKSPACE}/memory/pending-memories.json"
@@ -87,6 +88,7 @@ memories = index.get('memories', [])
 # high-salience tag (McGaugh memory enhancement) boosts encoding weight.
 # The amygdala's note-salience.sh consumer wrote these; a recent hint with
 # salience >= 0.6 raises the score of matching-domain signals by up to 0.15.
+# Ported from mirror encode-pipeline.sh (helm transplant, 2026-11-12).
 salience_hint_emotion = None
 salience_hint_strength = 0.0
 if os.path.exists(HINTS_FILE):
@@ -111,6 +113,29 @@ for m in memories:
         max_id = max(max_id, num)
     except:
         pass
+
+# MERGE, never overwrite: an unconsumed backlog in pending-memories.json
+# survives this run. Load it now so new ids never collide with ids it
+# already claimed, and new signals duplicating its texts are skipped.
+# (2026-11-20: a plain overwrite here silently discarded ~3,578 unsummarized
+# signals from a 3,947-signal backlog; the corpus still holds the sources,
+# but the backlog accounting was destroyed.)
+existing_pending = []
+if os.path.exists(PENDING_FILE):
+    try:
+        with open(PENDING_FILE, 'r') as f:
+            existing_pending = json.load(f).get('pending', []) or []
+    except Exception:
+        existing_pending = []
+existing_texts = set()
+for _p in existing_pending:
+    try:
+        num = int(str(_p.get('id', '')).replace('mem_', ''))
+        max_id = max(max_id, num)
+    except Exception:
+        pass
+    existing_texts.add(_p.get('raw_text', ''))
+carried_over = len(existing_pending)
 
 def score_signal(text, role):
     """Rule-based importance scoring"""
@@ -219,7 +244,13 @@ for sig in signals:
     if score < 0.5:
         skipped += 1
         continue
-    
+
+    # Already awaiting summarization in the carried-over backlog: skip
+    # instead of queueing a second copy of the same signal.
+    if text[:800] in existing_texts:
+        skipped += 1
+        continue
+
     # Check for similar existing memory
     similar_id = is_similar(text, memories)
     if similar_id:
@@ -236,7 +267,8 @@ for sig in signals:
     # Add to pending for summarization
     max_id += 1
     domain, category = categorize(text)
-    
+    existing_texts.add(text[:800])
+
     pending.append({
         "id": f"mem_{max_id:03d}",
         "raw_text": text[:800],  # Limit size
@@ -262,11 +294,13 @@ index['memories'] = memories
 with open(INDEX_FILE, 'w') as f:
     json.dump(index, f, indent=2)
 
-# Save pending for sub-agent
+# Save pending for Juno — merged: carried-over backlog first, then new.
+pending = existing_pending + pending
 with open(PENDING_FILE, 'w') as f:
     json.dump({"pending": pending, "created": today}, f, indent=2)
 
 # Report
+print(f"   Carried over from backlog: {carried_over}")
 print(f"   Pending for summarization: {len(pending)}")
 print(f"   Reinforced: {len(reinforced)}")
 for mid, old, new in reinforced[:3]:
@@ -276,8 +310,7 @@ print(f"   Total existing: {len(memories)}")
 PYTHON
 
 # Check if we have pending memories
-PENDING_COUNT=$(PENDING_FILE="$PENDING_FILE" python3 -c "import os
-import json; d=json.load(open(os.environ['PENDING_FILE'])); print(len(d.get('pending',[])))" 2>/dev/null || echo "0")
+PENDING_COUNT=$(python3 -c "import json; d=json.load(open('$PENDING_FILE')); print(len(d.get('pending',[])))" 2>/dev/null || echo "0")
 
 if [ "$PENDING_COUNT" -eq 0 ]; then
     echo ""
@@ -300,10 +333,10 @@ if [ "$NO_SPAWN" = "--no-spawn" ]; then
 fi
 
 echo ""
-echo "✅ Pipeline phase 1 complete. Sub-agent will handle summarization."
+echo "✅ Pipeline phase 1 complete. Juno will handle summarization."
 echo ""
 echo "To complete manually, run:"
-echo "  hermes chat -q 'Run ~/.hermes/workspace/skills/hippocampus-memory/scripts/summarize-pending.sh' --source daemon"
+echo "  openclaw sessions:spawn --task 'Run ~/.openclaw/workspace/skills/hippocampus-memory/scripts/summarize-pending.sh'"
 
 # Regenerate brain dashboard
 [ -x "$SCRIPT_DIR/generate-dashboard.sh" ] && "$SCRIPT_DIR/generate-dashboard.sh" 2>/dev/null || true

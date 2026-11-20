@@ -2,11 +2,11 @@
 # ACC: Analyze yesterday's transcript for errors
 # Called by daily cron job
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
-TRANSCRIPTS_DIR="${TRANSCRIPTS_DIR:-$HOME/.hermes/sessions}"
+TRANSCRIPTS_DIR="$HOME/.openclaw/sessions"
 
 echo "⚡ ACC Daily Analysis"
 echo "===================="

@@ -3,17 +3,17 @@
 # Designed to run on cron every 4 hours.
 # No new conflicts → load moves 20% closer to baseline per run.
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
+# JUNO-BC-PATH (2026-11-15, Dither-ordered): cron env lacks interactive PATH; bc lives in home.
+export PATH="$HOME/.juno-brain/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+command -v bc >/dev/null 2>&1 || ln -sf "$HOME/.juno-brain/bin/bc" /usr/local/bin/bc 2>/dev/null || true
+
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 
 if [[ ! -f "$STATE_FILE" ]]; then exit 0; fi
-
-# Serialize read-modify-write against the other conflict-state.json writers.
-exec 200>"$STATE_FILE.lock"
-flock 200
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -42,8 +42,7 @@ UPDATED=$(jq \
   --arg now "$NOW" \
   '.conflictLoad = $newLoad | .lastUpdated = $now' \
   "$STATE_FILE")
-echo "$UPDATED" > "$STATE_FILE.tmp.$$"
-mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+echo "$UPDATED" > "$STATE_FILE"
 
 "$SKILL_DIR/scripts/sync-state.sh" --quiet
 

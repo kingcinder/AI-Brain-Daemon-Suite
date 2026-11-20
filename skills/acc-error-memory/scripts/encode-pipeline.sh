@@ -7,9 +7,9 @@
 #   encode-pipeline.sh --no-spawn      # Just preprocess, don't spawn agent
 #   encode-pipeline.sh --full          # Process all history
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(dirname "$0")/.."
 PENDING_FILE="$WORKSPACE/memory/pending-errors.json"
 CALIBRATION_STATE="$WORKSPACE/memory/calibration-state.json"
@@ -21,21 +21,18 @@ echo "====================="
 RUN_COUNT=0
 CAL_INTERVAL=10
 if [ -f "$CALIBRATION_STATE" ]; then
-    RUN_COUNT=$(CALIBRATION_STATE="$CALIBRATION_STATE" python3 -c "import os
-import json; d=json.load(open(os.environ['CALIBRATION_STATE'])); print(d.get('runCount',0))")
-    CAL_INTERVAL=$(CALIBRATION_STATE="$CALIBRATION_STATE" python3 -c "import os
-import json; d=json.load(open(os.environ['CALIBRATION_STATE'])); print(d.get('calibrationInterval',10))")
+    RUN_COUNT=$(python3 -c "import json; d=json.load(open('$CALIBRATION_STATE')); print(d.get('runCount',0))")
+    CAL_INTERVAL=$(python3 -c "import json; d=json.load(open('$CALIBRATION_STATE')); print(d.get('calibrationInterval',10))")
 fi
 RUN_COUNT=$((RUN_COUNT + 1))
 # Update runCount in state file
-CALIBRATION_STATE="$CALIBRATION_STATE" python3 -c "import os
-
+python3 -c "
 import json
 try:
-    with open(os.environ['CALIBRATION_STATE']) as f: d=json.load(f)
+    with open('$CALIBRATION_STATE') as f: d=json.load(f)
 except: d={'runCount':0,'calibrationInterval':10,'lastCalibration':None,'stats':{'calibrationRuns':0,'samplesAnalyzed':0,'regexMisses':0,'patternsAdded':0}}
 d['runCount']=$RUN_COUNT
-with open(os.environ['CALIBRATION_STATE'],'w') as f: json.dump(d,f,indent=2); f.write('\n')
+with open('$CALIBRATION_STATE','w') as f: json.dump(d,f,indent=2); f.write('\n')
 "
 IS_CALIBRATION=false
 if [ $((RUN_COUNT % CAL_INTERVAL)) -eq 0 ]; then
@@ -67,8 +64,7 @@ if [ ! -f "$PENDING_FILE" ]; then
     exit 0
 fi
 
-TOTAL_COUNT=$(PENDING_FILE="$PENDING_FILE" python3 -c "import os
-import json; print(len(json.load(open(os.environ['PENDING_FILE']))))")
+TOTAL_COUNT=$(python3 -c "import json; print(len(json.load(open('$PENDING_FILE'))))")
 echo ""
 echo "Step 2: Found $TOTAL_COUNT total exchanges"
 
@@ -85,15 +81,14 @@ if [ "$IS_CALIBRATION" = true ]; then
     # Calibration outputs confirmed errors to calibration-errors.json
     "$SKILL_DIR/scripts/calibrate-patterns.sh" "$PENDING_FILE" 0.15 || echo "Calibration failed (non-fatal)"
     
-    # Use calibration results directly (skip regex + LLM screening)
+    # Use calibration results directly (skip regex + Juno screening)
     CALIB_ERRORS="$WORKSPACE/memory/calibration-errors.json"
     if [ -f "$CALIB_ERRORS" ]; then
-        COUNT=$(CALIB_ERRORS="$CALIB_ERRORS" python3 -c "import os
-import json; print(len(json.load(open(os.environ['CALIB_ERRORS']))))")
+        COUNT=$(python3 -c "import json; print(len(json.load(open('$CALIB_ERRORS'))))")
         if [ "$COUNT" -gt 0 ]; then
             cp "$CALIB_ERRORS" "$PENDING_FILE"
             echo ""
-            echo "Step 3: Using $COUNT errors from calibration (skipping regex+LLM)"
+            echo "Step 3: Using $COUNT errors from calibration (skipping regex+Juno screening)"
             echo ""
             echo "Pending file: $PENDING_FILE"
             echo ""
@@ -114,8 +109,7 @@ echo "Step 3: Pre-filtering for error signals..."
 FILTERED=$("$SKILL_DIR/scripts/prefilter-exchanges.sh" "$PENDING_FILE")
 echo "$FILTERED" > "$PENDING_FILE"
 
-REGEX_COUNT=$(PENDING_FILE="$PENDING_FILE" python3 -c "import os
-import json; print(len(json.load(open(os.environ['PENDING_FILE']))))")
+REGEX_COUNT=$(python3 -c "import json; print(len(json.load(open('$PENDING_FILE'))))")
 echo "Filtered $TOTAL_COUNT exchanges → $REGEX_COUNT candidates ($(( (TOTAL_COUNT - REGEX_COUNT) * 100 / TOTAL_COUNT ))% reduction)"
 
 if [ "$REGEX_COUNT" -eq 0 ]; then
@@ -124,25 +118,17 @@ if [ "$REGEX_COUNT" -eq 0 ]; then
     exit 0
 fi
 
-if [ "$NO_SPAWN" = true ]; then
-    echo ""
-    echo "⏭️  Skipping LLM screening / agent spawn (--no-spawn flag)"
-    echo "Pending file: $PENDING_FILE"
-    exit 0
-fi
-
-# Step 4: LLM screening (confirmation via ACC_MODELS)
+# Step 4: Juno screening (Juno confirms each candidate)
 echo ""
-echo "Step 4: LLM screening ($REGEX_COUNT candidates)..."
-SCREENED=$("$SKILL_DIR/scripts/haiku-screen.sh" "$PENDING_FILE")
+echo "Step 4: Juno screening ($REGEX_COUNT candidates)..."
+SCREENED=$("$SKILL_DIR/scripts/juno-screen.sh" "$PENDING_FILE")
 echo "$SCREENED" > "$PENDING_FILE"
 
-COUNT=$(PENDING_FILE="$PENDING_FILE" python3 -c "import os
-import json; print(len(json.load(open(os.environ['PENDING_FILE']))))")
-echo "LLM confirmed $REGEX_COUNT → $COUNT errors"
+COUNT=$(python3 -c "import json; print(len(json.load(open('$PENDING_FILE'))))")
+echo "Juno confirmed $REGEX_COUNT → $COUNT errors"
 
 if [ "$COUNT" -eq 0 ]; then
-    echo "LLM rejected all candidates — nothing to analyze"
+    echo "Juno rejected all candidates — nothing to analyze"
     rm -f "$PENDING_FILE"
     exit 0
 fi

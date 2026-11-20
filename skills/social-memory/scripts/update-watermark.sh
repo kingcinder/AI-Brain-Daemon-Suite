@@ -1,8 +1,8 @@
 #!/bin/bash
 # update-watermark.sh — Advance watermark after processing social signals
 # Usage: update-watermark.sh --from-signals
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SIGNALS_FILE="$WORKSPACE/memory/social-signals.jsonl"
 WATERMARK_FILE="$WORKSPACE/memory/social-watermark.json"
 

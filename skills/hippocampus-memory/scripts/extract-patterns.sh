@@ -6,14 +6,14 @@
 # This is the bridge from "recording experience" to "learning from experience."
 #
 # Called by hippocampus_weekly_consolidation daemon job (Sundays).
-# Falls back to heuristic extraction when LLM is unreachable.
+# Falls back to heuristic extraction when Juno is unreachable.
 #
 # Usage: extract-patterns.sh [--workspace PATH] [--days N]
 # Output: memory/semantic-state.json
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 DAYS="${1:-7}"
 STATE_FILE="$WORKSPACE/memory/semantic-state.json"
 EVENTS_FILE="$WORKSPACE/memory/hippocampus-events.jsonl"
@@ -63,7 +63,7 @@ fi
 echo "📊 Collected $EPISODIC_COUNT episodic entries"
 echo ""
 
-# ── Heuristic extraction (always runs, even with LLM) ──────────────────────
+# ── Heuristic extraction (always runs, Juno pass or not) ──────────────────────
 THEMES='[]'
 STRATEGIES='[]'
 ANTIPATTERNS='[]'
@@ -73,7 +73,7 @@ if [ "$EPISODIC_COUNT" -gt 0 ]; then
     EXTRACTED=$(python3 << 'PYTHON'
 import json, os, re, collections
 
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
 events_file = f"{workspace}/memory/hippocampus-events.jsonl"
 pending_file = f"{workspace}/memory/pending-memories.json"
 

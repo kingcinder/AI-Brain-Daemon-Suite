@@ -9,33 +9,32 @@
 #
 # Usage: beat.sh [--dry-run]
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/heartbeat-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200
 PFC_DECIDE="$WORKSPACE/skills/prefrontal-cortex-memory/scripts/decide.sh"
 DRY_RUN=false
-[ "${1:-}" = "--dry-run" ] && DRY_RUN=true
+[ "$1" = "--dry-run" ] && DRY_RUN=true
 
 if [ ! -f "$STATE_FILE" ]; then
     echo "❌ No heartbeat state found at $STATE_FILE"
     exit 1
 fi
 
-NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-HOUR=$(date -u +"%H" | sed 's/^0//')
+NOW=$(TZ=America/Los_Angeles date +"%Y-%m-%dT%H:%M:%S %Z")
+HOUR=$(TZ=America/Los_Angeles date +"%H" | sed 's/^0//')
 [ -z "$HOUR" ] && HOUR=0
 
 WAKE_HOUR=$(jq -r '.circadian.wakeHour // 7' "$STATE_FILE")
 SLEEP_HOUR=$(jq -r '.circadian.sleepHour // 23' "$STATE_FILE")
 
 # ── Circadian phase ──────────────────────────────────────────────────────────
-PHASE=$(HOUR="$HOUR" WAKE_HOUR="$WAKE_HOUR" SLEEP_HOUR="$SLEEP_HOUR" python3 -c "
-import os
-hour, wake, sleep = int(os.environ['HOUR']), int(os.environ['WAKE_HOUR']), int(os.environ['SLEEP_HOUR'])
+PHASE=$(python3 -c "
+hour, wake, sleep = $HOUR, $WAKE_HOUR, $SLEEP_HOUR
 def in_range(h, start, end):
     if start <= end:
         return start <= h < end
@@ -51,20 +50,17 @@ else:
     print('active')
 ")
 
-echo "💓 Heartbeat — $(date -u +"%H:%M UTC") (phase: $PHASE)"
+echo "💓 Heartbeat — $(TZ=America/Los_Angeles date +"%H:%M %Z") (phase: $PHASE)"
 
 # ── Build candidate option list ──────────────────────────────────────────────
-# `[]?` guards a missing .projects (freshly-initialized state file): jq would
-# otherwise error on the null iteration and kill the heartbeat under set -e.
-HAS_UNFINISHED=$(jq '[.projects[]? | select(.type == "unfinished" and .status == "active")] | length > 0' "$STATE_FILE")
-HAS_OWN=$(jq '[.projects[]? | select(.type == "own" and .status == "active")] | length > 0' "$STATE_FILE")
+HAS_UNFINISHED=$(jq '[.projects[] | select(.type == "unfinished" and .status == "active")] | length > 0' "$STATE_FILE")
+HAS_OWN=$(jq '[.projects[] | select(.type == "own" and .status == "active")] | length > 0' "$STATE_FILE")
 
-CANDIDATES=$(HAS_OWN="$HAS_OWN" HAS_UNFINISHED="$HAS_UNFINISHED" NOW="$NOW" PHASE="$PHASE" STATE_FILE="$STATE_FILE" python3 -c "import os
-
+CANDIDATES=$(python3 -c "
 import json
-state = json.load(open(os.environ['STATE_FILE']))
+state = json.load(open('$STATE_FILE'))
 opts = state.get('options', {})
-now_str = os.environ['NOW']
+now_str = '$NOW'
 from datetime import datetime, timezone
 
 def minutes_since(ts):
@@ -77,9 +73,9 @@ def minutes_since(ts):
     except Exception:
         return float('inf')
 
-phase = os.environ['PHASE']
-has_unfinished = os.environ['HAS_UNFINISHED'] == 'true'
-has_own = os.environ['HAS_OWN'] == 'true'
+phase = '$PHASE'
+has_unfinished = '$HAS_UNFINISHED' == 'true'
+has_own = '$HAS_OWN' == 'true'
 
 candidates = []
 for opt_id, cfg in opts.items():

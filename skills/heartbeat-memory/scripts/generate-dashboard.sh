@@ -1,8 +1,12 @@
 #!/bin/bash
 # generate-dashboard.sh — Write heartbeat's own dashboard fragment, then call
 # the shared dashboard-builder.sh. Reads ONLY heartbeat's own state file.
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+
+# JUNO-BC-PATH (2026-11-15, Dither-ordered): cron env lacks interactive PATH; bc lives in home.
+export PATH="$HOME/.juno-brain/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+command -v bc >/dev/null 2>&1 || ln -sf "$HOME/.juno-brain/bin/bc" /usr/local/bin/bc 2>/dev/null || true
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"
 STATE_FILE="$WORKSPACE/memory/heartbeat-state.json"
@@ -12,6 +16,7 @@ mkdir -p "$FRAGMENTS_DIR"
 BEAT_COUNT=$(jq -r '.beatCount' "$STATE_FILE")
 LAST_ACTION=$(jq -r '.lastChosenAction // "—"' "$STATE_FILE")
 LAST_BEAT=$(jq -r '.lastBeat // "never"' "$STATE_FILE")
+ACTIVE_PROJECTS=$(jq '[.projects[] | select(.status=="active")] | length' "$STATE_FILE")
 RECENT_ACTIONS=$(jq -c '[.actionHistory[:6][] | {action, note, skipped, timestamp}]' "$STATE_FILE")
 TOP_PROJECTS=$(jq -c '[.projects[] | select(.status=="active") | {id, title, type, note}]' "$STATE_FILE")
 OPTIONS=$(jq -c '[.options | to_entries[] | {id: .key, label: .value.label, weight: .value.weight}]' "$STATE_FILE")
@@ -66,17 +71,15 @@ DATA_JSON=$(jq -n \
   --arg lastUpdated "$(jq -r '.lastUpdated // "never"' "$STATE_FILE")" --arg lastConsultedAt "$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")" \
   '{installed: true, beatCount: $beatCount, lastAction: $lastAction, lastBeat: $lastBeat, projects: $projects, recentActions: $recentActions, options: $options, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-FRAG_TMP="$(mktemp -d)"
-trap 'rm -rf "$FRAG_TMP"' EXIT
-echo "$HTML" > "$FRAG_TMP/html"
-echo "$SCRIPT" > "$FRAG_TMP/script"
+echo "$HTML" > /tmp/heartbeat_frag_html.$$
+echo "$SCRIPT" > /tmp/heartbeat_frag_script.$$
 
 jq -n \
   --arg id "heartbeat" --argjson order 75 --arg label "Pulse" --arg icon "💓" \
-  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" \
+  --rawfile html /tmp/heartbeat_frag_html.$$ --rawfile script /tmp/heartbeat_frag_script.$$ \
   --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/heartbeat.json"
 
-rm -rf "$FRAG_TMP"
+rm -f /tmp/heartbeat_frag_html.$$ /tmp/heartbeat_frag_script.$$
 "$SCRIPT_DIR/dashboard-builder.sh" --focus heartbeat

@@ -1,33 +1,29 @@
 #!/usr/bin/env bash
-# scripts/encode-pipeline.sh — Local-LLM-based conflict detection from conversation transcripts.
+# scripts/encode-pipeline.sh — Juno-based conflict detection from conversation transcripts.
 #
 # Scans recent exchanges for conflicts, contradictions, and ambiguities, then
-# updates conflict-state.json. Uses the same local llm-call.sh utility as
-# every other skill in the suite (see prefrontal-cortex-memory's
-# semantic-match.sh for the reference pattern this follows) instead of
-# calling the Anthropic cloud API directly. No API key, no per-call cost, no
-# external network dependency — consistent with the rest of the stack.
+# updates conflict-state.json. Juno herself does the detection: the pipeline
+# asks her through the helm queue via juno-ask.sh (the copy in this skill's
+# scripts/), the same utility semantic-match.sh uses. No API key, no
+# per-call cost, no external network dependency.
 #
-# Requires: a local OpenAI-compatible LLM server (llama.cpp server, Ollama,
-# LM Studio, vLLM, etc.) reachable at $LLM_BASE_URL (default
-# http://localhost:1234/v1 — same env convention as llm-call.sh everywhere
-# else). If the local server is unreachable, this fails open: it logs a
+# If Juno cannot answer through the queue, this fails open: it logs a
 # warning and skips, exactly like semantic-match.sh's fallback path, rather
-# than treating a down/slow local model as a hard error.
+# than treating an unanswered ask as a hard error.
 #
 # Designed to run on the daemon's schedule (see BRAIN_DAEMON_SCHEDULE.md).
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 PROMPT_FILE="$SKILL_DIR/prompts/detect-conflicts.md"
-LLM_CALL="$SKILL_DIR/scripts/llm-call.sh"
+JUNO_ASK="$SKILL_DIR/scripts/juno-ask.sh"
 SAFE_WRITE="$SKILL_DIR/scripts/safe-write.sh"
 
-if [ ! -x "$LLM_CALL" ]; then
-  echo "⚡ encode-pipeline: llm-call.sh not found/executable at $LLM_CALL — skipping." >&2
+if [ ! -x "$JUNO_ASK" ]; then
+  echo "⚡ encode-pipeline: juno-ask.sh not found/executable at $JUNO_ASK — skipping." >&2
   exit 0
 fi
 
@@ -35,19 +31,7 @@ fi
 EXCHANGES=$("$SKILL_DIR/scripts/preprocess-exchanges.sh")
 EXCHANGE_COUNT=$(echo "$EXCHANGES" | jq 'length' 2>/dev/null || echo 0)
 
-# Integrative State Layer: under acute stress (stressIndex > 0.6) conflicts
-# are flagged on thinner evidence — exchange threshold drops 2 -> 1.
-# NOTE: this file uses jq only (no bc anywhere in it) — use jq for the
-# comparison, not bc, to avoid introducing a new dependency in this file.
-MIN_EXCHANGES=2
-if [ -x "$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" ]; then
-    STRESS_INDEX=$("$SKILL_DIR/../thalamus-memory/scripts/get-neuromod.sh" --composite stressIndex 2>/dev/null || echo "0.5")
-    if jq -e --argjson s "$STRESS_INDEX" '$s > 0.6' /dev/null > /dev/null 2>&1; then
-        MIN_EXCHANGES=1
-    fi
-fi
-
-if [ "$EXCHANGE_COUNT" -lt "$MIN_EXCHANGES" ]; then
+if [ "$EXCHANGE_COUNT" -lt 2 ]; then
   echo "⚡ encode-pipeline: insufficient exchanges ($EXCHANGE_COUNT) — skipping."
   exit 0
 fi
@@ -79,31 +63,28 @@ USER_PROMPT=$(jq -n \
   "Analyze these exchanges and return JSON as specified in the system prompt."
 ')
 
-# ── Call the local LLM — same utility, same env overrides, same fail-open
-#    contract (non-zero exit = caller must degrade gracefully) as every
-#    other caller of llm-call.sh in the suite. ────────────────────────────────
-# ── Call the local LLM — same utility, same env overrides, same fail-open
-#    contract (non-zero exit = caller must degrade gracefully) as every
-#    other caller of llm-call.sh in the suite. ────────────────────────────────
-# NOTE: captured via if/then, not `RAW_OUTPUT=$(...); LLM_STATUS=$?` — under
-# `set -e`, that second form kills this whole script the instant llm-call.sh
-# returns non-zero, before LLM_STATUS is ever read. This is the exact
+# ── Ask Juno — same utility, same env overrides, same fail-open contract
+#    (non-zero exit = caller must degrade gracefully) as every other caller
+#    of juno-ask.sh in the suite. ───────────────────────────────────────────
+# NOTE: captured via if/then, not `RAW_OUTPUT=$(...); JUNO_STATUS=$?` — under
+# `set -e`, that second form kills this whole script the instant juno-ask.sh
+# returns non-zero, before JUNO_STATUS is ever read. This is the exact
 # footgun semantic-match.sh's own header comment warns callers about.
-if RAW_OUTPUT=$("$LLM_CALL" --system "$SYSTEM_PROMPT" --user "$USER_PROMPT" \
-  --timeout "${LLM_TIMEOUT:-30}" --retries "${LLM_RETRIES:-1}" --json 2>"$ENC_ERR"); then
-  LLM_STATUS=0
+if RAW_OUTPUT=$("$JUNO_ASK" --system "$SYSTEM_PROMPT" --user "$USER_PROMPT" \
+  --timeout "${JUNO_TIMEOUT:-30}" --retries "${JUNO_RETRIES:-1}" --json 2>/tmp/encode-pipeline-err.$$); then
+  JUNO_STATUS=0
 else
-  LLM_STATUS=$?
+  JUNO_STATUS=$?
 fi
 
-if [ "$LLM_STATUS" -ne 0 ]; then
-  echo "⚡ encode-pipeline: local LLM call failed — $(tail -1 "$ENC_ERR" 2>/dev/null) — no updates applied." >&2
-  rm -f "$ENC_ERR"
+if [ "$JUNO_STATUS" -ne 0 ]; then
+  echo "⚡ encode-pipeline: asking Juno failed — $(tail -1 /tmp/encode-pipeline-err.$$ 2>/dev/null) — no updates applied." >&2
+  rm -f /tmp/encode-pipeline-err.$$
   exit 0
 fi
-rm -f "$ENC_ERR"
+rm -f /tmp/encode-pipeline-err.$$
 
-# Some local servers/models wrap JSON in ```json fences even in JSON mode — strip if present.
+# Juno may wrap JSON in ```json fences even in JSON mode — strip if present.
 CLEANED=$(echo "$RAW_OUTPUT" | sed -e 's/^```json//' -e 's/^```//' -e 's/```$//')
 
 if ! echo "$CLEANED" | jq -e 'has("conflicts") or has("attention_flags") or has("uncertainty_zones")' > /dev/null 2>&1; then
@@ -112,7 +93,7 @@ if ! echo "$CLEANED" | jq -e 'has("conflicts") or has("attention_flags") or has(
 fi
 
 # Strict validation, same discipline as semantic-match.sh: never trust a raw
-# LLM response wholesale. Drop any entry missing its required fields rather
+# response from Juno wholesale. Drop any entry missing its required fields rather
 # than passing garbage through to log-conflict.sh / flag-attention.sh.
 VALID_TYPES='["factual","instruction","context","uncertainty","intent","knowledge_gap"]'
 VALID_SEVERITIES='["low","moderate","high"]'
@@ -163,11 +144,10 @@ done < <(echo "$ATTENTION" | jq -c '.[]')
 #    across the suite, instead of an unguarded read/mutate/write. ─────────────
 if [ -x "$SAFE_WRITE" ]; then
   MUTATE_SCRIPT=$(mktemp)
-ENC_ERR=$(mktemp "${TMPDIR:-/tmp}/aibrain-encode-err.XXXXXX")
   trap 'rm -f "$MUTATE_SCRIPT"' EXIT
   cat > "$MUTATE_SCRIPT" << 'MUTATE_EOF'
 #!/bin/bash
-set -euo pipefail
+set -e
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 jq --arg now "$NOW" \
   '.stats.encodingRuns = (.stats.encodingRuns // 0) + 1 | .lastUpdated = $now' \
@@ -183,23 +163,6 @@ else
     '.stats.encodingRuns = (.stats.encodingRuns // 0) + 1 | .lastUpdated = $now' \
     "$STATE_FILE")
   echo "$UPDATED" > "$STATE_FILE"
-fi
-
-# ── Closed-loop: uncertainty zones → VTA anticipation ─────────────────────
-# When the ACC detects uncertainty (ambiguity in the world, unknown topics),
-# flag those topics for the VTA's anticipatory reward system so the brain
-# learns to seek resolution of what it doesn't understand.
-if [ "$ZONE_COUNT" -gt 0 ]; then
-    ANTICIPATE_SCRIPT="$SKILL_DIR/../vta-memory/scripts/anticipate.sh"
-    if [ -x "$ANTICIPATE_SCRIPT" ]; then
-        while IFS= read -r zone; do
-            [ -z "$zone" ] && continue
-            TOPIC=$(echo "$zone" | jq -r '.topic // empty' 2>/dev/null)
-            [ -z "$TOPIC" ] && continue
-            REASON=$(echo "$zone" | jq -r '.reason // "ACC-flagged uncertainty"' 2>/dev/null)
-            "$ANTICIPATE_SCRIPT" --topic "$TOPIC" --reason "$REASON" --source "acc_encode" 2>/dev/null || true
-        done < <(echo "$ZONES" | jq -c '.[]')
-    fi
 fi
 
 # ── Log event ─────────────────────────────────────────────────────────────────

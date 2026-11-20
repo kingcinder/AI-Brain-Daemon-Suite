@@ -63,7 +63,7 @@ Track seven interoceptive channels that persist and decay:
 | `update-state.sh` | Log a gut signal or update a channel directly |
 | `load-sense.sh` | Human-readable state for session context |
 | `decay-sense.sh` | Return to baseline over time (run via cron) |
-| `encode-pipeline.sh` | LLM-based interoceptive encoding from transcripts |
+| `encode-pipeline.sh` | Rule-based interoceptive encoding from transcripts, Juno-reviewed |
 | `preprocess-sense.sh` | Extract interoceptive signals from session history |
 | `update-watermark.sh` | Track processed transcript position |
 | `sync-state.sh` | Generate INSULA_STATE.md for auto-injection |
@@ -80,7 +80,7 @@ The insula automatically detects processing signals from conversations:
 
 Set up cron for automatic encoding every 3 hours:
 ```bash
-40 0,3,6,9,12,15,18,21 * * * ~/.hermes/workspace/skills/insula-memory/scripts/encode-pipeline.sh
+40 0,3,6,9,12,15,18,21 * * * ~/.openclaw/workspace/skills/insula-memory/scripts/encode-pipeline.sh
 ```
 
 ## Visualization
@@ -106,14 +106,14 @@ Adds a **🌡️ Sense** tab to the unified Brain Dashboard:
 
 ```bash
 ./scripts/generate-dashboard.sh
-open ~/.hermes/workspace/brain-dashboard.html
+open ~/.openclaw/workspace/brain-dashboard.html
 ```
 
 ## Installation
 
 ```bash
 clawdhub install insula-memory
-cd ~/.hermes/workspace/skills/insula-memory
+cd ~/.openclaw/workspace/skills/insula-memory
 # Note: install.sh and scripts/ arrive in v0.2.0
 # See SKILL.md for manual bootstrap steps available now
 ```

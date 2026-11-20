@@ -1,20 +1,4 @@
 #!/bin/bash
-# ── Standardized lifecycle contract (Initiative 9) ──────────────────────────
-#   install.sh              → initialize state files (defaults)
-#   install.sh --uninstall  → remove exactly the state files this skill's
-#                             manifest declares (delegates to skill-cleanup.sh)
-if [ "${1:-}" = "--uninstall" ]; then
-    THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
-    WS_UN="${WORKSPACE:-$HOME/.hermes/workspace}"
-    for CAND in "$THIS_DIR/../../core/skill-init/skill-cleanup.sh" \
-                "$THIS_DIR/../../../core/skill-init/skill-cleanup.sh"; do
-        if [ -x "$CAND" ]; then
-            exec "$CAND" --skill "$THIS_DIR" --workspace "$WS_UN" "${2:-}"
-        fi
-    done
-    echo "uninstall: skill-cleanup.sh not found — nothing removed." >&2
-    exit 1
-fi
 # Basal Ganglia Skill Installer
 # Sets up the habit registry, habit-state.json, and optionally cron jobs
 #
@@ -33,7 +17,7 @@ fi
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 WITH_CRON=false
@@ -118,20 +102,26 @@ if [ "$WITH_CRON" = true ]; then
     echo ""
     echo "⏰ Setting up cron jobs..."
 
-    if ! command -v hermes &> /dev/null; then
-        echo "   ⚠️  'hermes' not in PATH. Add these cron jobs manually:"
+    if ! command -v openclaw &> /dev/null; then
+        echo "   ⚠️  'openclaw' not in PATH. Add these cron jobs manually:"
         echo ""
         echo "# Encoding every 3 hours (habit detection + reinforcement)"
-        echo "hermes cron create '30 0,3,6,9,12,15,18,21 * * *' 'Run basal-ganglia encoding pipeline...' --name basal-ganglia-encoding"
+        echo "openclaw cron add --name basal-ganglia-encoding --cron '30 0,3,6,9,12,15,18,21 * * *' --session isolated --agent-turn 'Run basal-ganglia encoding pipeline...'"
         echo ""
         echo "# Daily decay at 4 AM"
-        echo "hermes cron create '0 4 * * *' '🎯 Run decay-habits.sh and report any habits below 0.2' --name basal-ganglia-decay"
+        echo "openclaw cron add --name basal-ganglia-decay --cron '0 4 * * *' --session isolated --agent-turn '🎯 Run decay-habits.sh and report any habits below 0.2'"
     else
         echo "   Creating basal-ganglia-encoding..."
-        hermes cron create '30 0,3,6,9,12,15,18,21 * * *' "Run basal-ganglia encoding pipeline:\n\n1. Run the encoding pipeline:\n\`\`\`bash\nWORKSPACE=\"\$HOME/.hermes/workspace\" ~/.hermes/workspace/skills/basal-ganglia-memory/scripts/encode-pipeline.sh --no-spawn\n\`\`\`\n\n2. Check pending habits:\n\`\`\`bash\ncat ~/.hermes/workspace/memory/pending-habits.json 2>/dev/null | head -40\n\`\`\`\n\n3. For each pending signal, classify per prompts/encode-habits.md: new habit, reinforce existing habit/procedure, or new suppression\n4. Update habit-state.json with the result (use reinforce-habit.sh for updates where possible)\n5. Delete pending-habits.json when done\n6. Sync state: ~/.hermes/workspace/skills/basal-ganglia-memory/scripts/sync-state.sh\n7. Report results" --name basal-ganglia-encoding 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+        openclaw cron add --name basal-ganglia-encoding \
+            --cron '30 0,3,6,9,12,15,18,21 * * *' \
+            --session isolated \
+            --agent-turn "Run basal-ganglia encoding pipeline:\n\n1. Run the encoding pipeline:\n\`\`\`bash\nWORKSPACE=\"\$HOME/.openclaw/workspace\" ~/.openclaw/workspace/skills/basal-ganglia-memory/scripts/encode-pipeline.sh --no-spawn\n\`\`\`\n\n2. Check pending habits:\n\`\`\`bash\ncat ~/.openclaw/workspace/memory/pending-habits.json 2>/dev/null | head -40\n\`\`\`\n\n3. For each pending signal, classify per prompts/encode-habits.md: new habit, reinforce existing habit/procedure, or new suppression\n4. Update habit-state.json with the result (use reinforce-habit.sh for updates where possible)\n5. Delete pending-habits.json when done\n6. Sync state: ~/.openclaw/workspace/skills/basal-ganglia-memory/scripts/sync-state.sh\n7. Report results" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
 
         echo "   Creating basal-ganglia-decay..."
-        hermes cron create '0 4 * * *' "🎯 Run habit decay:\n\n1. Run: ~/.hermes/workspace/skills/basal-ganglia-memory/scripts/decay-habits.sh\n2. Report any habits/procedures that dropped below 0.2 (candidates for pruning)\n3. Confirm decay complete" --name basal-ganglia-decay 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+        openclaw cron add --name basal-ganglia-decay \
+            --cron '0 4 * * *' \
+            --session isolated \
+            --agent-turn "🎯 Run habit decay:\n\n1. Run: ~/.openclaw/workspace/skills/basal-ganglia-memory/scripts/decay-habits.sh\n2. Report any habits/procedures that dropped below 0.2 (candidates for pruning)\n3. Confirm decay complete" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
     fi
     echo ""
 fi
@@ -146,12 +136,12 @@ echo ""
 echo "┌──────────────────────────────────────────────────────────┐"
 echo "│  🎯 View your agent's HABITS in the Brain Dashboard        │"
 echo "│                                                            │"
-echo "│  open ~/.hermes/workspace/brain-dashboard.html           │"
+echo "│  open ~/.openclaw/workspace/brain-dashboard.html           │"
 echo "└──────────────────────────────────────────────────────────┘"
 echo ""
 echo "Next steps:"
 echo "  1. Run first encoding: $SKILL_DIR/scripts/encode-pipeline.sh"
-echo "  2. The encoding will process the last $([ "$WHOLE_HISTORY" = true ] && echo 'ALL' || echo "$SIGNAL_LIMIT") signals"
+echo "  2. The encoding will process the last $([ "$WHOLE_HISTORY" = true ] && echo 'ALL' || echo $SIGNAL_LIMIT) signals"
 echo "  3. Add memory/habit-state.json to .gitignore (contains behavioral data)"
 echo "  4. Test loading: $SKILL_DIR/load-habits.sh"
 echo ""

@@ -14,11 +14,11 @@
 #   {"ts":"2026-06-15T10:00:00Z","type":"basal-ganglia","event":"reinforce","habit":"habit_001","strength":0.78}
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 LOG_FILE="$WORKSPACE/memory/brain-events.jsonl"
 
 EVENT="$1"

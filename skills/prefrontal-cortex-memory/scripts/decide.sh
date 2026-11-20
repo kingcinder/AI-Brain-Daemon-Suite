@@ -10,15 +10,11 @@
 # so a missing sibling just means "no adjustment from that signal" rather
 # than a crash — decide.sh must work standalone too.
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
-
-# Private scratch dir — mktemp, never predictable /tmp/pfc_*.$$ paths
-PFC_TMP="$(mktemp -d)"
-trap 'rm -rf "$PFC_TMP"' EXIT
 
 CONTEXT="general"
 OPTIONS_JSON="[]"
@@ -62,19 +58,9 @@ ERROR_PATTERNS=$(read_field "$WORKSPACE/memory/acc-state.json" '(.activePatterns
 # interoceptive_discrepancy; absent → no dampening (decide.sh must work
 # standalone).
 INTERO_DISC=$(read_field "$WORKSPACE/memory/pfc-uncertainty.json" '.interoceptiveDiscrepancy' "0.0")
-HABIT_STATE_PATH="$WORKSPACE/memory/habit-state.json"
-SEMANTIC_STATE_PATH="$WORKSPACE/memory/semantic-state.json"
-HABIT_STRENGTH=$(read_field "$HABIT_STATE_PATH" '([.habits[].strength] | if length > 0 then (add / length) else 0 end)' "0.0")
+HABIT_STRENGTH=$(read_field "$WORKSPACE/memory/habit-state.json" '([.habits[].strength] | if length > 0 then (add / length) else 0 end)' "0.0")
 CALIBRATION=$(read_field "$WORKSPACE/memory/cerebellum-state.json" '.globalCalibration' "0.5")
 OPEN_LOOPS=$(read_field "$WORKSPACE/memory/social-state.json" '([.relationships[].openLoops[]?] | length)' "0")
-
-# ── Integrative State Layer: global neuromod + workspace context ───────────
-NEURO_DA=0.5
-NEURO_CORT=0.5
-if [ -x "$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" ]; then
-    NEURO_DA=$("$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get dopamine 2>/dev/null || echo "0.5")
-    NEURO_CORT=$("$SCRIPT_DIR/../thalamus-memory/scripts/get-neuromod.sh" --get cortisol 2>/dev/null || echo "0.5")
-fi
 
 # ── Goals & inhibitions (PFC's own state) ────────────────────────────────────
 GOALS=$(jq -c '[.goals[] | select(.status == "active")]' "$STATE_FILE")
@@ -82,9 +68,9 @@ INHIBITIONS=$(jq -c '.inhibitions' "$STATE_FILE")
 
 # ── Semantic matching (replaces the old word-overlap heuristic when available) ─
 # The heuristic is NOT deleted — it's demoted to a fallback for when the local
-# LLM is unreachable, times out, or returns something that fails validation.
+# Juno is unreachable, times out, or returns something that fails validation.
 # This is a whole-call decision (semantic OR heuristic), not mixed per-item:
-# if the LLM validly returns zero matches for a given goal, that's a real
+# if Juno validly returns zero matches for a given goal, that's a real
 # "no match" verdict, and falling back to the heuristic for just that one
 # goal would make it ambiguous whether "no match" was a decision or an
 # omission. See semantic-match.sh for the full validation contract.
@@ -97,62 +83,51 @@ if [ "${PFC_SEMANTIC_MATCHING:-auto}" != "off" ] && [ -x "$SCRIPT_DIR/semantic-m
   # under `set -e`, a command substitution that legitimately returns non-zero
   # (semantic-match.sh's designed fallback signal) kills the WHOLE calling
   # script right there, before the next line even runs. if/then is exempt.
-  if SEMANTIC_RESULT=$("$SCRIPT_DIR/semantic-match.sh" --options "$OPTIONS_JSON" --goals "$GOALS" --inhibitions "$INHIBITIONS" 2>"$PFC_TMP/semantic_err"); then
+  if SEMANTIC_RESULT=$("$SCRIPT_DIR/semantic-match.sh" --options "$OPTIONS_JSON" --goals "$GOALS" --inhibitions "$INHIBITIONS" 2>/tmp/pfc_semantic_err.$$); then
     SEMANTIC_STATUS=0
   else
     SEMANTIC_STATUS=$?
   fi
   if [ "$SEMANTIC_STATUS" -eq 0 ]; then
     METHOD_CHECK=$(echo "$SEMANTIC_RESULT" | jq -r '.method // empty' 2>/dev/null)
-    if [ "$METHOD_CHECK" = "semantic-llm" ]; then
-      SEMANTIC_METHOD="semantic-llm"
+    if [ "$METHOD_CHECK" = "semantic-juno" ]; then
+      SEMANTIC_METHOD="semantic-juno"
       SEMANTIC_GOAL_MATCHES=$(echo "$SEMANTIC_RESULT" | jq -c '.goal_matches // []')
       SEMANTIC_INHIBITION_MATCHES=$(echo "$SEMANTIC_RESULT" | jq -c '.inhibition_matches // []')
     fi
   fi
-  rm -f "$PFC_TMP/semantic_err"
+  rm -f /tmp/pfc_semantic_err.$$
 fi
 
-cp "$HABIT_STATE_PATH" "$PFC_TMP/habit_state" 2>/dev/null || echo '{"habits":[]}' > "$PFC_TMP/habit_state"
-cp "$SEMANTIC_STATE_PATH" "$PFC_TMP/semantic_state" 2>/dev/null || echo '{"patterns":{"themes":[],"strategies":[],"antipatterns":[]}}' > "$PFC_TMP/semantic_state"
-echo "$OPTIONS_JSON" > "$PFC_TMP/options"
-echo "$GOALS" > "$PFC_TMP/goals"
-echo "$INHIBITIONS" > "$PFC_TMP/inhibitions"
-echo "$SEMANTIC_GOAL_MATCHES" > "$PFC_TMP/semantic_goals"
-echo "$SEMANTIC_INHIBITION_MATCHES" > "$PFC_TMP/semantic_inhibitions"
+echo "$OPTIONS_JSON" > /tmp/pfc_options.$$
+echo "$GOALS" > /tmp/pfc_goals.$$
+echo "$INHIBITIONS" > /tmp/pfc_inhibitions.$$
+echo "$SEMANTIC_GOAL_MATCHES" > /tmp/pfc_semantic_goals.$$
+echo "$SEMANTIC_INHIBITION_MATCHES" > /tmp/pfc_semantic_inhibitions.$$
 
-RESULT=$(CALIBRATION="$CALIBRATION" COGNITIVE_LOAD="$COGNITIVE_LOAD" CONFLICT_LOAD="$CONFLICT_LOAD" CONTEXT="$CONTEXT" DRIVE="$DRIVE" ENERGY="$ENERGY" ERROR_PATTERNS="$ERROR_PATTERNS" GUT_SIGNAL="$GUT_SIGNAL" HABIT_STRENGTH="$HABIT_STRENGTH" INTERO_DISC="$INTERO_DISC" NEURO_CORT="$NEURO_CORT" NEURO_DA="$NEURO_DA" OPEN_LOOPS="$OPEN_LOOPS" SATURATION="$SATURATION" SEEKING="$SEEKING" SEMANTIC_METHOD="$SEMANTIC_METHOD" VALENCE="$VALENCE" \
-  OPTIONS_FILE=""$PFC_TMP/options"" GOALS_FILE=""$PFC_TMP/goals"" INHIBITIONS_FILE=""$PFC_TMP/inhibitions"" \
-  HABIT_STATE_FILE=""$PFC_TMP/habit_state"" \
-  SEMANTIC_STATE_FILE=""$PFC_TMP/semantic_state"" \
-  SEMANTIC_GOALS_FILE=""$PFC_TMP/semantic_goals"" SEMANTIC_INHIBITIONS_FILE=""$PFC_TMP/semantic_inhibitions"" \
-  python3 << 'PYTHON'
-import os
-
+RESULT=$(python3 -c "
 import json, random
 
-options = json.load(open(os.environ['OPTIONS_FILE']))
-goals = json.load(open(os.environ['GOALS_FILE']))
-inhibitions = json.load(open(os.environ['INHIBITIONS_FILE']))
-semantic_goal_matches = json.load(open(os.environ['SEMANTIC_GOALS_FILE']))
-semantic_inhibition_matches = json.load(open(os.environ['SEMANTIC_INHIBITIONS_FILE']))
-using_semantic = os.environ['SEMANTIC_METHOD'] == 'semantic-llm'
+options = json.load(open('/tmp/pfc_options.$$'))
+goals = json.load(open('/tmp/pfc_goals.$$'))
+inhibitions = json.load(open('/tmp/pfc_inhibitions.$$'))
+semantic_goal_matches = json.load(open('/tmp/pfc_semantic_goals.$$'))
+semantic_inhibition_matches = json.load(open('/tmp/pfc_semantic_inhibitions.$$'))
+using_semantic = '$SEMANTIC_METHOD' == 'semantic-juno'
 
-cognitive_load = float(os.environ['COGNITIVE_LOAD'])
-saturation = float(os.environ['SATURATION'])
-gut_signal = float(os.environ['GUT_SIGNAL'])
-drive = float(os.environ['DRIVE'])
-seeking = os.environ['SEEKING'] == 'true'
-valence = float(os.environ['VALENCE'])
-energy = float(os.environ['ENERGY'])
-conflict_load = float(os.environ['CONFLICT_LOAD'])
-error_patterns = int(os.environ['ERROR_PATTERNS'])
-habit_strength = float(os.environ['HABIT_STRENGTH'])
-calibration = float(os.environ['CALIBRATION'])
-open_loops = int(os.environ['OPEN_LOOPS'])
-intero_disc = float(os.environ['INTERO_DISC'])
-dopamine = float(os.environ['NEURO_DA'])
-cortisol = float(os.environ['NEURO_CORT'])
+cognitive_load = float('$COGNITIVE_LOAD')
+saturation = float('$SATURATION')
+gut_signal = float('$GUT_SIGNAL')
+drive = float('$DRIVE')
+seeking = '$SEEKING' == 'true'
+valence = float('$VALENCE')
+energy = float('$ENERGY')
+conflict_load = float('$CONFLICT_LOAD')
+error_patterns = int('$ERROR_PATTERNS')
+habit_strength = float('$HABIT_STRENGTH')
+calibration = float('$CALIBRATION')
+open_loops = int('$OPEN_LOOPS')
+intero_disc = float('$INTERO_DISC')
 
 notes = []
 scores = {}
@@ -207,14 +182,14 @@ for opt in options:
         for gm in semantic_goal_matches:
             if gm.get('option_id') == oid:
                 g = goals[gm['goal_index']]
-                score *= (1.0 + g.get('priority', 0.5)) * (0.8 + 0.4 * dopamine)
-                notes.append(f"active goal '{g.get('description')}' boosts {oid} (semantic match, DA={dopamine:.2f})")
+                score *= (1.0 + g.get('priority', 0.5))
+                notes.append(f\"active goal '{g.get('description')}' boosts {oid} (semantic match)\")
     else:
         for g in goals:
             desc = g.get('description') or ''
             if desc and overlaps(desc, label):
-                score *= (1.0 + g.get('priority', 0.5)) * (0.8 + 0.4 * dopamine)
-                notes.append(f"active goal '{g.get('description')}' boosts {oid} (heuristic match, DA={dopamine:.2f})")
+                score *= (1.0 + g.get('priority', 0.5))
+                notes.append(f\"active goal '{g.get('description')}' boosts {oid} (heuristic match)\")
 
     # Inhibitions suppress matching options entirely (impulse control)
     if using_semantic:
@@ -222,35 +197,17 @@ for opt in options:
             if im.get('option_id') == oid:
                 inh = inhibitions[im['inhibition_index']]
                 score *= max(0.0, 1.0 - inh.get('strength', 0.8))
-                notes.append(f"inhibition '{inh.get('pattern')}' suppresses {oid} (semantic match)")
+                notes.append(f\"inhibition '{inh.get('pattern')}' suppresses {oid} (semantic match)\")
     else:
         for inh in inhibitions:
             pat = inh.get('pattern') or ''
             if pat and (overlaps(pat, label) or overlaps(pat, oid)):
                 score *= max(0.0, 1.0 - inh.get('strength', 0.8))
-                notes.append(f"inhibition '{inh.get('pattern')}' suppresses {oid} (heuristic match)")
+                notes.append(f\"inhibition '{inh.get('pattern')}' suppresses {oid} (heuristic match)\")
 
-    # ── Per-option habit pull (Closed-loop: basal-ganglia → PFC decide) ──
-    # Read the full habit state and match by option label overlap — gives
-    # well-rehearsed behaviors their real pull instead of a coarse global
-    # average that treats all options the same.
-    habit_state_file = os.environ.get('HABIT_STATE_FILE', '')
-    if habit_state_file:
-        try:
-            habit_state = json.load(open(habit_state_file))
-            habit_entries = habit_state.get('habits', [])
-            for he in habit_entries:
-                h_label = (he.get('label') or he.get('description') or '').lower()
-                if h_label and (overlaps(h_label, label) or overlaps(h_label, oid)):
-                    h_strength = float(he.get('strength', 0.5))
-                    # Per-option habit pull: well-worn grooves are cheap to act on
-                    score *= (0.9 + 0.2 * h_strength)
-                    notes.append(f"habit '{he.get('label','')[:40]}' pull {h_strength:.2f} on {oid}")
-                    break
-        except Exception:
-            pass
-
-    # Legacy global habit pull (fallback when no per-option match above)
+    # Habitual pull: options with above-average habit strength get a light nudge
+    # (well-worn grooves are cheap to act on) — kept small since this is a
+    # coarse suite-wide average, not a per-option lookup.
     if habit_strength > 0.6 and high_effort:
         score *= 1.1
 
@@ -267,59 +224,14 @@ for opt in options:
         score *= (1.0 + min(open_loops, 5) * 0.08)
         notes.append(f'{open_loops} open loop(s) favor social_interaction')
 
-    # ── Insula gutSignal → PFC inhibition (Closed-loop) ───────────────────
-    # High gut signal (somatic "bad feeling") applies inhibition strength to
-    # options whose label overlaps any active inhibition pattern — the body's
-    # alarm system gates executive decisions.
-    if gut_signal > 0.5:
-        for inh in inhibitions:
-            pat = inh.get('pattern') or ''
-            if pat and (overlaps(pat, label) or overlaps(pat, oid)):
-                # Gut signal amplifies the inhibition: stronger body alarm = stronger block
-                inh_power = inh.get('strength', 0.6) * (0.7 + 0.3 * gut_signal)
-                score *= max(0.05, 1.0 - inh_power)
-                notes.append(f"gutSignal={gut_signal:.2f} amplifies inhibition '{pat[:30]}' on {oid}")
-
-    # Somatic bias: under acute stress (cortisol > 0.6), options that look
-    # uncertain/novel get dampened — prefer the known over the unknown.
-    if cortisol > 0.6:
-        UNCERTAINTY_MARKERS = ('maybe', 'uncertain', 'try', 'experiment', 'new', 'explore')
-        if any(m in label for m in UNCERTAINTY_MARKERS):
-            score *= (1.0 - 0.2 * cortisol)
-            notes.append(f"stress (cortisol={cortisol:.2f}) dampens uncertain option {oid}")
-
-    # ── Insula interoceptive discrepancy → PFC confidence (Closed-loop) ──
+    # Insula interoceptive discrepancy → PFC confidence (Closed-loop)
     # High body-level prediction error (Craig's predictive-coding insula;
     # Critchley's decision-confidence extension) lowers executive confidence:
     # dampen ALL candidates by up to 30% as the discrepancy approaches 1.0.
     if intero_disc > 0.3:
         damp = 1.0 - 0.3 * min(intero_disc, 1.0)
         score *= damp
-        notes.append(f"interoceptive discrepancy {intero_disc:.2f} dampens all options (confidence {damp:.2f})")
-
-    # ── Semantic knowledge boost (Initiative 7) ─────────────────────────
-    # Options whose label overlaps an extracted theme or strategy from
-    # the episodic store get a light nudge — the brain has "learned"
-    # that this kind of thing works.
-    semantic_file = os.environ.get('SEMANTIC_STATE_FILE', '')
-    if semantic_file:
-        try:
-            sem_state = json.load(open(semantic_file))
-            patterns = sem_state.get('patterns', {})
-            semantic_labels = []
-            for t in patterns.get('themes', []):
-                semantic_labels.append(t.get('label', ''))
-            for s in patterns.get('strategies', []):
-                summary = s.get('summary', '')
-                if summary:
-                    semantic_labels.append(summary)
-            for sl in semantic_labels:
-                if sl and (overlaps(sl, label) or overlaps(sl, oid)):
-                    score *= 1.08  # +8% boost for semantic match
-                    notes.append(f"semantic match '{sl[:40]}' boosts {oid}")
-                    break
-        except Exception:
-            pass
+        notes.append(f\"interoceptive discrepancy {intero_disc:.2f} dampens all options (confidence {damp:.2f})\")
 
     scores[oid] = round(score, 3)
 
@@ -330,13 +242,12 @@ else:
     weights = [max(0.001, scores[i]) for i in ids]
     chosen = random.choices(ids, weights=weights, k=1)[0]
     reasoning = '; '.join(notes) if notes else 'no strong signals either way — picked by relative weight'
-    matching_method = 'semantic-llm' if using_semantic else 'heuristic-fallback'
-    print(json.dumps({'chosen': chosen, 'reasoning': reasoning, 'scores': scores, 'context': os.environ['CONTEXT'], 'matching_method': matching_method}))
-PYTHON
-)
+    matching_method = 'semantic-juno' if using_semantic else 'heuristic-fallback'
+    print(json.dumps({'chosen': chosen, 'reasoning': reasoning, 'scores': scores, 'context': '$CONTEXT', 'matching_method': matching_method}))
+")
 
 echo "$RESULT"
-rm -f "$PFC_TMP/options" "$PFC_TMP/goals" "$PFC_TMP/inhibitions" "$PFC_TMP/habits" "$PFC_TMP/habit_state" "$PFC_TMP/semantic_state" "$PFC_TMP/semantic_goals" "$PFC_TMP/semantic_inhibitions"
+rm -f /tmp/pfc_options.$$ /tmp/pfc_goals.$$ /tmp/pfc_inhibitions.$$ /tmp/pfc_semantic_goals.$$ /tmp/pfc_semantic_inhibitions.$$
 
 # Log the decision (best-effort, never block the caller on this).
 # flock-guarded via safe-write.sh: this file is written on every decide.sh
@@ -353,18 +264,18 @@ LOG_ENTRY=$(echo "$RESULT" | jq -c --arg now "$NOW" '. + {timestamp: $now}')
 
 if [ -x "$SCRIPT_DIR/safe-write.sh" ]; then
   MUTATE_SCRIPT=$(mktemp)
-  echo "$LOG_ENTRY" > "$PFC_TMP/log_entry"
+  echo "$LOG_ENTRY" > /tmp/pfc_log_entry.$$
   cat > "$MUTATE_SCRIPT" << 'MUTATE_EOF'
 #!/bin/bash
-set -euo pipefail
+set -e
 ENTRY=$(cat "$PFC_LOG_ENTRY_FILE")
 jq --argjson entry "$ENTRY" \
   '.decisionLog = ([$entry] + .decisionLog | .[0:30]) | .lastUpdated = $entry.timestamp' \
   "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
 MUTATE_EOF
   chmod +x "$MUTATE_SCRIPT"
-  PFC_LOG_ENTRY_FILE=""$PFC_TMP/log_entry"" "$SCRIPT_DIR/safe-write.sh" "$STATE_FILE" "$MUTATE_SCRIPT" 2>/dev/null || true
-  rm -f "$MUTATE_SCRIPT" "$PFC_TMP/log_entry"
+  PFC_LOG_ENTRY_FILE="/tmp/pfc_log_entry.$$" "$SCRIPT_DIR/safe-write.sh" "$STATE_FILE" "$MUTATE_SCRIPT" 2>/dev/null || true
+  rm -f "$MUTATE_SCRIPT" /tmp/pfc_log_entry.$$
 else
   jq --argjson entry "$LOG_ENTRY" '.decisionLog = ([$entry] + .decisionLog | .[0:30]) | .lastUpdated = $entry.timestamp' \
     "$STATE_FILE" > "$STATE_FILE.tmp" 2>/dev/null && mv "$STATE_FILE.tmp" "$STATE_FILE" || true

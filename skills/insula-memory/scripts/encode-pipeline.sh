@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # encode-pipeline.sh — Full interoceptive encoding pipeline
 # 1. Preprocess transcripts for signals
-# 2. Apply rule-based signals directly (no LLM needed for insula)
+# 2. Apply rule-based signals directly (no Juno ask needed for insula)
 # 3. Sync state → INSULA_STATE.md
 # 4. Update dashboard
 # 5. Log event
 set -euo pipefail
 
-WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/interoceptive-state.json"
 PENDING="$WORKSPACE/memory/pending-sense.json"

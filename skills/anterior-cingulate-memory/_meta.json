@@ -44,7 +44,7 @@
       {
         "schedule": "50 0,3,6,9,12,15,18,21 * * *",
         "script": "scripts/encode-pipeline.sh",
-        "description": "LLM conflict detection from transcripts (staggered +50m)"
+        "description": "Juno conflict detection from transcripts (staggered +50m)"
       }
     ],
     "related": [

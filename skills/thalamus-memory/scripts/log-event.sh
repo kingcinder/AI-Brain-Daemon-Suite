@@ -2,7 +2,7 @@
 # log-event.sh — Emit a thalamus event to brain-events.jsonl
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 EVENT_LOG="$WORKSPACE/memory/brain-events.jsonl"
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

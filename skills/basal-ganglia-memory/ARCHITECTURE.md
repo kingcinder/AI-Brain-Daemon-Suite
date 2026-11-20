@@ -36,7 +36,7 @@ become automatic routines.
 │      reinforcement candidate)                                │
 │     → pending-habits.json                                    │
 │                                                              │
-│  3. Sub-agent / LLM classification                           │
+│  3. Juno classification                                      │
 │     (Reads pending-habits.json + prompts/encode-habits.md,   │
 │      calls reinforce-habit.sh for each signal)               │
 │                                                              │
@@ -83,7 +83,7 @@ basal-ganglia-memory/         ← SKILL ROOT
 ├── skill-card.md             OpenClaw marketplace card
 ├── _meta.json                Version metadata
 │
-│   ── LLM instructions ──
+│   ── Juno instructions ──
 ├── prompts/
 │   └── encode-habits.md      Sub-agent classification prompt
 │
@@ -218,7 +218,7 @@ persist even when the triggering situation isn't frequent.
 ### Signal scoring heuristics
 
 The pipeline's Python scoring phase assigns each conversation turn a
-preliminary score and type without LLM calls:
+preliminary score and type without asking Juno:
 
 | Pattern | Score | Type |
 |---------|-------|------|
@@ -229,13 +229,13 @@ preliminary score and type without LLM calls:
 | Substantial user input (>100 chars) | 0.40 | habit |
 
 Signals that **word-overlap ≥ 35%** with an existing item get
-`suggested_type = "reinforcement"` and skip LLM classification entirely —
+`suggested_type = "reinforcement"` and skip Juno classification entirely —
 they're reinforced in the scoring phase for efficiency.
 
 ### Sub-agent classification
 
 Signals that pass scoring but don't match an existing item go into
-`pending-habits.json` for the LLM sub-agent. The sub-agent reads:
+`pending-habits.json` for Juno. She reads:
 - `pending-habits.json` (pre-scored signals)
 - `habit-state.json` (current state, for duplicate checking)
 - `prompts/encode-habits.md` (classification instructions)
@@ -267,7 +267,7 @@ Suppressions (actively avoid these patterns):
 ```
 
 The equivalent Markdown file (`BASAL_GANGLIA_STATE.md` in workspace root)
-is also available for the legacy memory_search / extraPaths injection (OpenClaw openclaw.json; Hermes reads AGENTS.md instead).
+is also available for OpenClaw's memory_search / extraPaths injection.
 
 ---
 

@@ -5,9 +5,9 @@
 # When something you were looking forward to happens, resolve it.
 # Optional --reward flag also logs a social/connection reward.
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -54,11 +54,7 @@ if [ "$EXISTS" = "-1" ]; then
   exit 0
 fi
 
-# Remove from anticipating — lock only around our own write. log-reward.sh
-# (below, when --reward is passed) and sync-motivation.sh re-enter the same
-# state file and take their own locks; holding this lock across them would
-# deadlock the child.
-exec 200>"$STATE_FILE.lock"; flock 200
+# Remove from anticipating
 jq --arg item "$ITEM" --arg now "$NOW" \
    '
    .anticipating = [.anticipating[] | select((. | ascii_downcase) != ($item | ascii_downcase))] |
@@ -66,9 +62,8 @@ jq --arg item "$ITEM" --arg now "$NOW" \
      [.anticipatingMeta[] | select((.item | ascii_downcase) != ($item | ascii_downcase))]
    else [] end) |
    .lastUpdated = $now
-   ' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
-exec 200>&-
+   ' "$STATE_FILE" > "$STATE_FILE.tmp"
+mv "$STATE_FILE.tmp" "$STATE_FILE"
 
 echo "✨ Anticipation resolved!"
 echo "   '$ITEM' happened!"

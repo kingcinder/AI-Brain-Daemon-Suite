@@ -5,7 +5,7 @@
 #                             manifest declares (delegates to skill-cleanup.sh)
 if [ "${1:-}" = "--uninstall" ]; then
     THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
-    WS_UN="${WORKSPACE:-$HOME/.hermes/workspace}"
+    WS_UN="${WORKSPACE:-$HOME/.openclaw/workspace}"
     for CAND in "$THIS_DIR/../../core/skill-init/skill-cleanup.sh" \
                 "$THIS_DIR/../../../core/skill-init/skill-cleanup.sh"; do
         if [ -x "$CAND" ]; then
@@ -26,7 +26,7 @@ fi
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "🩺 Verification-memory Skill Installer"

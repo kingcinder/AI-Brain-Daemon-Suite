@@ -6,11 +6,11 @@
 #   update-watermark.sh --to <id>        # Set to specific ID
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 
 set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/habit-state.json"
 SIGNALS_FILE="$WORKSPACE/memory/habit-signals.jsonl"
 
@@ -57,21 +57,19 @@ if [ ! -f "$STATE_FILE" ]; then
     exit 1
 fi
 
-OLD_WATERMARK=$(STATE_FILE="$STATE_FILE" python3 -c "import os
-import json; print(json.load(open(os.environ['STATE_FILE'])).get('lastProcessedSignal') or '(none)')" 2>/dev/null || echo "(none)")
+OLD_WATERMARK=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('lastProcessedSignal') or '(none)')" 2>/dev/null || echo "(none)")
 
-SPECIFIC_ID="$SPECIFIC_ID" STATE_FILE="$STATE_FILE" python3 -c "import os
-
+python3 -c "
 import json
 from datetime import datetime, timezone
 
-with open(os.environ['STATE_FILE']) as f:
+with open('$STATE_FILE') as f:
     state = json.load(f)
 
-state['lastProcessedSignal'] = os.environ['SPECIFIC_ID']
+state['lastProcessedSignal'] = '$SPECIFIC_ID'
 state['lastUpdated'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-with open(os.environ['STATE_FILE'], 'w') as f:
+with open('$STATE_FILE', 'w') as f:
     json.dump(state, f, indent=2)
 "
 

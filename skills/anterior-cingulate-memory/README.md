@@ -34,7 +34,7 @@ Track **conflict load** — a persistent uncertainty metric that rises when conf
 ```bash
 # Install
 clawdhub install anterior-cingulate-memory
-cd ~/.hermes/workspace/skills/anterior-cingulate-memory
+cd ~/.openclaw/workspace/skills/anterior-cingulate-memory
 ./install.sh --with-cron
 
 # Check conflict state
@@ -105,7 +105,7 @@ CONFLICT DETECTED
 | `load-state.sh` | Human-readable output |
 | `decay-load.sh` | Load fades over time |
 | `sync-state.sh` | Generate ACC_CONFLICT_STATE.md |
-| `encode-pipeline.sh` | LLM-based conflict detection |
+| `encode-pipeline.sh` | Juno-based conflict detection |
 | `preprocess-exchanges.sh` | Extract exchanges for analysis |
 | `update-watermark.sh` | Update processing watermark |
 | `generate-dashboard.sh` | Generate unified brain dashboard |
@@ -133,16 +133,6 @@ These two skills cover different aspects of the ACC:
 |-------|-------|--------|
 | **anterior-cingulate-memory** | Proactive conflict detection | Real-time / in session |
 | **acc-error-memory** | Reactive error pattern tracking | Post-correction learning |
-
-**Which one logs a given signal?** If the agent notices the conflict,
-ambiguity, or uncertainty *before* committing to an action or answer, it
-belongs here (`anterior-cingulate-memory`). If it only exists because the
-user corrected something the agent already said or did, it belongs in
-`acc-error-memory` instead. The same underlying issue can legitimately show
-up in both — this one records the flagged uncertainty in the moment,
-`acc-error-memory` records the confirmed mistake afterward if the
-uncertainty turned out to be founded — and that pairing is itself useful
-calibration signal, not duplicate logging.
 
 Install both for complete anterior cingulate coverage.
 

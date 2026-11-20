@@ -3,7 +3,7 @@
 # verification-state.json. Reads ONLY this skill's own state file.
 set -u
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_FILE="$WORKSPACE/memory/verification-state.json"
 MD_FILE="$WORKSPACE/VERIFICATION_STATE.md"

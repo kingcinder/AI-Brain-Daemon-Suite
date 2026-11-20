@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # scripts/sync-state.sh — Generate ACC_CONFLICT_STATE.md for session auto-injection
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.hermes/workspace}}"
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
 STATE_FILE="$WORKSPACE/memory/conflict-state.json"
 INJECT_FILE="$WORKSPACE/ACC_CONFLICT_STATE.md"
 QUIET=false

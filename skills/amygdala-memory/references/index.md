@@ -6,5 +6,5 @@ Progressive-disclosure links. Load this index via `skill_view("amygdala-memory",
 |------|--------------|
 | `../README.md` | Human-oriented setup, usage, and troubleshooting |
 | `../skill-card.md` | Compact summary card for quick recall |
-| `../prompts/` | LLM prompts for emotional encoding |
+| `../prompts/` | Prompts for Juno: emotional encoding |
 | `../scripts/encode-pipeline.sh` | Automatic emotional encoding from transcripts |

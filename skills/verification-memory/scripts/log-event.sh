@@ -3,7 +3,7 @@
 # Usage: log-event.sh --type <event_type> --signal <signal_name> [--source <module>]
 set -u
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 EVENT_LOG="$WORKSPACE/memory/brain-events.jsonl"
 
 TYPE=""; SIGNAL=""; SOURCE="verification-memory"

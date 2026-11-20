@@ -1,24 +1,8 @@
 #!/bin/bash
-# ── Standardized lifecycle contract (Initiative 9) ──────────────────────────
-#   install.sh              → initialize state files (defaults)
-#   install.sh --uninstall  → remove exactly the state files this skill's
-#                             manifest declares (delegates to skill-cleanup.sh)
-if [ "${1:-}" = "--uninstall" ]; then
-    THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
-    WS_UN="${WORKSPACE:-$HOME/.hermes/workspace}"
-    for CAND in "$THIS_DIR/../../core/skill-init/skill-cleanup.sh" \
-                "$THIS_DIR/../../../core/skill-init/skill-cleanup.sh"; do
-        if [ -x "$CAND" ]; then
-            exec "$CAND" --skill "$THIS_DIR" --workspace "$WS_UN" "${2:-}"
-        fi
-    done
-    echo "uninstall: skill-cleanup.sh not found — nothing removed." >&2
-    exit 1
-fi
-# install.sh — Set up cerebellum-memory for Hermes Agent
+# install.sh — Set up cerebellum-memory for OpenClaw
 # Usage: ./install.sh [--with-cron]
 set -e
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 WITH_CRON=false
 [ "$1" = "--with-cron" ] && WITH_CRON=true
@@ -48,12 +32,14 @@ echo "✅ Scripts are executable"
 
 if [ "$WITH_CRON" = true ]; then
   echo ""
-  echo "Setting up Hermes cron job..."
-  if ! command -v hermes &> /dev/null; then
-    echo "⚠️  'hermes' not in PATH. Add this cron job manually:"
-    echo "hermes cron create '0 */8 * * *' '🎚️ Run $SKILL_DIR/scripts/refine.sh' --name cerebellum-refine"
+  echo "Setting up OpenClaw cron job..."
+  if ! command -v openclaw &> /dev/null; then
+    echo "⚠️  'openclaw' not in PATH. Add this cron job manually:"
+    echo "openclaw cron add --name cerebellum-refine --cron '0 */8 * * *' --session isolated --agent-turn '🎚️ Run $SKILL_DIR/scripts/refine.sh'"
   else
-    hermes cron create '0 */8 * * *' "🎚️ Run $SKILL_DIR/scripts/refine.sh and report results" --name cerebellum-refine 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    openclaw cron add --name cerebellum-refine --cron '0 */8 * * *' --session isolated \
+      --agent-turn "🎚️ Run $SKILL_DIR/scripts/refine.sh and report results" \
+      2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
   fi
 fi
 

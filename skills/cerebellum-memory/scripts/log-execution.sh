@@ -3,8 +3,8 @@
 # precision (how close to the target outcome) and smoothness (how
 # consistent that has been over time, not just the running average).
 # Usage: log-execution.sh --skill "<name>" --quality <0.0-1.0> [--note "..."]
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/cerebellum-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

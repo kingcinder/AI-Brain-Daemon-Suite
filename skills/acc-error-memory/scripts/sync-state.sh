@@ -2,10 +2,11 @@
 # ACC: Generate ACC_STATE.md from acc-state.json
 # Creates human-readable state for context injection
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/acc-state.json"
+STATE_MD="$WORKSPACE/ACC_STATE.md"
 
 if [ ! -f "$STATE_FILE" ]; then
     echo "No acc-state.json found"
@@ -19,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import os
 
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
 state_file = Path(workspace) / 'memory' / 'acc-state.json'
 state_md = Path(workspace) / 'ACC_STATE.md'
 

@@ -2,8 +2,12 @@
 # generate-dashboard.sh — Write PFC's own dashboard fragment, then call the
 # shared dashboard-builder.sh. Reads ONLY PFC's own state file (its decide.sh
 # cross-reads siblings for arbitration, but the dashboard tab does not).
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+
+# JUNO-BC-PATH (2026-11-15, Dither-ordered): cron env lacks interactive PATH; bc lives in home.
+export PATH="$HOME/.juno-brain/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+command -v bc >/dev/null 2>&1 || ln -sf "$HOME/.juno-brain/bin/bc" /usr/local/bin/bc 2>/dev/null || true
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
@@ -65,14 +69,12 @@ DATA_JSON=$(jq -n --argjson load "$LOAD" --argjson goals "$GOALS" --argjson inhi
   --arg lastUpdated "$(jq -r '.lastUpdated // "never"' "$STATE_FILE")" --arg lastConsultedAt "$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")" \
   '{installed: true, executiveLoad: $load, goals: $goals, inhibitions: $inhibitions, decisions: $decisions, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-FRAG_TMP="$(mktemp -d)"
-trap 'rm -rf "$FRAG_TMP"' EXIT
-echo "$HTML" > "$FRAG_TMP/html"
-echo "$SCRIPT" > "$FRAG_TMP/script"
+echo "$HTML" > /tmp/pfc_frag_html.$$
+echo "$SCRIPT" > /tmp/pfc_frag_script.$$
 jq -n --arg id "prefrontal" --argjson order 15 --arg label "Executive" --arg icon "🧭" \
-  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
+  --rawfile html /tmp/pfc_frag_html.$$ --rawfile script /tmp/pfc_frag_script.$$ --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/prefrontal.json"
-rm -rf "$FRAG_TMP"
+rm -f /tmp/pfc_frag_html.$$ /tmp/pfc_frag_script.$$
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus prefrontal

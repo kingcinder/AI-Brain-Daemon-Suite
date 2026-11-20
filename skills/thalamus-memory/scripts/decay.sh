@@ -6,7 +6,7 @@
 # eventually get processed.
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/thalamus-state.json"
 
 if [[ ! -f "$STATE_FILE" ]]; then

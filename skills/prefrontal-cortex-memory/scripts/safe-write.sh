@@ -39,7 +39,7 @@
 # never deleted — a persistent zero-byte lock file is the normal, correct
 # way to use flock, not a leak.
 
-set -euo pipefail
+set -e
 
 STATE_FILE="$1"
 shift || true
@@ -67,15 +67,7 @@ fi
 
 export STATE_FILE
 
-# Explicit set +e/-e around the call: under set -e (top of this file), if
-# "$@" failed and this were left as a bare call, bash would exit
-# immediately with that command's status the instant it failed — making
-# STATUS=$?/exit $STATUS below unreachable dead code. The exit code was
-# still correct either way (errexit propagates it), but the dead code was
-# misleading to read. This makes the capture actually happen as written.
-set +e
 "$@"
 STATUS=$?
-set -euo pipefail
 
 exit $STATUS

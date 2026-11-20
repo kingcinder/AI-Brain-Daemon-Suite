@@ -30,7 +30,7 @@
 #   --force     Rebuild even if the window already looks backfilled
 #
 # Env:
-#   WORKSPACE   Defaults to $HOME/.hermes/workspace
+#   WORKSPACE   Defaults to $HOME/.openclaw/workspace
 #   SUITE_ROOT  Defaults to the repo root (used for the seed sweep only if the
 #               ledger has no full-sweep entry to copy from)
 #
@@ -39,7 +39,7 @@
 
 set -u
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 REPORT_LOG="$WORKSPACE/memory/verification-report.jsonl"
 
 DAYS=7

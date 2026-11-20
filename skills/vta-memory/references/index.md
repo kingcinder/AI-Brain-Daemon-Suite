@@ -6,6 +6,6 @@ Progressive-disclosure links. Load this index via `skill_view("vta-memory", "ref
 |------|--------------|
 | `../README.md` | Human-oriented setup, usage, and troubleshooting |
 | `../skill-card.md` | Compact summary card for quick recall |
-| `../prompts/` | LLM prompts for reward encoding |
+| `../prompts/` | Prompts for Juno: reward encoding |
 | `../scripts/log-reward.sh` | Log a reward and raise drive |
 | `../scripts/load-motivation.sh` | Session-start motivation context |

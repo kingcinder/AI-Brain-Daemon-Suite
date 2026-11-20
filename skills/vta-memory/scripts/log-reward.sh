@@ -4,19 +4,15 @@
 #
 # Types: accomplishment, social, curiosity, connection, creative, competence
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/reward-state.json"
 
 if [ ! -f "$STATE_FILE" ]; then
   echo "❌ No reward state found at $STATE_FILE"
   exit 1
 fi
-
-# Serialize read-modify-write against the other reward-state.json writers.
-exec 200>"$STATE_FILE.lock"
-flock 200
 
 # Parse arguments
 TYPE=""
@@ -108,8 +104,8 @@ jq --argjson reward "$REWARD_ENTRY" \
    .rewardHistory.byType[$type] += 1 |
    .expectedReward[$type] = $newExpected |
    .recentRPE = ([$rpeEntry] + (.recentRPE // []) | .[0:10])
-   ' "$STATE_FILE" > "$STATE_FILE.tmp.$$"
-mv "$STATE_FILE.tmp.$$" "$STATE_FILE"
+   ' "$STATE_FILE" > "$STATE_FILE.tmp"
+mv "$STATE_FILE.tmp" "$STATE_FILE"
 
 # Append to persistent reward log
 LOG_FILE="$WORKSPACE/memory/reward-log.jsonl"

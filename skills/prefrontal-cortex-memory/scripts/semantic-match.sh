@@ -1,5 +1,5 @@
 #!/bin/bash
-# semantic-match.sh — Ask the local LLM which goals/inhibitions are actually
+# semantic-match.sh — Ask Juno which goals/inhibitions are actually
 # relevant to which candidate options, replacing the old bash/jq word-overlap
 # heuristic (which missed real matches like "ship the project" vs "work on
 # project" whenever the shared word happened to be filtered as a stopword,
@@ -13,7 +13,7 @@
 # inhibitions:  [{"pattern": "...", "strength": 0.0-1.0}, ...]
 #
 # OUTPUT (always valid JSON on stdout, regardless of success/failure):
-#   {"method": "semantic-llm", "goal_matches": [...], "inhibition_matches": [...]}
+#   {"method": "semantic-juno", "goal_matches": [...], "inhibition_matches": [...]}
 #   {"method": "heuristic-fallback", "goal_matches": null, "inhibition_matches": null}
 #
 # EXIT CODE: 0 if a validated semantic match was produced, 1 if the caller
@@ -32,17 +32,17 @@
 # status safely:
 #   if RESULT=$(semantic-match.sh ...); then STATUS=0; else STATUS=$?; fi
 #
-# ENV: uses the same LLM_BASE_URL / LLM_MODEL / LLM_TIMEOUT / LLM_RETRIES
-# overrides as llm-call.sh, so one local-server config covers every caller
-# in the suite. Defaults favor NOT blocking a decision for long: local
-# inference on modest hardware can take several seconds even for a short
-# structured answer, so the default timeout is generous, but callers must
-# never treat a slow/absent model as a hard failure of the whole decision.
+# ENV: uses the same JUNO_TIMEOUT / JUNO_RETRIES overrides as juno-ask.sh,
+# so one Juno-ask config covers every caller in the suite. Defaults favor
+# NOT blocking a decision for long: Juno's queue turn can take several
+# seconds even for a short structured answer, so the default timeout is
+# generous, but callers must never treat a slow/absent answer as a hard
+# failure of the whole decision.
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LLM_CALL="$SCRIPT_DIR/llm-call.sh"
+JUNO_ASK="$SCRIPT_DIR/juno-ask.sh"
 
 OPTIONS_JSON="[]"
 GOALS_JSON="[]"
@@ -62,7 +62,7 @@ fallback() {
   exit 1
 }
 
-# Nothing to match against an LLM for — skip the call entirely, not even worth the latency.
+# Nothing to ask Juno about — skip the ask entirely, not even worth the wait.
 GOAL_COUNT=$(echo "$GOALS_JSON" | jq 'length' 2>/dev/null || echo 0)
 INHIBITION_COUNT=$(echo "$INHIBITIONS_JSON" | jq 'length' 2>/dev/null || echo 0)
 OPTION_COUNT=$(echo "$OPTIONS_JSON" | jq 'length' 2>/dev/null || echo 0)
@@ -71,8 +71,8 @@ if [ "$OPTION_COUNT" -eq 0 ] || { [ "$GOAL_COUNT" -eq 0 ] && [ "$INHIBITION_COUN
   fallback
 fi
 
-if [ ! -x "$LLM_CALL" ]; then
-  echo "⚠️  semantic-match.sh: llm-call.sh not found — falling back to heuristic" >&2
+if [ ! -x "$JUNO_ASK" ]; then
+  echo "⚠️  semantic-match.sh: juno-ask.sh not found — falling back to heuristic" >&2
   fallback
 fi
 
@@ -88,18 +88,18 @@ USER_PROMPT=$(jq -n --argjson options "$OPTIONS_JSON" --argjson goals "$GOALS_JS
 "\n\nFor each goal, decide which option(s) it is CLEARLY, semantically about accomplishing or making progress on — not vague or tangential relevance. A goal may match zero, one, or several options. Same for each inhibition: which option(s) it should suppress because doing that option would trigger the exact pattern being avoided.\n\nRespond with ONLY this JSON shape, using the goal/inhibition index numbers shown above and the exact option id strings shown above:\n{\"goal_matches\": [{\"goal_index\": 0, \"option_id\": \"...\"}], \"inhibition_matches\": [{\"inhibition_index\": 0, \"option_id\": \"...\"}]}\nIf nothing matches, use empty arrays. Output nothing but the JSON object."
 ')
 
-RAW_OUTPUT=$("$LLM_CALL" --system "$SYSTEM_PROMPT" --user "$USER_PROMPT" \
-  --timeout "${LLM_TIMEOUT:-20}" --retries "${LLM_RETRIES:-1}" --json 2>/tmp/semantic-match-err.$$)
-LLM_STATUS=$?
+RAW_OUTPUT=$("$JUNO_ASK" --system "$SYSTEM_PROMPT" --user "$USER_PROMPT" \
+  --timeout "${JUNO_TIMEOUT:-20}" --retries "${JUNO_RETRIES:-1}" --json 2>/tmp/semantic-match-err.$$)
+JUNO_STATUS=$?
 
-if [ "$LLM_STATUS" -ne 0 ]; then
-  echo "⚠️  semantic-match.sh: local LLM call failed — $(cat /tmp/semantic-match-err.$$ 2>/dev/null | tail -1)" >&2
+if [ "$JUNO_STATUS" -ne 0 ]; then
+  echo "⚠️  semantic-match.sh: asking Juno failed — $(cat /tmp/semantic-match-err.$$ 2>/dev/null | tail -1)" >&2
   rm -f /tmp/semantic-match-err.$$
   fallback
 fi
 rm -f /tmp/semantic-match-err.$$
 
-# Some local servers/models wrap JSON in ```json fences even in JSON mode — strip if present.
+# Juno may wrap JSON in ```json fences even in JSON mode — strip if present.
 CLEANED=$(echo "$RAW_OUTPUT" | sed -e 's/^```json//' -e 's/^```//' -e 's/```$//')
 
 if ! echo "$CLEANED" | jq -e 'has("goal_matches") and has("inhibition_matches")' > /dev/null 2>&1; then
@@ -133,4 +133,4 @@ if [ -z "$VALIDATED" ]; then
   fallback
 fi
 
-echo "$VALIDATED" | jq -c '{method: "semantic-llm"} + .'
+echo "$VALIDATED" | jq -c '{method: "semantic-juno"} + .'

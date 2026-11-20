@@ -22,13 +22,13 @@
 #   --text           Human-readable table instead of JSON
 #
 # Env:
-#   WORKSPACE   Defaults to $HOME/.hermes/workspace
+#   WORKSPACE   Defaults to $HOME/.openclaw/workspace
 #
 # Exit code: always 0 (an empty/missing ledger is a valid empty answer).
 
 set -u
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 REPORT_LOG="$WORKSPACE/memory/verification-report.jsonl"
 
 MODULE_FILTER=""

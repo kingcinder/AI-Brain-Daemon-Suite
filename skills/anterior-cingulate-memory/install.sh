@@ -1,28 +1,12 @@
 #!/usr/bin/env bash
-# ── Standardized lifecycle contract (Initiative 9) ──────────────────────────
-#   install.sh              → initialize state files (defaults)
-#   install.sh --uninstall  → remove exactly the state files this skill's
-#                             manifest declares (delegates to skill-cleanup.sh)
-if [ "${1:-}" = "--uninstall" ]; then
-    THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
-    WS_UN="${WORKSPACE:-$HOME/.hermes/workspace}"
-    for CAND in "$THIS_DIR/../../core/skill-init/skill-cleanup.sh" \
-                "$THIS_DIR/../../../core/skill-init/skill-cleanup.sh"; do
-        if [ -x "$CAND" ]; then
-            exec "$CAND" --skill "$THIS_DIR" --workspace "$WS_UN" "${2:-}"
-        fi
-    done
-    echo "uninstall: skill-cleanup.sh not found — nothing removed." >&2
-    exit 1
-fi
 # anterior-cingulate-memory/install.sh
-# Installs the anterior-cingulate-memory skill into the Hermes workspace.
+# Installs the anterior-cingulate-memory skill into the OpenClaw workspace.
 # Usage: ./install.sh [--with-cron]
 
 set -e
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}}"
 MEMORY_DIR="$WORKSPACE/memory"
 STATE_FILE="$MEMORY_DIR/conflict-state.json"
 INJECT_FILE="$WORKSPACE/ACC_CONFLICT_STATE.md"
@@ -80,19 +64,25 @@ echo "   ✅ Generated ACC_CONFLICT_STATE.md"
 # ── 5. Optional cron setup ────────────────────────────────────────────────────
 if [[ "$WITH_CRON" == true ]]; then
   echo ""
-  echo "Setting up Hermes cron jobs..."
+  echo "Setting up OpenClaw cron jobs..."
 
-  if ! command -v hermes &> /dev/null; then
-    echo "⚠️  'hermes' not in PATH. Add these cron jobs manually:"
+  if ! command -v openclaw &> /dev/null; then
+    echo "⚠️  'openclaw' not in PATH. Add these cron jobs manually:"
     echo ""
-    echo "hermes cron create '0 */4 * * *' '⚡ Run conflict load decay: Run $SKILL_DIR/scripts/decay-load.sh and sync state' --name acc-conflict-decay"
-    echo "hermes cron create '50 0,3,6,9,12,15,18,21 * * *' 'Run ACC conflict encoding: Run encode-pipeline.sh, detect conflicts, update state.' --name acc-conflict-encoding"
+    echo "openclaw cron add --name acc-conflict-decay --cron '0 */4 * * *' --session isolated --agent-turn '⚡ Run conflict load decay: Run $SKILL_DIR/scripts/decay-load.sh and sync state'"
+    echo "openclaw cron add --name acc-conflict-encoding --cron '50 0,3,6,9,12,15,18,21 * * *' --session isolated --agent-turn 'Run ACC conflict encoding: Run encode-pipeline.sh, detect conflicts, update state.'"
   else
     echo "   Creating acc-conflict-decay..."
-    hermes cron create '0 */4 * * *' "⚡ Run conflict load decay: Run $SKILL_DIR/scripts/decay-load.sh and report results" --name acc-conflict-decay 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    openclaw cron add --name acc-conflict-decay \
+      --cron '0 */4 * * *' \
+      --session isolated \
+      --agent-turn "⚡ Run conflict load decay: Run $SKILL_DIR/scripts/decay-load.sh and report results" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
 
     echo "   Creating acc-conflict-encoding..."
-    hermes cron create '50 0,3,6,9,12,15,18,21 * * *' "Run ACC conflict encoding: 1) Run encode-pipeline.sh 2) Detect conflicts and uncertainty 3) Update state 4) Update watermark 5) Sync state" --name acc-conflict-encoding 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
+    openclaw cron add --name acc-conflict-encoding \
+      --cron '50 0,3,6,9,12,15,18,21 * * *' \
+      --session isolated \
+      --agent-turn "Run ACC conflict encoding: 1) Run encode-pipeline.sh 2) Detect conflicts and uncertainty 3) Update state 4) Update watermark 5) Sync state" 2>/dev/null && echo "   ✅ Created" || echo "   ⏭️  Already exists"
   fi
 fi
 

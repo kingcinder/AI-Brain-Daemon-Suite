@@ -1,17 +1,23 @@
 #!/bin/bash
 # generate-dashboard.sh — Write social-memory's own dashboard fragment, then
 # call the shared dashboard-builder.sh. Reads ONLY social-memory's own state.
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+
+# JUNO-BC-PATH (2026-11-15, Dither-ordered): cron env lacks interactive PATH; bc lives in home.
+export PATH="$HOME/.juno-brain/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+command -v bc >/dev/null 2>&1 || ln -sf "$HOME/.juno-brain/bin/bc" /usr/local/bin/bc 2>/dev/null || true
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$WORKSPACE/memory/dashboard-fragments"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 mkdir -p "$FRAGMENTS_DIR"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No social state found"; exit 1; }
 
+REL_COUNT=$(jq '.relationships | length' "$STATE_FILE")
+HUMAN_COUNT=$(jq '[.relationships[] | select(.type=="human")] | length' "$STATE_FILE")
+AGENT_COUNT=$(jq '[.relationships[] | select(.type=="ai_agent")] | length' "$STATE_FILE")
 TOP_RELATIONSHIPS=$(jq -c '[.relationships | to_entries | sort_by(.value.lastContact) | reverse | .[:6] | .[] | {id: .key, name: .value.name, type: .value.type, trust: .value.trust, affinity: .value.affinity}]' "$STATE_FILE")
 OPEN_LOOPS=$(jq -c '[.relationships | to_entries[] | .value.name as $name | .value.openLoops[] | select(.status=="open") | {name: $name, description}] | .[:8]' "$STATE_FILE")
-SPE=$(jq -c '[.recentSPE // [] | .[-6:] | .[] | {id, expected, outcome, spe}]' "$STATE_FILE")
 
 HTML=$(cat << 'HTMLEOF'
         <div class="card">
@@ -23,7 +29,6 @@ HTML=$(cat << 'HTMLEOF'
         </div>
         <div class="card"><div class="card-title">Recent Contacts</div><div id="relList"></div></div>
         <div class="card"><div class="card-title">Open Loops</div><div id="loopList"></div></div>
-        <div class="card"><div class="card-title">Social Prediction Errors (SPE)</div><div id="speList"></div></div>
 HTMLEOF
 )
 
@@ -49,32 +54,20 @@ SCRIPT=$(cat << 'SCRIPTEOF'
   } else {
     loopEl.innerHTML = '<div class="empty">Nothing pending</div>';
   }
-  const sp = document.getElementById('speList');
-  if (s.recentSPE && s.recentSPE.length) {
-    s.recentSPE.slice().reverse().forEach(e => {
-      const cls = e.spe >= 0 ? 'badge-chunked' : 'badge-critical';
-      const sign = e.spe >= 0 ? '+' : '';
-      sp.innerHTML += `<div class="list-item"><div class="badge ${cls}">SPE ${sign}${e.spe.toFixed(2)}</div><div class="list-text">${e.id}</div><div class="list-sub">expected ${e.expected.toFixed(2)} → outcome ${e.outcome.toFixed(2)}</div></div>`;
-    });
-  } else {
-    sp.innerHTML = '<div class="empty">No social prediction errors — interactions matched expectations.</div>';
-  }
 })();
 SCRIPTEOF
 )
 
-DATA_JSON=$(jq -n --argjson relationships "$TOP_RELATIONSHIPS" --argjson openLoops "$OPEN_LOOPS" --argjson recentSPE "$SPE" \
+DATA_JSON=$(jq -n --argjson relationships "$TOP_RELATIONSHIPS" --argjson openLoops "$OPEN_LOOPS" \
   --arg lastUpdated "$(jq -r '.lastUpdated // "never"' "$STATE_FILE")" --arg lastConsultedAt "$(jq -r '.lastConsultedAt // "never"' "$STATE_FILE")" \
-  '{installed: true, relationships: $relationships, openLoops: $openLoops, recentSPE: $recentSPE, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
+  '{installed: true, relationships: $relationships, openLoops: $openLoops, lastUpdated: $lastUpdated, lastConsultedAt: $lastConsultedAt}')
 
-FRAG_TMP="$(mktemp -d)"
-trap 'rm -rf "$FRAG_TMP"' EXIT
-echo "$HTML" > "$FRAG_TMP/html"
-echo "$SCRIPT" > "$FRAG_TMP/script"
+echo "$HTML" > /tmp/social_frag_html.$$
+echo "$SCRIPT" > /tmp/social_frag_script.$$
 jq -n --arg id "social" --argjson order 85 --arg label "Social" --arg icon "🫂" \
-  --rawfile html "$FRAG_TMP/html" --rawfile script "$FRAG_TMP/script" --argjson data "$DATA_JSON" \
+  --rawfile html /tmp/social_frag_html.$$ --rawfile script /tmp/social_frag_script.$$ --argjson data "$DATA_JSON" \
   '{id:$id, order:$order, label:$label, icon:$icon, html:$html, script:$script, data:$data}' \
   > "$FRAGMENTS_DIR/social.json"
-rm -rf "$FRAG_TMP"
+rm -f /tmp/social_frag_html.$$ /tmp/social_frag_script.$$
 
 "$SCRIPT_DIR/dashboard-builder.sh" --focus social

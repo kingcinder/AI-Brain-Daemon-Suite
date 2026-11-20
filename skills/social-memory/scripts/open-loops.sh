@@ -4,8 +4,8 @@
 #   open-loops.sh add --id <id> --description "..."
 #   open-loops.sh resolve --id <id> --loop-id <loop_id>
 #   open-loops.sh list [--id <id>]
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/social-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200

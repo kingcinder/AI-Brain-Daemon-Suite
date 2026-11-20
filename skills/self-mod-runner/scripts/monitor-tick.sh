@@ -1,7 +1,7 @@
 #!/bin/bash
 # Daemon entry: post-deploy self-mod monitor (Phase 3).
 set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -x "$WORKSPACE/core/self-mod/monitor.sh" ]; then

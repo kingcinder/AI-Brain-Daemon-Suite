@@ -112,7 +112,7 @@ If hippocampus is installed, basal-ganglia extends the shared brain dashboard wi
 
 ```bash
 ./scripts/generate-dashboard.sh
-open ~/.hermes/workspace/brain-dashboard.html
+open ~/.openclaw/workspace/brain-dashboard.html
 ```
 
 ---
@@ -123,7 +123,7 @@ open ~/.hermes/workspace/brain-dashboard.html
 |------|---------|
 | `memory/habit-state.json` | Central store |
 | `memory/habit-signals.jsonl` | Preprocessed signals |
-| `memory/pending-habits.json` | Signals awaiting LLM classification |
+| `memory/pending-habits.json` | Signals awaiting Juno classification |
 | `memory/brain-events.jsonl` | Append-only event log |
 | `BASAL_GANGLIA_STATE.md` | Auto-injected context (chunked habits) |
 | `brain-dashboard.html` | Visual dashboard |
@@ -132,7 +132,7 @@ open ~/.hermes/workspace/brain-dashboard.html
 
 ## Privacy & Security
 
-- All data stays local in `~/.hermes/workspace/`
+- All data stays local in `~/.openclaw/workspace/`
 - `habit-state.json` contains behavioral patterns — add to `.gitignore`
 - Suppressions contain correction history — treat as sensitive
 - No external network calls
@@ -143,9 +143,9 @@ open ~/.hermes/workspace/brain-dashboard.html
 
 **"No habit state found"** — Run `./install.sh` first.
 
-**"No session transcripts found"** — Check `$HOME/.hermes/sessions` exists and contains session files (or run `hermes sessions export --format jsonl <dir>` and point `TRANSCRIPT_DIR` at the export).
+**"No session transcripts found"** — Check `$HOME/.openclaw/agents/main/sessions/` exists and contains `.jsonl` files.
 
-**Habits aren't growing** — The encoding pipeline may not be running. Check cron with `hermes cron list` or run manually: `./scripts/encode-pipeline.sh`.
+**Habits aren't growing** — The encoding pipeline may not be running. Check cron with `openclaw cron list` or run manually: `./scripts/encode-pipeline.sh`.
 
 **Dashboard not showing BG tab** — `generate-dashboard.sh` must run after install. It will only add the tab if `habit-state.json` is present.
 

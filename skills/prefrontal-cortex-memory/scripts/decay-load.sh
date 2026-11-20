@@ -1,7 +1,7 @@
 #!/bin/bash
 # decay-load.sh — Executive load eases back toward baseline over time
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/pfc-state.json"
 [ ! -f "$STATE_FILE" ] && { echo "❌ No PFC state found"; exit 1; }
 

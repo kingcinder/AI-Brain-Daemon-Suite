@@ -1,5 +1,5 @@
 #!/bin/bash
-# Daemon entrypoint for Open Item 5: Hermes session → suite transcript bridge.
+# Daemon entrypoint for Open Item 5: Juno session → suite transcript bridge.
 # Resolves core/transcripts/export-transcripts.sh either from the installed
 # WORKSPACE (install.sh deploys core/ next to skills/) or from the suite tree
 # (dev). Same convention as self-mod-runner/scripts/monitor-tick.sh and
@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -x "$WORKSPACE/core/transcripts/export-transcripts.sh" ]; then

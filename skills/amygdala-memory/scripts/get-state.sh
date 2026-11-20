@@ -2,9 +2,13 @@
 # get-state.sh — Read current emotional state
 # Usage: ./get-state.sh [--json] [--dimension <name>]
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+# JUNO-BC-PATH (2026-11-15, Dither-ordered): cron env lacks interactive PATH; bc lives in home.
+export PATH="$HOME/.juno-brain/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+command -v bc >/dev/null 2>&1 || ln -sf "$HOME/.juno-brain/bin/bc" /usr/local/bin/bc 2>/dev/null || true
+
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/emotional-state.json"
 
 # Check if state file exists
@@ -63,8 +67,7 @@ else
   bar() {
     local val=$1
     local width=20
-    local filled
-    filled=$(echo "$val * $width" | bc | cut -d. -f1)
+    local filled=$(echo "$val * $width" | bc | cut -d. -f1)
     [ -z "$filled" ] && filled=0
     [ "$filled" -lt 0 ] && filled=0
     [ "$filled" -gt "$width" ] && filled=$width
@@ -75,11 +78,11 @@ else
     printf "]"
   }
   
-  printf "Valence:    %s %.2f\n" "$(bar "$VALENCE")" "$VALENCE"
-  printf "Arousal:    %s %.2f\n" "$(bar "$AROUSAL")" "$AROUSAL"
-  printf "Connection: %s %.2f\n" "$(bar "$CONNECTION")" "$CONNECTION"
-  printf "Curiosity:  %s %.2f\n" "$(bar "$CURIOSITY")" "$CURIOSITY"
-  printf "Energy:     %s %.2f\n" "$(bar "$ENERGY")" "$ENERGY"
+  printf "Valence:    %s %.2f\n" "$(bar $VALENCE)" "$VALENCE"
+  printf "Arousal:    %s %.2f\n" "$(bar $AROUSAL)" "$AROUSAL"
+  printf "Connection: %s %.2f\n" "$(bar $CONNECTION)" "$CONNECTION"
+  printf "Curiosity:  %s %.2f\n" "$(bar $CURIOSITY)" "$CURIOSITY"
+  printf "Energy:     %s %.2f\n" "$(bar $ENERGY)" "$ENERGY"
   
   echo ""
   echo "Last updated: $(jq -r '.lastUpdated' "$STATE_FILE")"

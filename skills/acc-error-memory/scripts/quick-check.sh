@@ -1,6 +1,6 @@
 #!/bin/bash
 # ACC Quick Check — Lightweight real-time error signal detection
-# Runs inline during conversation (no LLM, pure pattern matching)
+# Runs inline during conversation (no Juno ask, pure pattern matching)
 #
 # Usage:
 #   quick-check.sh --user "user's message" [--assistant "your last response"]
@@ -12,9 +12,10 @@
 #
 # Design: Fast heuristic only. For deep analysis, use the full cron pipeline.
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
+STATE_FILE="$WORKSPACE/memory/acc-state.json"
 
 # Parse arguments
 USER_TEXT=""
@@ -117,7 +118,7 @@ for pattern, label in low_patterns:
 
 # --- Context boost: check against active patterns ---
 # If user text matches context of an existing active pattern, boost the signal
-workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.hermes/workspace'))
+workspace = os.environ.get('WORKSPACE', os.path.expanduser('~/.openclaw/workspace'))
 state_file = os.path.join(workspace, 'memory', 'acc-state.json')
 matched_patterns = []
 try:

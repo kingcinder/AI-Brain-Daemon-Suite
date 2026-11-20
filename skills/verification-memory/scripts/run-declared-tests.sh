@@ -18,7 +18,7 @@
 #   --timeout N       Per-test timeout in seconds (default 300)
 #
 # Env:
-#   WORKSPACE   Defaults to $HOME/.hermes/workspace
+#   WORKSPACE   Defaults to $HOME/.openclaw/workspace
 #   SUITE_ROOT  Defaults to the repo root (three dirs up from this script)
 #
 # Exit code: 0 if every declared test passed, 1 otherwise (CI/daemon gate).
@@ -28,7 +28,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 SUITE_ROOT="${SUITE_ROOT:-$(cd "$SKILL_DIR/../.." && pwd)}"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/verification-state.json"
 REPORT_LOG="$WORKSPACE/memory/verification-report.jsonl"
 PUBLISH_SH="$SUITE_ROOT/core/signaling/publish.sh"

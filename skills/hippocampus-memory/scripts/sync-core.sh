@@ -3,12 +3,12 @@
 # This file gets loaded by OpenClaw as workspace context
 #
 # Environment:
-#   WORKSPACE - OpenClaw workspace directory (default: ~/.hermes/workspace)
+#   WORKSPACE - OpenClaw workspace directory (default: ~/.openclaw/workspace)
 #   THRESHOLD - Minimum importance score (default: 0.75)
 
-set -euo pipefail
+set -e
 
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 INDEX="$WORKSPACE/memory/index.json"
 OUTPUT="$WORKSPACE/HIPPOCAMPUS_CORE.md"
 THRESHOLD="${THRESHOLD:-0.75}"
@@ -18,15 +18,14 @@ if [ ! -f "$INDEX" ]; then
     exit 0
 fi
 
-INDEX="$INDEX" OUTPUT="$OUTPUT" THRESHOLD="$THRESHOLD" \
-python3 << 'PYTHON'
+python3 << PYTHON
 import json
 import os
 from datetime import datetime
 
-INDEX_PATH = os.environ["INDEX"]
-OUTPUT_PATH = os.environ["OUTPUT"]
-THRESHOLD = float(os.environ["THRESHOLD"])
+INDEX_PATH = "$INDEX"
+OUTPUT_PATH = "$OUTPUT"
+THRESHOLD = $THRESHOLD
 
 with open(INDEX_PATH, 'r') as f:
     data = json.load(f)
@@ -69,25 +68,6 @@ for domain in domain_order:
         for m in by_domain[domain]:
             lines.append(f"- **[{m['importance']:.2f}]** {m['content']}")
         lines.append("")
-
-# CLS replay consolidation: cortical theme weights (memory/cortical.json) —
-# episodic traces replayed into slowly-strengthening cortical themes.
-cortical_path = os.path.join(os.path.dirname(INDEX_PATH), 'cortical.json')
-try:
-    with open(cortical_path) as f:
-        cortical = json.load(f)
-    themes = cortical.get('themes', {})
-    if themes:
-        lines.append("## Cortical Themes (replay consolidation)")
-        lines.append("")
-        for name, t in sorted(themes.items(), key=lambda kv: -kv[1].get('weight', 0))[:8]:
-            lines.append(
-                f"- **{name}**: weight {t.get('weight', 0):.3f} "
-                f"({t.get('traceCount', 0)} traces replayed)"
-            )
-        lines.append("")
-except Exception:
-    pass
 
 # Write output
 with open(OUTPUT_PATH, 'w') as f:

@@ -1,8 +1,8 @@
 #!/bin/bash
 # log-action.sh — Confirm what actually happened after a beat
 # Usage: log-action.sh --action <id> [--note "..."] [--skipped]
-set -euo pipefail
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+set -e
+WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 STATE_FILE="$WORKSPACE/memory/heartbeat-state.json"
 exec 200>"$STATE_FILE.lock"
 flock 200
