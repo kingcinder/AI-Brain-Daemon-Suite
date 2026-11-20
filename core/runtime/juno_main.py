@@ -43,6 +43,10 @@ def get_runtime() -> JunoRuntime:
         # suite_root defaults to the repo containing this file
         skills_root=home / "workspace" / "skills",
         memory_root=home / "memory",
+        # Stage 4 unification: the heart's journal lives in the agent's
+        # real journal tree (~/memory/journal), merged with her prose;
+        # proposals/plans/backups stay under ~/.juno-brain.
+        journal_root=home / "memory",
     )
 
 
@@ -105,6 +109,51 @@ def _advance(pipe: Pipeline, store: ProposalStore,
         if halt or proposal.status in ("rejected", "rolled_back"):
             break
     return made
+
+
+def _helm_health_anomalies(rt: JunoRuntime) -> list[dict]:
+    """Stage 4 (helm unification, design §2.4): each heart beat first
+    checks the organ suite's queue and pulse, so a stalled drain or a
+    missing organ surfaces in the beat's health_anomalies instead of
+    rotting silently. Reads the real instance's helm-health.json and
+    heartbeat-pulse.log under <store root>/workspace/memory/. Any
+    failure (no helm on this host, unreadable files) yields no
+    anomalies — the check must never break the beat."""
+    import json as _json
+    import re as _re
+    out: list[dict] = []
+    try:
+        mem = Path(rt.memory.root) / "workspace" / "memory"
+        health = _json.loads((mem / "helm-health.json").read_text())
+        depth = health.get("queue_depth") or 0
+        oldest = health.get("oldest_unacked_age_s") or 0
+        if (health.get("deadletter_count") or 0) > 0:
+            out.append({"kind": "helm_deadletter",
+                        "detail": f"deadletter_count="
+                                  f"{health['deadletter_count']}"})
+        if depth > 0 and oldest > 900:
+            out.append({"kind": "helm_queue_stalled",
+                        "detail": f"queue_depth={depth} "
+                                  f"oldest_unacked_age_s={oldest}"})
+        lines = (mem / "heartbeat-pulse.log").read_text().splitlines()
+        m = _re.search(r"helm-pulse (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})",
+                       lines[-1]) if lines else None
+        if m:
+            from zoneinfo import ZoneInfo
+            last = datetime.strptime(f"{m.group(1)} {m.group(2)}",
+                                     "%Y-%m-%d %H:%M:%S").replace(
+                                         tzinfo=ZoneInfo("America/Los_Angeles"))
+            age_s = (datetime.now(ZoneInfo("America/Los_Angeles"))
+                     - last).total_seconds()
+            if age_s > 2700:
+                out.append({"kind": "helm_pulse_stale",
+                            "detail": f"last pulse {int(age_s)}s ago"})
+        else:
+            out.append({"kind": "helm_pulse_missing",
+                        "detail": "no parseable pulse line"})
+    except Exception:
+        return []
+    return out
 
 
 def heartbeat(runtime: JunoRuntime | None = None) -> dict:
@@ -207,6 +256,9 @@ def heartbeat(runtime: JunoRuntime | None = None) -> dict:
     except Exception as exc:
         report["errors"].append({"id": "health_check",
                                  "error": str(exc)[:200]})
+    # Stage 4: the beat also checks the organ suite's queue + pulse.
+    report["health_anomalies"] = (report.get("health_anomalies") or []) \
+        + _helm_health_anomalies(rt)
 
     # -- 4. journal the beat -----------------------------------------------
     try:

@@ -52,9 +52,27 @@ class JunoMemoryStore(MemoryStore):
     under the root; the weekly-reflection job writes dated ``##`` markdown
     sections, which the runtime's memory indexer consumes."""
 
-    def __init__(self, root: Path | str | None = None):
+    def __init__(self, root: Path | str | None = None,
+                 journal_root: Path | str | None = None):
         self.root = Path(root or Path.home() / ".juno-brain").resolve()
         self.root.mkdir(parents=True, exist_ok=True)
+        # Stage 4 unification (helm integration): when journal_root is
+        # set, suite-relative paths under "journal/" resolve against it
+        # instead of the store root — the heart's journal converges into
+        # the agent's real journal tree while proposals, plans and
+        # backups stay under the store root. Default None = every path
+        # under root, the historical behaviour.
+        self.journal_root = (Path(journal_root).resolve()
+                             if journal_root is not None else None)
+        if self.journal_root is not None:
+            (self.journal_root / "journal").mkdir(parents=True,
+                                                  exist_ok=True)
+
+    def _base_for(self, norm: str) -> Path:
+        if self.journal_root is not None and (
+                norm == "journal" or norm.startswith("journal/")):
+            return self.journal_root
+        return self.root
 
     # -- path resolution --------------------------------------------------
     def _resolve(self, relpath: str) -> Path:
@@ -62,9 +80,10 @@ class JunoMemoryStore(MemoryStore):
         norm = relpath.replace(os.sep, "/").lstrip("/")
         if not norm or norm.startswith(("/", "~")) or ".." in norm.split("/"):
             raise MemoryViolation(f"path rejected: {relpath!r}")
-        target = (self.root / norm).resolve()
+        base = self._base_for(norm)
+        target = (base / norm).resolve()
         try:
-            target.relative_to(self.root)
+            target.relative_to(base)
         except ValueError:
             raise MemoryViolation(f"path escapes store root: {relpath!r}")
         return target
@@ -96,7 +115,9 @@ class JunoMemoryStore(MemoryStore):
         base = self._resolve(prefix)
         if not base.is_dir():
             return []
-        return sorted(str(p.relative_to(self.root))
+        norm = prefix.replace(os.sep, "/").lstrip("/")
+        root_for = self._base_for(norm)
+        return sorted(str(p.relative_to(root_for))
                       for p in base.rglob("*") if p.is_file())
 
 
@@ -191,9 +212,11 @@ class JunoRuntime(Runtime):
     def __init__(self, root: Path | str | None = None,
                  suite_root: Path | str | None = None,
                  skills_root: Path | str | None = None,
-                 memory_root: Path | str | None = None):
+                 memory_root: Path | str | None = None,
+                 journal_root: Path | str | None = None):
         self._root = Path(root or Path.home() / ".juno-brain").resolve()
-        self.memory = JunoMemoryStore(self._root)
+        self.memory = JunoMemoryStore(self._root,
+                                      journal_root=journal_root)
         self.scheduler = JunoScheduler(self._root)
         self.mind = None  # embedded-mind pattern: the agent IS the mind
         self._suite_root = Path(

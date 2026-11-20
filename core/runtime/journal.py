@@ -44,8 +44,18 @@ STATE_FENCE = "state"
 ANOMALY_FENCE = "anomaly"
 
 
+def _pacific_now() -> datetime:
+    """Journal days are Pacific (helm settlement: PST everywhere),
+    regardless of the host's own timezone."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("America/Los_Angeles"))
+    except Exception:
+        return datetime.now()
+
+
 def _today() -> str:
-    return datetime.now().date().isoformat()
+    return _pacific_now().date().isoformat()
 
 
 def _utcnow() -> str:
@@ -123,7 +133,7 @@ class Journal:
         """Yield (day, record) for fenced JSON blocks, newest day last."""
         out: list[tuple[str, dict]] = []
         from datetime import timedelta
-        end_dt = datetime.fromisoformat(day) if day else datetime.now()
+        end_dt = datetime.fromisoformat(day) if day else _pacific_now()
         for back in range(days):
             # walk back one day at a time
             day_s = (end_dt - timedelta(days=back)).date().isoformat()
