@@ -1,20 +1,24 @@
 #!/bin/bash
-# run_phase7_harness.sh — Open Item 5 transcript bridge regression.
+# run_phase7_harness.sh — Open Item 5 transcript bridge regression, Juno-direct.
 # Covers:
-#   * export-transcripts.sh runs `hermes sessions export --format jsonl`
-#     (fake hermes stub on PATH) and rewrites the session-level export into
-#     the per-message shape the memory preprocess parsers expect.
+#   * export-transcripts.sh reads Juno's own session files (per-message
+#     JSONL, the shape corpus-sync maintains) and rewrites them into the
+#     normalized per-message shape the memory preprocess parsers expect.
+#   * The JUNO_SESSION_EXPORT seam: a command that writes session-level
+#     JSONL (one whole-session object per line) to a file arg is transformed
+#     the same way (tests use a Juno stub for this seam).
 #   * Transform correctness: only user/assistant messages with text content
 #     and a parseable timestamp survive; system/tool/empty messages skipped.
 #   * The bridge feeds the preprocess pipeline: preprocess.sh consumes the
 #     transformed transcript and writes signals.jsonl.
-#   * Honest failure paths: hermes missing (exit 3) and export failure
-#     (exit 4) — so the daemon records a job failure, not a silent skip.
+#   * Honest failure paths: Juno session source unavailable (exit 3) and
+#     export failure (exit 4) — so the daemon records a job failure, not a
+#     silent skip.
 #   * Daemon integration: run_direct executes the wrapper skill script for
 #     the transcript_export job and records the success/failure outcome.
 #
-# Uses an isolated temp WORKSPACE and temp PATH. Does not touch the real
-# project tree and never calls real hermes.
+# Uses an isolated temp WORKSPACE. Does not touch the real project tree and
+# never reads Juno's real session files.
 #
 # Usage: bash tests/run_phase7_harness.sh
 
@@ -31,58 +35,60 @@ export WORKSPACE
 WORKSPACE=$(mktemp -d)
 WS="$WORKSPACE"
 trap 'rm -rf "$WS"' EXIT
-mkdir -p "$WS/memory" "$WS/bin" "$WS/sessions" "$WS/skills/hippocampus-memory/scripts" "$WS/core/transcripts"
+mkdir -p "$WS/memory" "$WS/bin" "$WS/sessions" "$WS/juno-src" \
+         "$WS/skills/hippocampus-memory/scripts" "$WS/core/transcripts" \
+         "$WS/fakehome/.openclaw/agents/main/sessions"
 
-# ── Fixtures: fake hermes (success + failing variants) ─────────────────────
+# ── Fixtures: Juno session files + Juno export stubs ───────────────────────
 section "fixture"
-cat > "$WS/bin/hermes" << 'EOF'
+# Juno's real session shape: per-message lines, content as text blocks.
+cat > "$WS/juno-src/juno-conversation.jsonl" << 'EOF'
+{"type":"message","id":"m1","timestamp":"2026-11-20T00:00:01.000000+00:00","message":{"role":"system","content":"session boot"}}
+{"type":"message","id":"m2","timestamp":"2026-11-20T00:00:02.000000+00:00","message":{"role":"user","content":[{"type":"text","text":"encode today's experience"}]}}
+{"type":"message","id":"m3","timestamp":"2026-11-20T00:00:03.000000+00:00","message":{"role":"assistant","content":[{"type":"text","text":"Signals encoded."}]}}
+{"type":"message","id":"m4","timestamp":"2026-11-20T00:00:04.000000+00:00","message":{"role":"user","content":""}}
+{"type":"message","id":"m5","message":{"role":"user","content":"drop me (no timestamp)"}}
+EOF
+
+# Juno export stub: writes session-level JSONL (whole-session objects with
+# epoch timestamps) to the file given as its last argument.
+cat > "$WS/bin/juno-export" << 'EOF'
 #!/bin/bash
-# Fake `hermes sessions export --format jsonl [--newer-than AGE] --yes <file>`
-# Writes a session-level export (one whole-session JSON object per LINE) to
-# the LAST argument, mirroring the real hermes schema observed in the field.
 STAGE="${!#}"
 cat > "$STAGE" << 'JSONL'
-{"id":"sess-1","title":"bridge test","created_at":1785700000,"messages":[{"role":"system","content":"You are Hermes.","timestamp":1785700001},{"role":"user","content":"encode today's experience","timestamp":1785700002},{"role":"assistant","content":[{"type":"text","text":"Signals encoded."}],"timestamp":1785700003},{"role":"user","content":"","timestamp":1785700004},{"role":"user","content":"drop me (no timestamp)"}]}
+{"id":"sess-1","title":"bridge test","created_at":1785700000,"messages":[{"role":"system","content":"boot","timestamp":1785700001},{"role":"user","content":"encode today's experience","timestamp":1785700002},{"role":"assistant","content":[{"type":"text","text":"Signals encoded."}],"timestamp":1785700003},{"role":"user","content":"","timestamp":1785700004},{"role":"user","content":"drop me (no timestamp)"}]}
 JSONL
 exit 0
 EOF
-chmod +x "$WS/bin/hermes"
+chmod +x "$WS/bin/juno-export"
 
-cat > "$WS/bin/hermes-fail" << 'EOF'
+cat > "$WS/bin/juno-export-fail" << 'EOF'
 #!/bin/bash
-echo "hermes sessions export: simulated failure" >&2
+echo "juno session export: simulated failure" >&2
 exit 4
 EOF
-chmod +x "$WS/bin/hermes-fail"
-
-cat > "$WS/bin/hermes-no-export" << 'EOF'
-#!/bin/bash
-# hermes exists but does not support sessions export (missing subcommand)
-exit 1
-EOF
-chmod +x "$WS/bin/hermes-no-export"
+chmod +x "$WS/bin/juno-export-fail"
 
 BRIDGE="$ROOT/core/transcripts/export-transcripts.sh"
-export PATH="$WS/bin:$PATH"
-pass "fixtures: fake hermes (success/fail/no-export) on temp PATH"
+pass "fixtures: Juno session files (per-message) + Juno export stubs (session-level, failing)"
 
-# ── 1. Bridge: export + transform to per-message shape ──────────────────────
+# ── 1. Bridge: default mode reads Juno session files ────────────────────────
 section "bridge-transform"
-OUT=$(TRANSCRIPT_DIR="$WS/sessions" WORKSPACE="$WS" bash "$BRIDGE" 2>&1)
+OUT=$(JUNO_SESSION_DIR="$WS/juno-src" TRANSCRIPT_DIR="$WS/sessions" WORKSPACE="$WS" bash "$BRIDGE" 2>&1)
 RC=$?
-if [ $RC -eq 0 ] && [ -s "$WS/sessions/hermes-sessions.jsonl" ]; then
-  pass "bridge runs hermes sessions export and writes hermes-sessions.jsonl"
+if [ $RC -eq 0 ] && [ -s "$WS/sessions/juno-sessions.jsonl" ]; then
+  pass "bridge reads Juno session files and writes juno-sessions.jsonl"
 else
-  fail "bridge export+transform (rc=$RC: $OUT)"
+  fail "bridge transform (rc=$RC: $OUT)"
 fi
 
-TOTAL=$(wc -l < "$WS/sessions/hermes-sessions.jsonl" | tr -d ' ')
+TOTAL=$(wc -l < "$WS/sessions/juno-sessions.jsonl" | tr -d ' ')
 if [ "$TOTAL" -eq 2 ]; then
   pass "transform keeps only the 2 user/assistant messages with text ($TOTAL lines)"
 else
   fail "transform message count (expected 2, got $TOTAL)"
 fi
-if python3 - "$WS/sessions/hermes-sessions.jsonl" << 'PY'
+if python3 - "$WS/sessions/juno-sessions.jsonl" << 'PY'
 import json, sys
 ok = True
 for line in open(sys.argv[1]):
@@ -102,22 +108,37 @@ then
 else
   fail "per-message shape validation"
 fi
-if grep -q '"content": "Signals encoded."' "$WS/sessions/hermes-sessions.jsonl"; then
+if grep -q '"content": "Signals encoded."' "$WS/sessions/juno-sessions.jsonl"; then
   pass "assistant content rendered from text blocks"
 else
   fail "assistant text-block content"
 fi
-if grep -q '"role": "user"' "$WS/sessions/hermes-sessions.jsonl" \
-   && ! grep -q '"role": "system"' "$WS/sessions/hermes-sessions.jsonl"; then
+if grep -q '"role": "user"' "$WS/sessions/juno-sessions.jsonl" \
+   && ! grep -q '"role": "system"' "$WS/sessions/juno-sessions.jsonl"; then
   pass "system/empty/no-timestamp messages skipped"
 else
   fail "role filtering"
 fi
 
-# ── 2. Bridge feeds the preprocess pipeline ─────────────────────────────────
+# ── 2. Bridge: JUNO_SESSION_EXPORT seam (session-level objects) ─────────────
+section "bridge-export-seam"
+mkdir -p "$WS/sessions2"
+OUT=$(JUNO_SESSION_EXPORT="$WS/bin/juno-export" TRANSCRIPT_DIR="$WS/sessions2" WORKSPACE="$WS" bash "$BRIDGE" 2>&1)
+RC=$?
+TOTAL2=$(wc -l < "$WS/sessions2/juno-sessions.jsonl" 2>/dev/null | tr -d ' ')
+if [ $RC -eq 0 ] && [ "$TOTAL2" -eq 2 ] && grep -q "encode today" "$WS/sessions2/juno-sessions.jsonl"; then
+  pass "JUNO_SESSION_EXPORT seam: session-level export transformed to the same 2 messages"
+else
+  fail "export seam (rc=$RC total=$TOTAL2: $OUT)"
+fi
+
+# ── 3. Bridge feeds the preprocess pipeline ─────────────────────────────────
 section "preprocess-feed"
+# preprocess.sh reads $HOME/.openclaw/agents/main/sessions — feed it the
+# bridge output through a fake HOME so the chain is proven in isolation.
+cp "$WS/sessions/juno-sessions.jsonl" "$WS/fakehome/.openclaw/agents/main/sessions/"
 PP="$ROOT/skills/hippocampus-memory/scripts/preprocess.sh"
-OUT=$(TRANSCRIPT_DIR="$WS/sessions" WORKSPACE="$WS" bash "$PP" --full 2>&1)
+OUT=$(HOME="$WS/fakehome" WORKSPACE="$WS" bash "$PP" --full 2>&1)
 RC=$?
 if [ $RC -eq 0 ] && [ -s "$WS/memory/signals.jsonl" ]; then
   pass "preprocess.sh consumes the transformed transcript and writes signals.jsonl"
@@ -130,33 +151,24 @@ else
   fail "signal content ($OUT)"
 fi
 
-# ── 3. Bridge: honest failure paths ─────────────────────────────────────────
+# ── 4. Bridge: honest failure paths ─────────────────────────────────────────
 section "bridge-failures"
-# The real hermes binary exists on this host, so 'missing from PATH' is tested
-# via an explicit HERMES_BIN that resolves to nothing — the same exit-3 guard.
-OUT=$(HERMES_BIN=hermes-nonexistent-xyz TRANSCRIPT_DIR="$WS/sessions" WORKSPACE="$WS" bash "$BRIDGE" 2>&1)
+OUT=$(JUNO_SESSION_DIR="$WS/no-such-dir" TRANSCRIPT_DIR="$WS/sessions" WORKSPACE="$WS" bash "$BRIDGE" 2>&1)
 RC=$?
 if [ $RC -eq 3 ]; then
-  pass "hermes binary missing exits 3"
+  pass "Juno session source unavailable exits 3"
 else
-  fail "hermes-missing exit code (got $RC)"
+  fail "source-missing exit code (got $RC)"
 fi
 
-OUT=$(HERMES_BIN=hermes-fail TRANSCRIPT_DIR="$WS/sessions" WORKSPACE="$WS" bash "$BRIDGE" 2>&1)
+OUT=$(JUNO_SESSION_EXPORT="$WS/bin/juno-export-fail" TRANSCRIPT_DIR="$WS/sessions" WORKSPACE="$WS" bash "$BRIDGE" 2>&1)
 if [ $? -eq 4 ]; then
-  pass "hermes sessions export failure exits 4 (recorded job failure)"
+  pass "Juno session export failure exits 4 (recorded job failure)"
 else
   fail "export-failure exit code ($OUT)"
 fi
 
-OUT=$(HERMES_BIN=hermes-no-export TRANSCRIPT_DIR="$WS/sessions" WORKSPACE="$WS" bash "$BRIDGE" 2>&1)
-if [ $? -eq 4 ]; then
-  pass "hermes without sessions export support exits 4"
-else
-  fail "no-export exit code ($OUT)"
-fi
-
-# ── 4. Daemon integration: run_direct executes the wrapper ──────────────────
+# ── 5. Daemon integration: run_direct executes the wrapper ──────────────────
 section "daemon-integration"
 # Deploy the wrapper + bridge into the temp workspace (installed layout).
 cp "$ROOT/skills/hippocampus-memory/scripts/export-transcripts.sh" \
@@ -166,17 +178,17 @@ chmod +x "$WS/skills/hippocampus-memory/scripts/export-transcripts.sh" \
          "$WS/core/transcripts/export-transcripts.sh"
 
 run_direct_case() {
-  # $1 = HERMES_BIN ('' for default); $2 = label
+  # $1 = mode: ok | fail ; $2 = label
   python3 - "$ROOT/deep-brain-kernel.py" "$1" "$2" "$WS" << 'PY'
 import asyncio, importlib.util, json, logging, os, sys
 logging.disable(logging.CRITICAL)  # keep daemon log lines out of the captured JSON
-hermes_bin, label, ws = sys.argv[2], sys.argv[3], sys.argv[4]
+mode, label, ws = sys.argv[2], sys.argv[3], sys.argv[4]
 # WORKSPACE must be set BEFORE exec_module: the daemon binds its paths at import.
 os.environ["WORKSPACE"] = ws
 os.environ["TRANSCRIPT_DIR"] = ws + "/sessions"
-os.environ["PATH"] = ws + "/bin:" + os.environ.get("PATH", "")
-if hermes_bin:
-    os.environ["HERMES_BIN"] = hermes_bin
+os.environ["JUNO_SESSION_DIR"] = ws + "/juno-src"
+if mode == "fail":
+    os.environ["JUNO_SESSION_EXPORT"] = ws + "/bin/juno-export-fail"
 spec = importlib.util.spec_from_file_location("dbk", sys.argv[1])
 dbk = importlib.util.module_from_spec(spec)
 sys.modules["dbk"] = dbk
@@ -192,29 +204,29 @@ print(json.dumps({"success": stats.get("success", 0),
 PY
 }
 
-INJ=$(run_direct_case "" "p7_transcript")
+rm -f "$WS/sessions/juno-sessions.jsonl"
+INJ=$(run_direct_case "ok" "p7_transcript")
 if echo "$INJ" | jq -e '.success==1 and .failure==0' >/dev/null; then
   pass "run_direct (transcript_export) records success outcome"
 else
   fail "run_direct success outcome ($INJ)"
 fi
-if [ -s "$WS/sessions/hermes-sessions.jsonl" ]; then
+if [ -s "$WS/sessions/juno-sessions.jsonl" ]; then
   pass "daemon-driven run produced the transformed transcript"
 else
   fail "daemon-driven transcript missing"
 fi
 
-rm -f "$WS/sessions/hermes-sessions.jsonl"
-INJ=$(run_direct_case "hermes-fail" "p7_transcript_fail")
+INJ=$(run_direct_case "fail" "p7_transcript_fail")
 if echo "$INJ" | jq -e '.failure>=1 and .success==0' >/dev/null; then
   pass "run_direct (export failure) records failure outcome — no silent skip"
 else
   fail "run_direct failure outcome ($INJ)"
 fi
 
-# ── 5. Schedule surface: job is wired with a unique minute ──────────────────
+# ── 6. Schedule surface: job is wired with a unique minute ──────────────────
 section "schedule"
-python3 - "$ROOT/deep-brain-kernel.py" << 'PY' > /dev/null 2>&1 || true
+SCHED_OUT=$(python3 - "$ROOT/deep-brain-kernel.py" << 'PY' 2>&1
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dbk", sys.argv[1])
 dbk = importlib.util.module_from_spec(spec)
@@ -231,11 +243,11 @@ for j in dbk.JOBS:
         mins.add(m)
 print("OK")
 PY
-RC=$?
-if [ $RC -eq 0 ]; then
+)
+if [ $? -eq 0 ]; then
   pass "transcript_export is a direct job on unique minute 58; no minute collisions"
 else
-  fail "schedule assertion failed (rc=$RC)"
+  fail "schedule assertion failed ($SCHED_OUT)"
 fi
 
 # ── Summary ─────────────────────────────────────────────────────────────────

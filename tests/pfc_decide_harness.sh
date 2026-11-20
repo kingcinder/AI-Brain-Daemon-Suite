@@ -2,7 +2,7 @@
 # pfc_decide_harness.sh — closed-loop verification for prefrontal-cortex-memory's
 # decide.sh: proves the arbitration score actually moves in response to each
 # sibling signal it claims to read, using synthetic sibling state files
-# (no real siblings, no local LLM required — PFC_SEMANTIC_MATCHING=off forces
+# (no real siblings, no live Juno turn required — PFC_SEMANTIC_MATCHING=off forces
 # the deterministic heuristic path). Exits non-zero if any assertion fails.
 #
 # Usage: WORKSPACE is created fresh under a temp dir; nothing outside it is

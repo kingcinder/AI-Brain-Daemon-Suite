@@ -30,7 +30,7 @@ trap 'rm -rf "$WS"' EXIT
 # Export BOTH workspace vars: insula's update-state.sh prefers
 # OPENCLAW_WORKSPACE, everything else prefers WORKSPACE. Exporting both once
 # guarantees the test is fully self-contained and can never touch the live
-# ~/.hermes/workspace.
+# ~/.juno-brain/workspace.
 export WORKSPACE="$WS"
 export OPENCLAW_WORKSPACE="$WS"
 mkdir -p "$WS/memory"

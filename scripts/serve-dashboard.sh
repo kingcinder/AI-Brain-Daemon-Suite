@@ -24,7 +24,7 @@
 #              aibrain-dashboard.service).
 #
 # Env:
-#   WORKSPACE                    Defaults to $HOME/.hermes/workspace.
+#   WORKSPACE                    Defaults to $HOME/.juno-brain/workspace.
 #   DASHBOARD_PORT               Fixed port. Default 8123.
 #   DASHBOARD_HOST               Bind address. Default 127.0.0.1 (loopback).
 #   DASHBOARD_REFRESH_SECONDS    Auto-refresh poll interval. Default 5.
@@ -40,7 +40,7 @@
 set -euo pipefail
 
 SUITE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORKSPACE="${WORKSPACE:-$HOME/.hermes/workspace}"
+WORKSPACE="${WORKSPACE:-$HOME/.juno-brain/workspace}"
 HOST="${DASHBOARD_HOST:-127.0.0.1}"
 PORT="${DASHBOARD_PORT:-8123}"
 REFRESH_SECONDS="${DASHBOARD_REFRESH_SECONDS:-5}"

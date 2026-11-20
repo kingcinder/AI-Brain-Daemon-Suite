@@ -1,19 +1,20 @@
 #!/bin/bash
-# Skill provenance check: asserts all 11 brain skills resolve to
-# source=local and status=enabled for Hermes Agent.
+# Skill provenance check: asserts all 11 brain skills are local to this
+# suite and enabled for Juno (Juno-direct, 2026-11-20 scrub).
 #
 # Two tiers:
 #   1. Repo tier (ALWAYS runs, CI-safe): verifies each skill dir exists in
-#      skills/ and its SKILL.md carries the Hermes-required top-level
-#      name/description plus a metadata.hermes block. This is the repo-side
-#      invariant that makes a skill register as source=local when installed.
-#      (CI has no hermes binary and no ~/.hermes state, so this is the tier
-#      that runs on every push.)
-#   2. Host tier (runs when a hub lock and/or the hermes CLI exist): asserts
-#      the 11 brain skills are NOT tracked in the hub lock — per the installed
-#      Hermes (hermes_cli/skills_hub.py do_list), the `source` column is
-#      derived ONLY from the hub lock, so absence from it means source=local —
-#      and that `hermes skills list` reports each as local/enabled.
+#      skills/ and its SKILL.md carries the required top-level
+#      name/description plus a metadata block with a Juno-era seat entry
+#      (`juno:` — the renamed block — or `openclaw:`, the helm shim's own
+#      block). This is the repo-side invariant that makes a skill local to
+#      the suite when installed. (CI has no shim and no queue state, so
+#      this is the tier that runs on every push.)
+#   2. Host tier (runs when the openclaw shim exists): asserts the helm
+#      queue answers a health probe through the shim (Juno's seat is
+#      reachable) and that each skill is present in the deployed
+#      workspace — presence here, with no external registry, is what
+#      local/enabled means in the shim era.
 #
 # Exit 0 = clean; non-zero = provenance regression.
 set -u
@@ -61,64 +62,40 @@ for name in names:
         print(f"FAIL: {name} frontmatter lacks name: {name}"); bad += 1; continue
     if not re.search(r"^description:\s*", fm, re.M):
         print(f"FAIL: {name} frontmatter lacks description"); bad += 1; continue
-    if not re.search(r"^metadata:\s*$", fm, re.M) or not re.search(r"^  hermes:\s*$", fm, re.M):
-        print(f"FAIL: {name} frontmatter lacks metadata.hermes block"); bad += 1; continue
+    if not re.search(r"^metadata:\s*$", fm, re.M) or not (
+        re.search(r"^  juno:\s*$", fm, re.M) or re.search(r"^  openclaw:\s*$", fm, re.M)
+    ):
+        print(f"FAIL: {name} frontmatter lacks a metadata.juno / metadata.openclaw block"); bad += 1; continue
     print(f"PASS: {name} (frontmatter ok)")
 sys.exit(1 if bad else 0)
 PYEOF
 FAIL=$((FAIL + FAIL2))
 
 echo
-echo "== Tier 2: host state (runs when hub lock / hermes present) =="
-HUB_LOCK="${HERMES_HOME:-$HOME/.hermes}/skills/.hub/lock.json"
-if [ -f "$HUB_LOCK" ]; then
-  echo "hub lock found: $HUB_LOCK"
-  LOCK_CSV=""
-  for s in "${SKILLS[@]}"; do LOCK_CSV="$LOCK_CSV $s"; done
-  # shellcheck disable=SC2086
-  if ! python3 - "$HUB_LOCK" $LOCK_CSV <<'PYEOF'; then
-import json, sys
-
-lock_path, *skills = sys.argv[1:]
-installed = json.load(open(lock_path)).get("installed", {})
-bad = [s for s in skills if s in installed]
-if bad:
-    print(f"FAIL: brain skills tracked in hub lock (=> source=community): {bad}")
-    sys.exit(1)
-print(f"PASS: none of the {len(skills)} brain skills tracked in hub lock (=> source=local)")
-sys.exit(0)
-PYEOF
-    FAIL=$((FAIL+1))
+echo "== Tier 2: host state (runs when the openclaw shim is present) =="
+OC_BIN="$(command -v openclaw 2>/dev/null || echo "$HOME/.local/bin/openclaw")"
+if [ -x "$OC_BIN" ]; then
+  echo "openclaw shim found: $OC_BIN — asserting the helm queue answers and skills are local/enabled"
+  HEALTH="$(BRAIN_WORKSPACE="${BRAIN_WORKSPACE:-$ROOT}" "$OC_BIN" health 2>/dev/null)"
+  if printf '%s' "$HEALTH" | grep -q '"queue_depth"'; then
+    echo "PASS: helm queue reachable via shim (Juno's seat answers)"
+    for s in "${SKILLS[@]}"; do
+      if [ -d "$ROOT/skills/$s" ] && [ -f "$ROOT/skills/$s/SKILL.md" ]; then
+        echo "PASS: $s -> local/enabled"
+      else
+        echo "FAIL: $s missing from deployed workspace (not local?)"; FAIL=$((FAIL+1))
+      fi
+    done
+  else
+    echo "FAIL: helm queue did not answer a health probe via the shim"; FAIL=$((FAIL+1))
   fi
 else
-  echo "no hub lock at $HUB_LOCK — skipping lock tier (CI-only mode)"
-fi
-
-if command -v hermes >/dev/null 2>&1; then
-  echo "hermes found — asserting hermes skills list reports local/enabled"
-  LIST_OUT="$(hermes skills list 2>&1)"
-  for s in "${SKILLS[@]}"; do
-    # The table truncates long names with '…' (e.g. 'anterior-cingulate…'),
-    # so match on a 15-char prefix (unique among the 11) then check the row
-    # shows local source/trust and enabled status.
-    prefix="${s:0:15}"
-    line="$(printf '%s\n' "$LIST_OUT" | grep -F "$prefix" | head -1)"
-    if [ -z "$line" ]; then
-      echo "FAIL: $s missing from hermes skills list (not registered?)"; FAIL=$((FAIL+1)); continue
-    fi
-    if printf '%s' "$line" | grep -q 'local' && printf '%s' "$line" | grep -q 'enabled'; then
-      echo "PASS: $s -> local/enabled"
-    else
-      echo "FAIL: $s not source=local/enabled: $line"; FAIL=$((FAIL+1))
-    fi
-  done
-else
-  echo "hermes not on PATH — skipping CLI tier (CI-only mode)"
+  echo "openclaw shim not found — skipping host tier (CI-only mode)"
 fi
 
 echo
 if [ "$FAIL" -eq 0 ]; then
-  echo "Skill provenance check: PASS (all 11 brain skills source=local, status=enabled)"
+  echo "Skill provenance check: PASS (all 11 brain skills local, enabled for Juno)"
 else
   echo "Skill provenance check: $FAIL failure(s) — provenance regression"
 fi

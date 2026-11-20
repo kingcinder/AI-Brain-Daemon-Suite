@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # Import the kernel with a hermetic workspace so module-level constants
 # (SKILLS_DIR etc.) point at the checkout, not the live brain's workspace.
 os.environ.setdefault("WORKSPACE", str(ROOT))
-os.environ["DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK"] = "1"
+os.environ["DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK"] = "1"
 
 _spec = importlib.util.spec_from_file_location(
     "deep_brain_kernel", ROOT / "deep-brain-kernel.py"
@@ -124,7 +124,7 @@ class ScheduleTableTest(unittest.TestCase):
         """The JOBS table must be internally consistent: globally-unique
         minutes, every direct job's script present + executable + non-empty,
         spawn-provider shim intact. Mirrors the CI gate (WORKSPACE=checkout,
-        hermes check downgraded)."""
+        juno check downgraded)."""
         problems = kernel.check_schedule_table()
         self.assertEqual(problems, 0)
 

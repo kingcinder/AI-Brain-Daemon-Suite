@@ -3,14 +3,14 @@
 #
 # Proves the signal → proposal → target linkage through the REAL generator:
 #   * A fixture with a known verification failure must steer
-#     generate-proposals-llm.sh --emit-target to that failing module's script
+#     generate-proposals-juno.sh --emit-target to that failing module's script
 #     (the suite aims its self-modification at measured weaknesses).
 #   * With no failure signals, the generator falls back to the static
 #     preference list (steered_by=preference).
 #   * The emitted target must pass check-target (mutable module, real file).
 #
 # Uses an isolated temp WORKSPACE for the health signals; the suite tree
-# itself is read-only (SUITE_ROOT = repo root). No LLM call happens:
+# itself is read-only (SUITE_ROOT = repo root). Juno is not asked:
 # --emit-target resolves the target and exits before any provider is hit.
 #
 # Run: bash tests/test_m5_proposal_linkage.sh
@@ -19,14 +19,14 @@
 set -euo pipefail
 PASS=0; FAIL=0
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-GEN="$ROOT/core/self-mod/generate-proposals-llm.sh"
+GEN="$ROOT/core/self-mod/generate-proposals-juno.sh"
 WS=$(mktemp -d)
 WS2=$(mktemp -d)
 trap 'rm -rf "$WS" "$WS2"' EXIT
 pass() { PASS=$((PASS + 1)); echo "  ✅ $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "  ❌ $1"; }
 
-[ -x "$GEN" ] || { echo "FAIL: generate-proposals-llm.sh not executable"; exit 1; }
+[ -x "$GEN" ] || { echo "FAIL: generate-proposals-juno.sh not executable"; exit 1; }
 mkdir -p "$WS/memory/self-mod/proposals"
 
 # ── Seed a verification failure for a real mutable module ────────────────

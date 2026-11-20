@@ -3,8 +3,9 @@
 # Covers:
 #   * M1 job registration: self_mod_proposal_cycle exists in the daemon's
 #     JOBS table with a globally-unique minute and weekly (Sunday) cadence.
-#   * M2 autonomy gate: full_review queues for human approval (deploy skipped
-#     with reason), relaxed_review auto-deploys the accepted proposal.
+#   * M9 approval gate (2026-11-13): Juno is the gate — full_review deploys
+#     the accepted proposal on her approval (nothing queues for a human),
+#     relaxed_review deploys as before.
 #   * Back-compat: without --autonomy-gate the pipeline deploys as before.
 #
 # Uses an isolated temp suite + WORKSPACE. Does not touch the real project
@@ -13,6 +14,11 @@
 # Usage: bash tests/run_phase4_harness.sh
 
 set -u
+# Juno-direct: on an empty workspace the pipeline's proposal generation asks
+# Juno through the helm queue and degrades gracefully when no drainer
+# answers. Bound that wait so the harness stays inside the declared-sweep
+# per-test cap — the degrade path is what is under test, not the wait.
+export JUNO_PROPOSAL_TIMEOUT="${JUNO_PROPOSAL_TIMEOUT:-25}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CORE="$ROOT/core"
 SM="$CORE/self-mod"
@@ -168,8 +174,8 @@ set_review_mode() {
 EOF
 }
 
-# ── M2: full_review → human approval required (no auto-deploy) ──────────────
-section "M2-full-review-blocks-deploy"
+# ── M9: full_review → Juno approves, deploy proceeds ────────────────────────
+section "M9-full-review-juno-approves"
 set_review_mode full_review
 PROP=$(make_proposal prop_autonomy_full '#!/bin/bash
 # demo
@@ -180,20 +186,20 @@ PIPE=$(run_pipeline "$PROP" --autonomy-gate 2>/tmp/p4_fr_err.$$) || {
   PIPE="{}"
 }
 rm -f /tmp/p4_fr_err.$$
-if echo "$PIPE" | jq -e '.deploy.skipped==true and .deploy.reason=="full_review_human_approval_required" and .deploy.review_mode=="full_review"' >/dev/null; then
-  pass "full_review: deploy skipped with human-approval reason"
+if echo "$PIPE" | jq -e '(.deploy.skipped != true) and .deploy.proposal_id=="prop_autonomy_full"' >/dev/null; then
+  pass "full_review: Juno approved — pipeline deployed (not queued for human)"
 else
-  fail "full_review: deploy skipped with reason ($PIPE)"
+  fail "full_review: Juno approved — pipeline deployed ($PIPE)"
 fi
 if echo "$PIPE" | jq -e '.review_mode=="full_review" and .autonomy_gate==true' >/dev/null; then
   pass "summary reports autonomy_gate + full_review"
 else
   fail "summary reports autonomy_gate + full_review ($PIPE)"
 fi
-if grep -q 'hello-v1' "$SUITE/skills/demo-mod/scripts/hello.sh"; then
-  pass "full_review: target file unchanged (no auto-deploy)"
+if grep -q 'hello-v2-full' "$SUITE/skills/demo-mod/scripts/hello.sh"; then
+  pass "full_review: content applied to suite"
 else
-  fail "full_review: target file unchanged (got $(cat "$SUITE/skills/demo-mod/scripts/hello.sh"))"
+  fail "full_review: content applied (got $(cat "$SUITE/skills/demo-mod/scripts/hello.sh"))"
 fi
 rm -f "$PROP"
 
@@ -276,13 +282,13 @@ rm -rf "$WORKSPACE3"
 
 # ── M1: tick script smoke test (scheduled cycle degrades gracefully) ──────
 section "M1-tick-smoke"
-# Fresh empty workspace: LLM generation fails fast (no local server), pipeline
+# Fresh empty workspace: Juno generation fails fast (no drainer answering), pipeline
 # continues with an empty store, writes a run summary, and exits 0.
 WS_TICK=$(mktemp -d)
 mkdir -p "$WS_TICK/memory"
 if WORKSPACE="$WS_TICK" bash "$ROOT/skills/self-mod-runner/scripts/proposal-cycle-tick.sh" \
   >/tmp/p4_tick_out.$$ 2>/tmp/p4_tick_err.$$; then
-  pass "tick script exits 0 on empty workspace (LLM gen degrades gracefully)"
+  pass "tick script exits 0 on empty workspace (Juno gen degrades gracefully)"
 else
   cat /tmp/p4_tick_err.$$ >&2
   fail "tick script exits 0 on empty workspace (got rc=$?)"

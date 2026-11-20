@@ -2,7 +2,7 @@
 # Unit: health-context.sh (ROADMAP M5) surfaces daemon failure streaks,
 # verification failures, ACC lessons, graduation state, and proposal-store
 # counts as ONE valid JSON block — the outcome-driven input to the self-mod
-# LLM proposal generator.
+# Juno proposal generator.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export WORKSPACE; WORKSPACE=$(mktemp -d)

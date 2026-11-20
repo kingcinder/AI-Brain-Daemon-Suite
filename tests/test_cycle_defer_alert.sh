@@ -1,20 +1,26 @@
 #!/bin/bash
-# test_cycle_defer_alert.sh — The weekly self-mod cycle must ALERT on deferral.
+# test_cycle_defer_alert.sh — M9 contract: the weekly self-mod cycle NEVER defers.
 #
-# When proposal-cycle-tick.sh runs under a steward_mode + full_review contract,
-# the pipeline defers (--defer-gate) instead of churning — and the tick must
-# make that visible, not silent:
-#   1. A brain-events.jsonl signal ({type:"self-mod", event:"cycle_deferred"}).
-#   2. A daemon-status marker (memory/self-mod/last-deferral.json) that
-#      deep-brain-kernel.py --status and the dashboard /__daemon + status bar
-#      read — so a steward who expected the weekly cycle to run notices it
-#      waited for the human.
-# Also: an auto_mode contract runs (not defers) and CLEARS the marker.
+# Before M9, proposal-cycle-tick.sh under a steward_mode + full_review
+# contract deferred (--defer-gate) and the tick had to alert on it. M9
+# (Dither's order, 2026-11-13) moved the approval gate to Juno: the cycle
+# always runs, no proposal waits for a human, and no deferral artifacts
+# are produced. This test now proves the negative space:
+#   1. latest.json is NOT deferred under steward_mode + full_review.
+#   2. No cycle_deferred signal is written to brain-events.jsonl.
+#   3. No last-deferral.json marker is written — and a stale pre-M9 marker
+#      is CLEARED by the run.
+#   4. deep-brain-kernel.py --status shows no DEFERRED line.
+# Also: an auto_mode contract runs and clears the marker (unchanged).
 #
 # Run: bash tests/test_cycle_defer_alert.sh
 # Requires: bash, jq, python3 (the suite's standard set)
 
 set -euo pipefail
+# Juno-direct: proposal generation asks Juno through the helm queue and
+# degrades gracefully when no drainer answers. Bound that wait so the cycle
+# tests stay fast — the degrade path is what is under test, not the wait.
+export JUNO_PROPOSAL_TIMEOUT="${JUNO_PROPOSAL_TIMEOUT:-25}"
 PASS=0; FAIL=0
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 pass() { PASS=$((PASS + 1)); echo "  ✅ $1"; }
@@ -27,48 +33,49 @@ mkdir -p "$WS/memory/self-mod/pipeline-runs"
 cat > "$WS/memory/self-mod/autonomy-state.json" << 'EOF'
 {"mode":"steward_mode","auto":false,"computed_at":"2026-08-08T09:00:00Z","evidence":{}}
 EOF
+# Seed a stale pre-M9 marker — the M9 run must clear it, not refresh it.
+echo '{"deferred":true,"at":"2026-08-07T09:00:00Z","autonomy_mode":"steward_mode","review_mode":"full_review","reason":"steward_full_review_deferred"}' \
+  > "$WS/memory/self-mod/last-deferral.json"
 
-echo "Test 1: steward+full_review → tick defers and alerts"
+echo "Test 1: steward+full_review → tick RUNS under M9 (no deferral)"
 if WORKSPACE="$WS" bash "$ROOT/skills/self-mod-runner/scripts/proposal-cycle-tick.sh" \
     >/tmp/cda_out.$$ 2>/tmp/cda_err.$$; then
-  pass "tick exits 0 on deferral (defer is a successful no-op, not a failure)"
+  pass "tick exits 0 under steward+full_review (cycle ran)"
 else
   cat /tmp/cda_err.$$ >&2
-  fail "tick exits 0 on deferral (rc=$?)"
+  fail "tick exits 0 under steward+full_review (rc=$?)"
 fi
 rm -f /tmp/cda_out.$$ /tmp/cda_err.$$
 
-# 1) latest.json genuinely deferred
-if jq -e '.deferred == true' "$WS/memory/self-mod/pipeline-runs/latest.json" >/dev/null 2>&1; then
-  pass "pipeline run marked deferred:true in latest.json"
+# 1) latest.json is a normal run, not deferred
+if jq -e '.deferred != true' "$WS/memory/self-mod/pipeline-runs/latest.json" >/dev/null 2>&1; then
+  pass "pipeline run NOT deferred in latest.json"
 else
-  fail "latest.json not deferred: $(cat "$WS/memory/self-mod/pipeline-runs/latest.json" 2>/dev/null)"
+  fail "latest.json deferred under M9: $(cat "$WS/memory/self-mod/pipeline-runs/latest.json" 2>/dev/null)"
 fi
 
-# 2) brain-events.jsonl signal
+# 2) no brain-events.jsonl deferral signal
 if [ -f "$WS/memory/brain-events.jsonl" ] && \
-   jq -se 'any(.[]; .type == "self-mod" and .event == "cycle_deferred" and .autonomy_mode == "steward_mode")' \
+   jq -se 'any(.[]; .type == "self-mod" and .event == "cycle_deferred")' \
      "$WS/memory/brain-events.jsonl" >/dev/null 2>&1; then
-  pass "brain-events.jsonl carries the self-mod cycle_deferred signal"
+  fail "brain-events.jsonl carries a cycle_deferred signal under M9: $(cat "$WS/memory/brain-events.jsonl" 2>/dev/null)"
 else
-  fail "brain-events.jsonl missing cycle_deferred: $(cat "$WS/memory/brain-events.jsonl" 2>/dev/null)"
+  pass "brain-events.jsonl carries no cycle_deferred signal"
 fi
 
-# 3) daemon-status marker
-if [ -f "$WS/memory/self-mod/last-deferral.json" ] && \
-   jq -e '.deferred == true and .autonomy_mode == "steward_mode" and .review_mode == "full_review"' \
-     "$WS/memory/self-mod/last-deferral.json" >/dev/null 2>&1; then
-  pass "last-deferral.json marker written (deferred, steward+full_review)"
+# 3) stale marker cleared, none written
+if [ ! -f "$WS/memory/self-mod/last-deferral.json" ]; then
+  pass "stale last-deferral.json cleared; no new marker written"
 else
-  fail "last-deferral.json malformed: $(cat "$WS/memory/self-mod/last-deferral.json" 2>/dev/null)"
+  fail "last-deferral.json still present after M9 run: $(cat "$WS/memory/self-mod/last-deferral.json" 2>/dev/null)"
 fi
 
-# 4) kernel --status surfaces it
+# 4) kernel --status surfaces no DEFERRED line
 STATUS_OUT=$(WORKSPACE="$WS" python3 "$ROOT/deep-brain-kernel.py" --status 2>&1 || true)
 if echo "$STATUS_OUT" | grep -q 'DEFERRED'; then
-  pass "--status prints the DEFERRED line (steward sees it in the terminal)"
+  fail "--status prints a DEFERRED line under M9: $STATUS_OUT"
 else
-  fail "--status missing DEFERRED line: $STATUS_OUT"
+  pass "--status prints no DEFERRED line"
 fi
 
 # ── Test 2: auto_mode contract → runs, and the marker is cleared ─────────
@@ -92,7 +99,7 @@ echo '{"deferred":true,"at":"2026-08-07T09:00:00Z","autonomy_mode":"steward_mode
 
 if WORKSPACE="$WS2" bash "$ROOT/skills/self-mod-runner/scripts/proposal-cycle-tick.sh" \
     >/tmp/cda2_out.$$ 2>/tmp/cda2_err.$$; then
-  pass "tick exits 0 under auto_mode (pipeline runs, LLM gen degrades gracefully)"
+  pass "tick exits 0 under auto_mode (pipeline runs, Juno gen degrades gracefully)"
 else
   cat /tmp/cda2_err.$$ >&2
   fail "tick exits 0 under auto_mode (rc=$?)"
@@ -114,7 +121,7 @@ rm -rf "$WS2"
 
 echo ""
 echo "─────────────────────────────────────────"
-echo "Cycle Deferral Alert Tests: $PASS passed, $FAIL failed"
+echo "Cycle Deferral (M9) Tests: $PASS passed, $FAIL failed"
 echo "─────────────────────────────────────────"
 [ "$FAIL" -gt 0 ] && exit 1
 exit 0

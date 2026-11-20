@@ -16,7 +16,7 @@ EOF
 # sensed channel lands at −0.14, PE = 0.24 ≥ 0.05 → recorded.
 # NOTE: insula scripts honor OPENCLAW_WORKSPACE (not WORKSPACE) — the
 # existing test_insula_state.sh sets both; must do the same or the script
-# silently operates on the live ~/.hermes/workspace.
+# silently operates on the live ~/.juno-brain/workspace.
 WORKSPACE="$WORKSPACE" OPENCLAW_WORKSPACE="$WORKSPACE" bash "$ROOT/skills/insula-memory/scripts/update-state.sh" --signal discord --intensity 0.6 >/dev/null
 jq -e '.recentDiscrepancies | length >= 1' "$WORKSPACE/memory/interoceptive-state.json" >/dev/null
 jq -e '[.recentDiscrepancies[].error] | any(. > 0.15)' "$WORKSPACE/memory/interoceptive-state.json" >/dev/null

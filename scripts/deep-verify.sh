@@ -29,7 +29,7 @@
 #   WORKSPACE or --workspace    — where evaluate-proposal.sh persists baseline
 #       metrics / graduation streak / provenance. Defaults to an isolated
 #       mktemp scratch (like CI's runner.temp), so the live brain's
-#       ~/.hermes/workspace is never touched; removed on exit.
+#       ~/.juno-brain/workspace is never touched; removed on exit.
 
 set -euo pipefail
 

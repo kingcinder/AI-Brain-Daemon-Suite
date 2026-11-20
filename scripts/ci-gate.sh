@@ -7,8 +7,8 @@
 #
 #   1. core/schema/validate-manifest.sh --all
 #   2. deep-brain-kernel.py --check   (WORKSPACE=<checkout>,
-#                                      DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1 —
-#                                      hermes presence is a host concern, not a
+#                                      DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1 —
+#                                      shim presence is a host concern, not a
 #                                      gate concern, on runners and desktops
 #                                      alike)
 #   3. tests/run_skill_unit_tests.sh
@@ -16,7 +16,7 @@
 #        (isolated scratch WORKSPACE, mirroring CI's
 #         runner.temp/verification-workspace — the sweep writes verification
 #         state, appends to the report ledger, and publishes signals, none of
-#         which may touch the live brain's ~/.hermes/workspace)
+#         which may touch the live brain's ~/.juno-brain/workspace)
 #
 # Fails fast on the first red step, exactly like a failing CI job; exit 0
 # means the same four commands just went green in the same order CI runs them.
@@ -76,7 +76,7 @@ step() { # name command...
 step "1/5 validate manifests" bash core/schema/validate-manifest.sh --all
 step "2/5 daemon job table (deep-brain-kernel.py --check)" env \
   WORKSPACE="$SUITE_ROOT" \
-  DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1 \
+  DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1 \
   python3 deep-brain-kernel.py --check
 step "3/5 skill unit tests" bash tests/run_skill_unit_tests.sh
 step "4/5 verification sweep" env \

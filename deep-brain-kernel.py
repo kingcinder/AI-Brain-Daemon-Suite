@@ -69,8 +69,7 @@ VERIFICATION STATUS (stated precisely, not implied by confident-looking code):
 
 POST-REVIEW FIX (bug scan, applied here): run_spawn() originally awaited
 proc.communicate() with no timeout while holding _spawn_lock — one hung
-    `hermes chat` call (network stall, model stuck generating, an
-agent turn that never returns) would silently starve every other spawn-type
+    Juno session call (queue stall, an agent turn that never returns) would silently starve every other spawn-type
 job forever, with nothing logged, until a manual restart. Confirmed with an
 isolated asyncio.Lock repro, then with a real hung subprocess against the
 actual _spawn_lock. Fixed via _await_with_timeout() wrapping
@@ -120,18 +119,18 @@ logging.basicConfig(
 logging.Formatter.converter = time.gmtime
 log = logging.getLogger("deep-brain-kernel")
 
-WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / ".hermes" / "workspace")))
+WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / ".juno-brain" / "workspace")))
 SKILLS_DIR = WORKSPACE / "skills"
 
-# ROADMAP M3 + Gap-2 follow-on: provider abstraction for spawn jobs.
-# SPAWN_PROVIDER=hermes (default, external harness), local (suite's own
-# llm-call.sh endpoint), or agentloop (internal agentic loop — tool use +
-# session memory, core/agent-loop/agent-loop.sh). Unknown values fall back to
-# hermes with a warning — never fail to launch.
-SPAWN_PROVIDER = os.environ.get("SPAWN_PROVIDER", "agentloop").strip().lower()
-if SPAWN_PROVIDER not in ("hermes", "local", "agentloop"):
-    log.warning("unknown SPAWN_PROVIDER '%s' — defaulting to hermes", SPAWN_PROVIDER)
-    SPAWN_PROVIDER = "hermes"
+# ROADMAP M3 + Gap-2 follow-on, Juno-direct (2026-11-20): there is exactly
+# one spawn provider — Juno herself, through her internal agentic loop
+# (tool use + session memory, core/agent-loop/agent-loop.sh), dispatched by
+# core/spawn/spawn-provider.sh. Any other SPAWN_PROVIDER value is unknown:
+# warn and use juno — never fail to launch.
+SPAWN_PROVIDER = os.environ.get("SPAWN_PROVIDER", "juno").strip().lower()
+if SPAWN_PROVIDER != "juno":
+    log.warning("unknown SPAWN_PROVIDER '%s' — Juno is the only provider; using juno", SPAWN_PROVIDER)
+    SPAWN_PROVIDER = "juno"
 SPAWN_PROVIDER_SHIM = Path(__file__).resolve().parent / "core" / "spawn" / "spawn-provider.sh"
 
 # XDG runtime dir for this user — correct place for ephemeral daemon state
@@ -739,7 +738,7 @@ class CgroupThrottle:
 class DaemonState:
     # FIX #3: last_fired_key alone can't answer "has this job actually been
     # working" — a job can fire every tick and fail every tick (missing
-    # script, hermes gone, bad GPU-parsing exception) and this state file
+    # script, Juno shim gone, bad GPU-parsing exception) and this state file
     # would look identical to a healthy one. job_stats adds a persistent,
     # per-job outcome history: total success/failure counts, a consecutive-
     # failure streak (the thing you actually care about — "has this been
@@ -804,7 +803,7 @@ class DaemonState:
     def record_result(self, job_name: str, success: bool, error: Optional[str] = None) -> None:
         """Record a job's actual execution outcome (not a defer/skip — only
         a job that genuinely ran and either finished or failed/timed out).
-        Deferrals (VRAM limit, PSI pressure, hermes missing, script missing)
+        Deferrals (VRAM limit, PSI pressure, Juno shim missing, script missing)
         deliberately do NOT call this: those are the scheduler correctly
         declining to run, not the job failing, and mixing the two would
         make a well-behaved deferral look identical to a broken job in
@@ -1033,11 +1032,11 @@ JOBS: list[Job] = [
     Job("heartbeat_beat", "direct", "*", "7,37", "heartbeat-memory/scripts/beat.sh"),
     Job("hippocampus_decay", "direct", "3", "2", "hippocampus-memory/scripts/decay.sh"),
     Job("hippocampus_encoding", "spawn", "0,3,6,9,12,15,18,21", "0",
-        "Run hippocampus encoding with LLM summarization: 1. Run the encoding pipeline: "
+        "Run hippocampus encoding with Juno summarization: 1. Run the encoding pipeline: "
         "encode-pipeline.sh --no-spawn 2. Check pending memories 3. If pending exist, "
         "summarize each to ~100 chars 4. Update index.json 5. Delete pending-memories.json "
         "6. Sync core 7. Report results",
-        spawn_max_steps=12, thinking_model=True),
+        spawn_max_steps=12, direct_reply=True),
     # NEW: weekly consolidation and self-reflection. consolidate.sh, reflect.sh, and
     # their prompt files (prompts/consolidation-guide.md, prompts/self-reflect.md,
     # prompts/weekly-reflection-event.md) already existed and were designed for
@@ -1046,16 +1045,28 @@ JOBS: list[Job] = [
     # scheduled them. They were manual-invocation-only in every prior version of
     # this suite. days="6" = Sunday (Python's datetime.weekday(): 0=Mon..6=Sun).
     Job("hippocampus_weekly_consolidation", "spawn", "2", "34",
-        "Run weekly memory consolidation: 1) Run consolidate.sh to list the past "
-        "week's daily notes 2) Follow prompts/consolidation-guide.md to review each "
+        "Run nightly memory consolidation (cadence changed weekly→nightly "
+        "2026-11-13, Dither-ordered): 1) Run consolidate.sh to list the recent "
+        "daily notes 2) Follow prompts/consolidation-guide.md to review each "
         "daily note and extract user/self/relationship/world facts into "
         "memory/{user,self,relationship,world}/*.md 3) Update MEMORY.md with the "
         "most important distilled insights 4) Archive or delete routine/superseded "
-        "daily-note content per the guide 5) Report what was consolidated",
-        days="6"),
+        "daily-note content per the guide 5) Run core/self-mod/chink-check.sh and "
+        "read memory/self-mod/chinks-latest.json: the chinks are part of this "
+        "consolidation — carry every actionable chink (medium+) into the report, "
+        "and where a chink is a code/capability gap, name it as an evolution "
+        "candidate for the proposal cycle (chinks are the nucleation sites "
+        "proposals crystallize around); on any night where a chink makes the "
+        "need pressing, author the proposal that night — genesis and final "
+        "approval are Juno's; the weekly cycle is the minimum, not the limit "
+        "6) Report what was consolidated"),
     Job("hippocampus_weekly_reflection", "spawn", "2", "44",
         "Run weekly self-reflection: 1) Run reflect.sh to load the Weekly Reflection "
         "section of prompts/self-reflect.md (also see prompts/weekly-reflection-event.md) "
+        "1b) Read memory/self-mod/chinks-latest.json (run core/self-mod/chink-check.sh "
+        "first if it is stale): the current chinks are the evidence base for this "
+        "reflection's pattern and work-on answers — engage them directly, do not "
+        "reflect in the abstract while a named gap sits unaddressed "
         "2) Honestly answer: how have I changed this week, what opinions shifted or "
         "strengthened, how has the relationship with the user evolved, what patterns "
         "do I notice in myself, what am I proud of, what do I want to work on "
@@ -1069,20 +1080,20 @@ JOBS: list[Job] = [
         "Run amygdala emotional encoding: 1) Run preprocess-emotions.sh 2) Read "
         "encode-emotions.md 3) Update state for significant emotions 4) Update "
         "watermark 5) Sync state",
-        spawn_max_steps=12, thinking_model=True),
+        spawn_max_steps=12, direct_reply=True),
     Job("vta_decay", "direct", "4,12,20", "8", "vta-memory/scripts/decay-drive.sh"),
     Job("vta_encoding", "spawn", "0,3,6,9,12,15,18,21", "20",
         "Run VTA reward encoding: 1) Run preprocess-rewards.sh 2) Read encode-rewards.md "
         "3) Log rewards found 4) Resolve fulfilled anticipations 5) Sync state "
         "6) Update watermark",
-        spawn_max_steps=12, thinking_model=True),
+        spawn_max_steps=12, direct_reply=True),
     Job("basal_ganglia_decay", "direct", "4", "12", "basal-ganglia-memory/scripts/decay-habits.sh"),
     Job("basal_ganglia_encoding", "spawn", "0,3,6,9,12,15,18,21", "30",
         "Run basal-ganglia encoding pipeline: 1. Run encode-pipeline.sh --no-spawn "
         "2. Check pending habits 3. Classify per prompts/encode-habits.md: new habit, "
         "reinforce existing, or new suppression 4. Update habit-state.json "
         "5. Delete pending-habits.json 6. Sync state 7. Report results",
-        spawn_max_steps=12, thinking_model=True),
+        spawn_max_steps=12, direct_reply=True),
     Job("insula_encoding", "direct", "0,3,6,9,12,15,18,21", "40", "insula-memory/scripts/encode-pipeline.sh"),
     Job("insula_decay", "direct", "0,4,8,12,16,20", "14", "insula-memory/scripts/decay-sense.sh"),
     Job("acc_conflict_encoding", "direct", "0,3,6,9,12,15,18,21", "50", "anterior-cingulate-memory/scripts/encode-pipeline.sh"),
@@ -1094,7 +1105,7 @@ JOBS: list[Job] = [
     Job("social_encoding", "spawn", "0,3,6,9,12,15,18,21", "52",
         "Run social-memory encoding: 1) Run encode-pipeline.sh 2) Detect relationship "
         "signals 3) Update relationships 4) Update watermark 5) Sync state",
-        spawn_max_steps=12, thinking_model=True),
+        spawn_max_steps=12, direct_reply=True),
     Job("cerebellum_refine", "direct", "0,8,16", "26", "cerebellum-memory/scripts/refine.sh"),
     # V4.0 Phase 2: isolated reflection + goal proposal cycle (direct / non-inference).
     # Minute 28 is unique in this table. Runs 3× daily; promote path gates on E < 0.75.
@@ -1105,14 +1116,15 @@ JOBS: list[Job] = [
     Job("self_mod_monitor", "direct", "2,10,18", "32",
         "self-mod-runner/scripts/monitor-tick.sh"),
     # ROADMAP M1: scheduled self-mod proposal cycle (weekly, Sunday). Minute 46 unique.
-    # Runs run-pipeline.sh --generate-llm with the M2 autonomy gate: relaxed_review may
-    # auto-deploy; full_review queues for human approval. LLM provider failure is
-    # non-fatal — the pipeline continues with whatever is already queued.
+    # Runs run-pipeline.sh --generate-juno with the autonomy gate. M9 (2026-11-13):
+    # Juno is the approval gate — accepted proposals deploy on her approval in
+    # any review mode; nothing queues for human approval. A Juno generation
+    # failure is non-fatal — the pipeline continues with whatever is queued.
     Job("self_mod_proposal_cycle", "direct", "3", "46",
         "self-mod-runner/scripts/proposal-cycle-tick.sh", days="6"),
-    # Open Item 5: Hermes session → suite transcript bridge. Refreshes the
-    # per-message transcripts the preprocess pipelines read from ~/.hermes/sessions
-    # by running `hermes sessions export --format jsonl` and transforming it to the
+    # Open Item 5: Juno session → suite transcript bridge. Refreshes the
+    # per-message transcripts the preprocess pipelines read by transforming
+    # Juno's own session files (~/.openclaw/agents/main/sessions) into the
     # parser shape. Minute 58 is unique in this table; runs 4× daily just before the
     # encoding blocks (hours 6/12/18/0), so each encoding sees fresh transcripts.
     Job("transcript_export", "direct", "5,11,17,23", "58",
@@ -1197,7 +1209,7 @@ def check_schedule_table() -> int:
             print(f"{job.name:<28} {job.kind:<8} {job.days:<10} {job.hours:<24} {job.minutes:<10} {status}")
         else:
             print(f"{job.name:<28} {job.kind:<8} {job.days:<10} {job.hours:<24} {job.minutes:<10} "
-                  f"(hermes chat task, {len(job.target)} chars)")
+                  f"(Juno spawn task, {len(job.target)} chars)")
     print()
     shim_ok = SPAWN_PROVIDER_SHIM.is_file() and os.access(SPAWN_PROVIDER_SHIM, os.X_OK)
     if shim_ok:
@@ -1205,20 +1217,36 @@ def check_schedule_table() -> int:
     else:
         print(f"spawn-provider shim: MISSING or not executable ({SPAWN_PROVIDER_SHIM})")
         problems += 1
-    if shutil.which("hermes"):
-        print(f"hermes: found ({shutil.which('hermes')})")
-    elif os.environ.get("DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK") == "1":
-        # hermes presence is a HOST-environment concern, not a job-table-
-        # integrity one: --check on a machine that legitimately has no hermes
-        # (CI runners, fresh sandboxes) should still fail on table problems.
-        # Opt-in downgrade (set DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1) so the
-        # problem count is untouched by something --check can't fix here.
-        print("hermes: NOT FOUND — downgraded to a warning "
-              "(DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1); spawn-type jobs will be "
-              "skipped with a warning on the real host until hermes is installed",
+    # Juno check: the openclaw shim must be resolvable and the helm queue
+    # must answer a health probe. Shim presence is a HOST-environment
+    # concern, not a job-table-integrity one: --check on a machine that
+    # legitimately has no shim (CI runners, fresh sandboxes) should still
+    # fail on table problems. Opt-in downgrade (set
+    # DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1) so the problem count is
+    # untouched by something --check can't fix here.
+    _oc = shutil.which("openclaw") or str(Path.home() / ".local" / "bin" / "openclaw")
+    _oc_ok = Path(_oc).is_file() and os.access(_oc, os.X_OK)
+    _queue_ok = False
+    if _oc_ok:
+        try:
+            _env = dict(os.environ, BRAIN_WORKSPACE=str(WORKSPACE))
+            _probe = subprocess.run([_oc, "health"], capture_output=True,
+                                    text=True, timeout=5, env=_env)
+            _health = json.loads(_probe.stdout or "{}")
+            _queue_ok = "queue_depth" in _health
+        except Exception:
+            _queue_ok = False
+    if _oc_ok and _queue_ok:
+        print(f"juno: shim found ({_oc}); helm queue reachable (health probe ok)")
+    elif os.environ.get("DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK") == "1":
+        print("juno: shim/queue NOT verified — downgraded to a warning "
+              "(DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1); spawn-type jobs will be "
+              "skipped with a warning on the real host until the openclaw shim "
+              "and helm queue are in place",
               file=sys.stderr)
     else:
-        print("hermes: NOT FOUND — spawn-type jobs will be skipped with a warning until this is fixed",
+        print("juno: shim/queue NOT verified — spawn-type jobs will be skipped "
+              "with a warning until the openclaw shim and helm queue are in place",
               file=sys.stderr)
         problems += 1
     return problems
@@ -1283,7 +1311,7 @@ class SingleInstanceLock:
 
 
 # ── Job execution ────────────────────────────────────────────────────────────
-_spawn_lock = asyncio.Lock()  # one agent-turn (real LLM inference) at a time
+_spawn_lock = asyncio.Lock()  # one Juno agent-turn at a time
 _running_procs: dict[str, TrackedProcess] = {}
 
 
@@ -1294,7 +1322,7 @@ async def _await_with_timeout(proc: "asyncio.subprocess.Process", tracked: Track
     exit, and return (b"", True) rather than raising. This is the fix for a
     real starvation bug: run_spawn() previously awaited proc.communicate()
     with NO timeout while holding _spawn_lock, so one hung
-    `hermes chat` call (network stall, model stuck generating, etc.)
+    Juno session call (queue stall, an answer that never arrives, etc.)
     silently starved every other spawn-type job forever — nothing errored,
     nothing logged, the daemon just stopped doing all 8 spawn-type jobs until a
     manual restart. Confirmed with an isolated asyncio.Lock repro before
@@ -1409,13 +1437,9 @@ def _audit_spawn(job: Job, yolo_enabled: bool) -> None:
 
 async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
                      psi_threshold: float, enable_yolo: bool, daemon_state: "DaemonState") -> None:
-    # ROADMAP M3: the hermes guard only applies to the hermes provider — with
-    # SPAWN_PROVIDER=local the suite's own llm-call.sh endpoint replaces it, and
-    # an unavailable local server is a recorded job failure, not a silent skip.
-    if SPAWN_PROVIDER == "hermes" and not shutil.which("hermes"):
-        log.warning("%s: due now, but hermes is not in PATH — skipped (this needs "
-                    "real agent reasoning, not just a script)", job.name)
-        return
+    # Juno-direct: the only guard is the spawn-provider shim itself — if it
+    # is missing, that is a recorded job failure, not a silent skip (checked
+    # immediately below).
     if not SPAWN_PROVIDER_SHIM.is_file():
         log.error("%s: spawn-provider shim missing at %s — recording failure",
                   job.name, SPAWN_PROVIDER_SHIM)
@@ -1426,7 +1450,7 @@ async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
     vram = gpu_vram_percent()
     if vram is not None and vram >= vram_limit:
         log.warning("%s: deferred — GPU VRAM at %.1f%% (limit %.1f%%), protecting active "
-                    "local inference", job.name, vram, vram_limit)
+                    "Juno's active work", job.name, vram, vram_limit)
         return
 
     # FIX #5: instantaneous point-in-time PSI check, in addition to the
@@ -1442,44 +1466,40 @@ async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
                         job.name, label, value, psi_threshold)
             return
 
-    # FIX #6: --yolo/--accept-hooks are no longer unconditional. An
-    # unattended, cron-equivalent daemon running an agent turn with
-    # unrestricted tool/hook approval is a materially larger blast radius
-    # than the rest of this file's privilege choices (see the eBPF
-    # CAP_BPF discussion above) — it deserves the same explicit opt-in, not
-    # a default. Without --enable-yolo on the daemon's command line, spawn
-    # jobs still run, but without --yolo/--accept-hooks, so hermes falls
-    # back to its own default (non-auto-approving) tool-use behavior.
+    # FIX #6: --yolo is no longer unconditional. The flag is recorded in the
+    # spawn audit and passed to the shim (which accepts it for call
+    # compatibility — Juno's loop has no approval gate for it to bypass),
+    # but an unattended daemon flagging runs as yolo is a materially larger
+    # blast radius than the rest of this file's privilege choices (see the
+    # eBPF CAP_BPF discussion above) — it deserves the same explicit opt-in,
+    # not a default. Without --enable-yolo on the daemon's command line,
+    # spawn jobs still run, just without the --yolo flag on the dispatch.
     async with _spawn_lock:
         _audit_spawn(job, enable_yolo)
-        log.info("%s: spawning Hermes chat session%s", job.name,
-                  " (--yolo/--accept-hooks enabled)" if enable_yolo else "")
+        log.info("%s: spawning Juno session%s", job.name,
+                  " (--yolo enabled)" if enable_yolo else "")
         # ROADMAP M4: inject active executive goals so the agent turn works
         # toward promoted goals; the outcome is recorded back into PFC/ACC.
-        # ROADMAP M3: dispatch through the spawn-provider shim (hermes or
-        # local llm-call.sh) — pidfd tracking, spawn lock, and timeout are
-        # unchanged; the shim `exec`s the real worker so the tracked pid is
-        # the actual hermes/llm-call process.
+        # ROADMAP M3: dispatch through the spawn-provider shim (sole
+        # provider: Juno's loop) — pidfd tracking, spawn lock, and timeout
+        # are unchanged; the shim `exec`s the real worker so the tracked
+        # pid is the actual Juno loop process.
         active_goals = _active_goal_descriptions()
         task_text = _augment_spawn_task(job.target, active_goals)
         env = os.environ.copy()
         env["WORKSPACE"] = str(WORKSPACE)
         env["SPAWN_PROVIDER"] = SPAWN_PROVIDER
-        # AUDIT Gap 2: the agentloop provider gets a STABLE session id derived
-        # from the job name, so a recurring spawn job (e.g. acc_error_analysis)
-        # remembers its prior turns across scheduled runs — session memory is
-        # a daemon-level feature, not just a direct-invocation one.
-        if SPAWN_PROVIDER == "agentloop":
-            env["AGENT_SESSION_ID"] = job.name
-            # Per-job step budget: thinking models need more reasoning
-            # budget before producing tool calls (Carnice 35B uses ~3-4
-            # steps on reasoning alone). Non-spawn jobs keep the default.
-            env["AGENT_MAX_STEPS"] = str(job.spawn_max_steps)
-            # Thinking-model flag: when set, spawn-provider.sh appends a
-            # no-reasoning suffix to the task text so the model skips
-            # chain-of-thought and produces tool calls directly.
-            if job.thinking_model:
-                env["AGENT_THINKING_MODEL"] = "1"
+        # AUDIT Gap 2: Juno spawn jobs get a STABLE session id derived from
+        # the job name, so a recurring spawn job (e.g. acc_error_analysis)
+        # remembers its prior turns across scheduled runs — session memory
+        # is a daemon-level feature, not just a direct-invocation one.
+        env["AGENT_SESSION_ID"] = job.name
+        # Per-job step budget for Juno's loop turns.
+        env["AGENT_MAX_STEPS"] = str(job.spawn_max_steps)
+        # Direct-reply flag: when set, spawn-provider.sh appends a suffix
+        # asking Juno to answer with tool calls or a final answer directly.
+        if job.direct_reply:
+            env["AGENT_DIRECT_REPLY"] = "1"
         cmd = ["bash", str(SPAWN_PROVIDER_SHIM), "--task", task_text]
         if enable_yolo:
             cmd.append("--yolo")
@@ -1501,14 +1521,14 @@ async def run_spawn(job: Job, vram_limit: float, spawn_timeout: float,
             if timed_out:
                 # FIX #3: a timeout is a failure outcome, not a no-op — record it.
                 daemon_state.record_result(job.name, success=False,
-                                            error=f"hermes chat timed out after {spawn_timeout:.0f}s")
+                                            error=f"Juno session timed out after {spawn_timeout:.0f}s")
             elif proc.returncode == 0:
-                log.info("%s: Hermes chat completed", job.name)
+                log.info("%s: Juno session completed", job.name)
                 daemon_state.record_result(job.name, success=True)
                 spawn_outcome = "success"
             else:
                 tail = out.decode(errors="replace")[-2000:]
-                log.error("%s: hermes chat exited with status %s — output: %s",
+                log.error("%s: Juno session exited with status %s — output: %s",
                            job.name, proc.returncode, tail)
                 daemon_state.record_result(job.name, success=False,
                                             error=f"exit status {proc.returncode}: {tail[-500:]}")
@@ -1704,19 +1724,20 @@ async def run_daemon(vram_limit: float, tick_seconds: int, psi_threshold: float,
 
     log.info("deep-brain-kernel starting. WORKSPACE=%s tick=%ss direct_timeout=%ss spawn_timeout=%ss",
               WORKSPACE, tick_seconds, direct_timeout, spawn_timeout)
-    if shutil.which("hermes"):
-        log.info("hermes found at %s — spawn-type jobs enabled", shutil.which("hermes"))
+    _oc = shutil.which("openclaw") or str(Path.home() / ".local" / "bin" / "openclaw")
+    if Path(_oc).is_file() and os.access(_oc, os.X_OK):
+        log.info("juno shim found at %s — spawn-type jobs enabled (provider=juno)", _oc)
     else:
-        log.warning("hermes not found in PATH — spawn-type jobs will be skipped every "
+        log.warning("openclaw shim not found — spawn-type jobs will be skipped every "
                     "time they're due, until this is fixed")
     if enable_yolo:
-        log.warning("--enable-yolo is set: unattended spawn jobs will run hermes with "
-                    "--yolo --accept-hooks (auto-approving tool/hook calls with no human "
-                    "review step). Every spawn dispatch is recorded to "
+        log.warning("--enable-yolo is set: unattended spawn jobs will be dispatched "
+                    "with the --yolo flag recorded (Juno's loop has no approval "
+                    "gate for it to bypass). Every spawn dispatch is recorded to "
                     "%s for after-the-fact audit.", WORKSPACE / "memory" / "aibrain-spawn-audit.jsonl")
     else:
-        log.info("--enable-yolo not set (default): spawn jobs run without --yolo/--accept-hooks. "
-                 "Pass --enable-yolo to restore full auto-approval for unattended agent turns.")
+        log.info("--enable-yolo not set (default): spawn jobs run without --yolo. "
+                 "Pass --enable-yolo to flag unattended Juno turns as yolo in the audit.")
 
     await asyncio.gather(
         circadian_scheduler(cgroup, pressure_state, vram_limit, tick_seconds, direct_timeout,
@@ -1730,7 +1751,7 @@ def print_brain_state() -> int:
     import json as _json
     import os as _os
 
-    mem = _os.environ.get("WORKSPACE", _os.path.expanduser("~/.hermes/workspace")) + "/memory"
+    mem = _os.environ.get("WORKSPACE", _os.path.expanduser("~/.juno-brain/workspace")) + "/memory"
 
     def read(path, default):
         p = _os.path.join(mem, path)
@@ -1978,7 +1999,7 @@ def print_status(job_detail: bool = False) -> int:
         last_error = (stats.get("last_error") or "")[:60]
         if job_detail:
             steps = job.spawn_max_steps if job.kind == "spawn" else "—"
-            think = "yes" if job.thinking_model else "—"
+            think = "yes" if job.direct_reply else "—"
             print(f"{job.name:<24} {job.kind:<8} {daemon_state.job_fired_key(job.name) or '—':<12} "
                   f"{stats.get('success', 0):>5} {stats.get('failure', 0):>5} {streak:>7}"
                   f"{str(steps):>6} {think:>5}{flag}  {last_error}")
@@ -1992,7 +2013,7 @@ def print_status(job_detail: bool = False) -> int:
     else:
         print("No jobs currently at or above the unhealthy consecutive-failure threshold "
               f"({DaemonState.UNHEALTHY_STREAK}).")
-    print("\nNote: deferrals (VRAM limit, PSI pressure, missing hermes/script) are NOT counted "
+    print("\nNote: deferrals (VRAM limit, PSI pressure, missing shim/script) are NOT counted "
           "as failures here — only jobs that actually ran and then errored or timed out.",
           file=sys.stderr)
     return unhealthy
@@ -2231,20 +2252,21 @@ def main() -> None:
                               "many seconds (default 300 = 5 min). Prevents one hung script "
                               "from lingering as an orphaned process indefinitely.")
     parser.add_argument("--spawn-timeout", type=float, default=900.0,
-                         help="Kill a 'spawn' job's hermes chat call if it hasn't "
+                         help="Kill a 'spawn' job's Juno session call if it hasn't "
                               "finished within this many seconds (default 900 = 15 min — real "
                               "agent turns legitimately take longer than direct scripts). This "
                               "bounds the shared spawn lock: without it, one hung agent turn "
                               "silently starves every other spawn-type job forever.")
     parser.add_argument("--enable-yolo", action="store_true",
-                         help="Explicit opt-in to run spawn-type jobs with hermes's "
-                              "--yolo --accept-hooks (auto-approving tool/hook calls with no "
-                              "human review). OFF by default: an unattended, cron-equivalent "
-                              "daemon auto-approving agent tool use is a materially larger "
-                              "blast radius than the rest of this daemon's default privileges, "
-                              "so it now requires the same explicit opt-in the eBPF/cgroup "
-                              "privilege trade-offs elsewhere in this file get. Every spawn "
-                              "dispatch is audit-logged to WORKSPACE/memory/aibrain-spawn-audit.jsonl "
+                         help="Explicit opt-in to dispatch spawn-type jobs with the "
+                              "--yolo flag recorded (Juno's loop has no approval gate "
+                              "for it to bypass). OFF by default: an unattended, "
+                              "cron-equivalent daemon flagging agent turns as yolo is "
+                              "a materially larger blast radius than the rest of this "
+                              "daemon's default privileges, so it requires the same "
+                              "explicit opt-in the eBPF/cgroup privilege trade-offs "
+                              "elsewhere in this file get. Every spawn dispatch is "
+                              "audit-logged to WORKSPACE/memory/aibrain-spawn-audit.jsonl "
                               "regardless of this flag.")
     args = parser.parse_args()
 

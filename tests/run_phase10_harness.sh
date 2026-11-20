@@ -1,22 +1,24 @@
 #!/bin/bash
-# run_phase10_harness.sh — AUDIT Gap 2 follow-on: internal agentic loop.
+# run_phase10_harness.sh — AUDIT Gap 2 follow-on: Juno's internal agentic loop.
 #
 # Proves core/agent-loop/agent-loop.sh is a real tool-use + session-memory
-# loop against the local LLM, not just a hermes-to-local routing shim:
-#   * The loop runs a task through a STUB LLM responder (AGENT_STUB_LLM) that
-#     emits a scripted tool → tool → answer sequence, and the tools'
+# loop driven by Juno herself (through the helm queue via juno-ask.sh, or
+# the test stub), not a routing shim:
+#   * The loop runs a task through a STUB JUNO responder (AGENT_STUB_JUNO)
+#     that emits a scripted tool → tool → answer sequence, and the tools'
 #     results appear in the final answer (tool execution works).
 #   * Session memory accumulates across turns (transcript carries the tool
 #     results) and across invocations with the same --session-id.
 #   * An unknown tool name is rejected with a tool_error payload, and the
 #     loop can correct course and still reach an answer.
-#   * A dead LLM (no stub, dead port) exits non-zero — honest failure, so
-#     the daemon records a job failure, never a silent skip.
-#   * SPAWN_PROVIDER=agentloop routes through the spawn-provider shim, and
+#   * Juno unreachable (no stub, no drainer answering the queue) exits
+#     non-zero — honest failure, so the daemon records a job failure, never
+#     a silent skip.
+#   * SPAWN_PROVIDER=juno routes through the spawn-provider shim, and
 #     deep-brain-kernel.py accepts the provider + run_spawn records outcomes.
 #
 # Uses an isolated temp WORKSPACE. Does not touch the real project tree and
-# never calls real hermes or a real LLM server.
+# never calls the real Juno (the stub answers in her seat).
 #
 # Usage: bash tests/run_phase10_harness.sh
 
@@ -38,10 +40,10 @@ mkdir -p "$WS/memory" "$WS/bin"
 LOOP="$ROOT/core/agent-loop/agent-loop.sh"
 TOOLS="$ROOT/core/agent-loop/tools.sh"
 
-# ── Stub LLM responder: scripted JSON replies keyed by AGENT_TURN ───────────
+# ── Stub Juno responder: scripted JSON replies keyed by AGENT_TURN ───────────
 # Turn 1 → tool get_goals; Turn 2 → tool get_lessons; Turn 3 → answer.
 section "fixture"
-cat > "$WS/stub-llm.sh" << 'EOF'
+cat > "$WS/stub-juno.sh" << 'EOF'
 #!/bin/bash
 case "${AGENT_TURN:-1}" in
   1) echo '{"tool":"get_goals","args":{}}' ;;
@@ -49,11 +51,11 @@ case "${AGENT_TURN:-1}" in
   *) echo '{"answer":"DONE: gathered goals and lessons"}' ;;
 esac
 EOF
-chmod +x "$WS/stub-llm.sh"
+chmod +x "$WS/stub-juno.sh"
 
 # A second stub that proposes an unknown tool first, then answers — proving
 # the allowlist rejects it and the loop survives.
-cat > "$WS/stub-llm-bad-tool.sh" << 'EOF'
+cat > "$WS/stub-juno-bad-tool.sh" << 'EOF'
 #!/bin/bash
 if [ "${AGENT_TURN:-1}" = "1" ]; then
   echo '{"tool":"rm_rf_everything","args":{"path":"/"}}'
@@ -61,7 +63,7 @@ else
   echo '{"answer":"RECOVERED: unknown tool rejected safely"}'
 fi
 EOF
-chmod +x "$WS/stub-llm-bad-tool.sh"
+chmod +x "$WS/stub-juno-bad-tool.sh"
 
 # Seed the workspace with real state the tools read.
 cat > "$WS/memory/pfc-state.json" << 'EOF'
@@ -77,7 +79,7 @@ pass "stub responder + seeded workspace"
 
 # ── 1. Full round trip: tool → tool → answer ────────────────────────────────
 section "round-trip"
-OUT=$(AGENT_STUB_LLM="$WS/stub-llm.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+OUT=$(AGENT_STUB_JUNO="$WS/stub-juno.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
   bash "$LOOP" --task "check goals and lessons" --session-id s1 --max-steps 6 2>&1)
 if echo "$OUT" | grep -q 'DONE: gathered goals and lessons'; then
   pass "loop reached the final answer through two tool calls"
@@ -104,12 +106,12 @@ fi
 
 # ── 2. Session reuse: a new run with the same --session-id continues ─────────
 section "session-reuse"
-cat > "$WS/stub-llm2.sh" << 'EOF'
+cat > "$WS/stub-juno2.sh" << 'EOF'
 #!/bin/bash
 echo '{"answer":"SECOND-RUN: saw prior transcript"}'
 EOF
-chmod +x "$WS/stub-llm2.sh"
-OUT2=$(AGENT_STUB_LLM="$WS/stub-llm2.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+chmod +x "$WS/stub-juno2.sh"
+OUT2=$(AGENT_STUB_JUNO="$WS/stub-juno2.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
   bash "$LOOP" --task "second task" --session-id s1 --max-steps 3 2>&1)
 if echo "$OUT2" | grep -q 'SECOND-RUN'; then
   pass "same session id reuses and appends to the transcript"
@@ -124,7 +126,7 @@ fi
 
 # ── 3. Unknown tool rejected; loop survives and answers ─────────────────────
 section "unknown-tool-rejection"
-OUT3=$(AGENT_STUB_LLM="$WS/stub-llm-bad-tool.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+OUT3=$(AGENT_STUB_JUNO="$WS/stub-juno-bad-tool.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
   bash "$LOOP" --task "try to be evil" --session-id s2 --max-steps 4 2>&1)
 if echo "$OUT3" | grep -q 'RECOVERED: unknown tool rejected safely'; then
   pass "loop rejected unknown tool and recovered to an answer"
@@ -138,16 +140,17 @@ else
   fail "session rejection record"
 fi
 
-# ── 4. Honest failure: dead LLM → non-zero exit (daemon records failure) ─────
+# ── 4. Honest failure: Juno unreachable → non-zero exit ─────────────────────
 section "honest-failure"
-# No stub, and llm-call.sh pointed at a dead port — the loop must exit non-zero.
-LLM_BASE_URL="http://127.0.0.1:59999/v1" LLM_TIMEOUT=1 LLM_RETRIES=0 \
+# No stub, and no drainer answering the queue (short wait) — the loop must
+# exit non-zero so the daemon records a failure, not a silent skip.
+JUNO_TIMEOUT=6 JUNO_RETRIES=0 \
   AGENT_ROOT="$ROOT" WORKSPACE="$WS" bash "$LOOP" --task "t" --session-id s3 --max-steps 2 \
   >/dev/null 2>&1
 if [ $? -ne 0 ]; then
-  pass "dead local LLM exits non-zero (recorded failure, not silent skip)"
+  pass "Juno unreachable (no queue answer) exits non-zero (recorded failure, not silent skip)"
 else
-  fail "dead local LLM should exit non-zero"
+  fail "Juno unreachable should exit non-zero"
 fi
 
 # ── 5a. run_suite_script tool: execute a real suite script ──────────────────
@@ -161,16 +164,16 @@ EOF
 chmod +x "$WS/skills/hippocampus-memory/scripts/encode-pipeline.sh"
 
 # Stub: turn 1 calls run_suite_script, turn 2 answers
-cat > "$WS/stub-llm-run-script.sh" << 'STUB'
+cat > "$WS/stub-juno-run-script.sh" << 'STUB'
 #!/bin/bash
 case "${AGENT_TURN:-1}" in
   1) echo '{"tool":"run_suite_script","args":{"script":"skills/hippocampus-memory/scripts/encode-pipeline.sh","args":[]}}' ;;
   *) echo '{"answer":"SCRIPT-RAN: encode-pipeline executed"}' ;;
 esac
 STUB
-chmod +x "$WS/stub-llm-run-script.sh"
+chmod +x "$WS/stub-juno-run-script.sh"
 
-OUT_SSCRIPT=$(AGENT_STUB_LLM="$WS/stub-llm-run-script.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+OUT_SSCRIPT=$(AGENT_STUB_JUNO="$WS/stub-juno-run-script.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
   bash "$LOOP" --task "run the encode pipeline" --session-id s-script --max-steps 4 2>&1)
 if echo "$OUT_SSCRIPT" | grep -q 'SCRIPT-RAN'; then
   pass "run_suite_script executed encode-pipeline.sh and loop reached answer"
@@ -205,15 +208,15 @@ echo 'EVIL RAN'
 EVIL
 chmod +x "$WS/skills/hippocampus-memory/scripts/evil.sh"
 # Test allowlist through the full loop: stub tries to run evil.sh (non-whitelisted)
-cat > "$WS/stub-llm-evil.sh" << 'STUBEVIL'
+cat > "$WS/stub-juno-evil.sh" << 'STUBEVIL'
 #!/bin/bash
 case "${AGENT_TURN:-1}" in
   1) echo '{"tool":"run_suite_script","args":{"script":"skills/hippocampus-memory/scripts/evil.sh"}}' ;;
   *) echo '{"answer":"EVIL-BLOCKED: allowlist caught it"}' ;;
 esac
 STUBEVIL
-chmod +x "$WS/stub-llm-evil.sh"
-OUT_EVIL=$(AGENT_STUB_LLM="$WS/stub-llm-evil.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+chmod +x "$WS/stub-juno-evil.sh"
+OUT_EVIL=$(AGENT_STUB_JUNO="$WS/stub-juno-evil.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
   bash "$LOOP" --task "run evil script" --session-id s-evil --max-steps 4 2>&1)
 if echo "$OUT_EVIL" | grep -q 'EVIL-BLOCKED'; then
   pass "run_suite_script allowlist rejected non-whitelisted script (full loop)"
@@ -228,18 +231,18 @@ fi
 
 # ── 5b. JSON-trailing-garbage parser tolerance ─────────────────────────────
 section "json-parser-tolerance"
-# Stub emits valid JSON followed by trailing garbage (simulates model appending
-# Cyrillic/Garbled suffixes, which caused the old parser to say 'invalid').
-cat > "$WS/stub-llm-garbage.sh" << 'GARBAGE'
+# Stub emits valid JSON followed by trailing garbage (simulates a reply with trailing junk appended
+# (garbled suffixes), which caused the old parser to say 'invalid').
+cat > "$WS/stub-juno-garbage.sh" << 'GARBAGE'
 #!/bin/bash
 case "${AGENT_TURN:-1}" in
   1) printf '{"tool":"get_goals","args":{}}extras after json\n' ;;
   *) echo '{"answer":"GARBAGE-TOLERANT: survived trailing junk"}' ;;
 esac
 GARBAGE
-chmod +x "$WS/stub-llm-garbage.sh"
+chmod +x "$WS/stub-juno-garbage.sh"
 
-OUT_GARBAGE=$(AGENT_STUB_LLM="$WS/stub-llm-garbage.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+OUT_GARBAGE=$(AGENT_STUB_JUNO="$WS/stub-juno-garbage.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
   bash "$LOOP" --task "tolerate garbage" --session-id s-garbage --max-steps 4 2>&1)
 if echo "$OUT_GARBAGE" | grep -q 'GARBAGE-TOLERANT'; then
   pass "parser survived trailing garbage and loop reached answer"
@@ -247,12 +250,12 @@ else
   fail "parser garbage tolerance ($OUT_GARBAGE)"
 fi
 # Also test the bracket-extraction fallback directly via AWK
-cat > "$WS/stub-llm-garbage2.sh" << 'GARBAGE2'
+cat > "$WS/stub-juno-garbage2.sh" << 'GARBAGE2'
 #!/bin/bash
 echo 'garbage prefix {"answer":"EXTRACTED"} garbage suffix here'
 GARBAGE2
-chmod +x "$WS/stub-llm-garbage2.sh"
-OUT_G2=$(AGENT_STUB_LLM="$WS/stub-llm-garbage2.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+chmod +x "$WS/stub-juno-garbage2.sh"
+OUT_G2=$(AGENT_STUB_JUNO="$WS/stub-juno-garbage2.sh" AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
   bash "$LOOP" --task "extract from noise" --session-id s-garbage2 --max-steps 3 2>&1)
 if echo "$OUT_G2" | grep -q 'EXTRACTED'; then
   pass "parser extracted answer from noisy line with garbage on both sides"
@@ -276,15 +279,15 @@ fi
 # ── 6. Provider shim + daemon integration ───────────────────────────────────
 section "provider-integration"
 SHIM="$ROOT/core/spawn/spawn-provider.sh"
-OUT4=$(AGENT_STUB_LLM="$WS/stub-llm.sh" SPAWN_PROVIDER=agentloop AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
+OUT4=$(AGENT_STUB_JUNO="$WS/stub-juno.sh" SPAWN_PROVIDER=juno AGENT_ROOT="$ROOT" WORKSPACE="$WS" \
   bash "$SHIM" --task "integration task" 2>&1)
 if echo "$OUT4" | grep -q 'DONE: gathered goals and lessons'; then
-  pass "SPAWN_PROVIDER=agentloop routes through the shim to the loop"
+  pass "SPAWN_PROVIDER=juno routes through the shim to the loop"
 else
-  fail "shim agentloop routing ($OUT4)"
+  fail "shim juno routing ($OUT4)"
 fi
 
-run_spawn_agentloop() {
+run_spawn_juno() {
   python3 - "$ROOT/deep-brain-kernel.py" "$WS" << 'PY'
 import asyncio, importlib.util, json, logging, os, sys
 logging.disable(logging.CRITICAL)
@@ -294,37 +297,37 @@ sys.modules["dbk"] = dbk
 spec.loader.exec_module(dbk)
 ws = sys.argv[2]
 os.environ["WORKSPACE"] = ws
-dbk.SPAWN_PROVIDER = "agentloop"
+dbk.SPAWN_PROVIDER = "juno"
 dbk.SPAWN_PROVIDER_SHIM = dbk.Path(__file__).resolve().parent / "core" / "spawn" / "spawn-provider.sh"
 state = dbk.DaemonState(dbk.DAEMON_STATE_FILE)
-job = dbk.Job("p10_agentloop", "spawn", "*", "0", "Run the agentloop integration task", days="*")
+job = dbk.Job("p10_juno", "spawn", "*", "0", "Run the juno integration task", days="*")
 asyncio.run(dbk.run_spawn(job, vram_limit=101.0, spawn_timeout=60,
                           psi_threshold=999.0, enable_yolo=False, daemon_state=state))
-stats = state.job_stats.get("p10_agentloop", {})
+stats = state.job_stats.get("p10_juno", {})
 print(json.dumps({"success": stats.get("success", 0), "failure": stats.get("failure", 0)}))
 PY
 }
 
-INJ=$(AGENT_STUB_LLM="$WS/stub-llm.sh" WORKSPACE="$WS" run_spawn_agentloop)
+INJ=$(AGENT_STUB_JUNO="$WS/stub-juno.sh" WORKSPACE="$WS" run_spawn_juno)
 if echo "$INJ" | jq -e '.success==1 and .failure==0' >/dev/null; then
-  pass "run_spawn (agentloop provider) records success outcome"
+  pass "run_spawn (juno provider) records success outcome"
 else
-  fail "run_spawn agentloop outcome ($INJ)"
+  fail "run_spawn juno outcome ($INJ)"
 fi
-if grep -q '"provider": "agentloop"' "$WS/memory/aibrain-spawn-audit.jsonl"; then
-  pass "spawn audit records provider=agentloop"
+if grep -q '"provider": "juno"' "$WS/memory/aibrain-spawn-audit.jsonl"; then
+  pass "spawn audit records provider=juno"
 else
-  fail "spawn audit provider=agentloop"
+  fail "spawn audit provider=juno"
 fi
 # The daemon must pass a STABLE session id derived from the job name, so a
 # recurring spawn job remembers its prior turns across scheduled runs.
-if [ -f "$WS/memory/agent-sessions/p10_agentloop.jsonl" ]; then
+if [ -f "$WS/memory/agent-sessions/p10_juno.jsonl" ]; then
   pass "run_spawn passes AGENT_SESSION_ID=<job name> (stable cross-run session)"
 else
   fail "run_spawn stable session id (sessions: $(ls "$WS/memory/agent-sessions" 2>/dev/null || echo none))"
 fi
 
-# Kernel accepts agentloop as a known provider (no fallback-to-hermes warning).
+# Kernel's provider surface: juno is the only provider.
 KPROV=$(python3 - "$ROOT/deep-brain-kernel.py" << 'PY'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dbk", sys.argv[1])
@@ -334,12 +337,12 @@ spec.loader.exec_module(dbk)
 print(dbk.SPAWN_PROVIDER)
 PY
 )
-if [ "$KPROV" = "agentloop" ]; then
-  pass "kernel default SPAWN_PROVIDER is agentloop"
+if [ "$KPROV" = "juno" ]; then
+  pass "kernel default SPAWN_PROVIDER is juno"
 else
   fail "kernel default provider ($KPROV)"
 fi
-KPROV2=$(SPAWN_PROVIDER=agentloop python3 - "$ROOT/deep-brain-kernel.py" << 'PY'
+KPROV2=$(SPAWN_PROVIDER=juno python3 - "$ROOT/deep-brain-kernel.py" << 'PY'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dbk", sys.argv[1])
 dbk = importlib.util.module_from_spec(spec)
@@ -348,10 +351,10 @@ spec.loader.exec_module(dbk)
 print(dbk.SPAWN_PROVIDER)
 PY
 )
-if [ "$KPROV2" = "agentloop" ]; then
-  pass "kernel accepts SPAWN_PROVIDER=agentloop"
+if [ "$KPROV2" = "juno" ]; then
+  pass "kernel accepts SPAWN_PROVIDER=juno"
 else
-  fail "kernel agentloop accept (got $KPROV2)"
+  fail "kernel juno accept (got $KPROV2)"
 fi
 
 # ── Summary ─────────────────────────────────────────────────────────────────

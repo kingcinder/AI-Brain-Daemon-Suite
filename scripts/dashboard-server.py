@@ -30,7 +30,7 @@ Stdlib-only (http.server, json, subprocess, secrets) — no pip dependencies,
 same python3 the daemon already requires.
 
 Env:
-  WORKSPACE                 default $HOME/.hermes/workspace
+  WORKSPACE                 default $HOME/.juno-brain/workspace
   SUITE_ROOT                repo/deployed root containing skills/ (default:
                             parent of this script's directory)
   DASHBOARD_HOST            default 127.0.0.1 (loopback only)
@@ -50,7 +50,7 @@ import subprocess
 import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-WORKSPACE = os.path.expanduser(os.environ.get("WORKSPACE", "~/.hermes/workspace"))
+WORKSPACE = os.path.expanduser(os.environ.get("WORKSPACE", "~/.juno-brain/workspace"))
 SUITE_ROOT = os.environ.get("SUITE_ROOT") or os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))
 )

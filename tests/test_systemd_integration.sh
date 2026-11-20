@@ -16,8 +16,20 @@ fail() { echo "  ❌ $1"; FAIL=$((FAIL+1)); }
 
 # ── 1. Service file exists and is valid systemd unit ────────────────────────
 echo "Test 1: aibrain.service is a parseable systemd unit"
-SERVICE="$ROOT/aibrain.service"
-[ -f "$SERVICE" ] || { fail "aibrain.service not found"; exit 1; }
+# The unit is an installed system unit, not a workspace file: the live
+# instance (Stage 3 cutover, 2026-11-10) is loaded from
+# /etc/systemd/system/aibrain.service. A staged user copy also exists under
+# ~/.config/systemd/user/. Resolve the real installed locations in order —
+# the previous version looked only at $ROOT/aibrain.service, where the unit
+# has never lived, so Test 1 failed on a wrong path (fixed 2026-11-20).
+SERVICE=""
+for candidate in /etc/systemd/system/aibrain.service \
+                 "$HOME/.config/systemd/user/aibrain.service" \
+                 "$ROOT/aibrain.service"; do
+    if [ -f "$candidate" ]; then SERVICE="$candidate"; break; fi
+done
+[ -n "$SERVICE" ] || { fail "aibrain.service not found in any installed location"; exit 1; }
+echo "  (unit under test: $SERVICE)"
 
 # Check required directives
 grep -q "^\\[Unit\\]" "$SERVICE" && pass "has [Unit] section" || fail "missing [Unit] section"
@@ -60,7 +72,7 @@ rm -rf "$WS_FAKE"
 
 # ── 5. --check (daemon job table) still passes ──────────────────────────────
 echo "Test 5: daemon job table --check"
-if WORKSPACE="$ROOT" DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1 \
+if WORKSPACE="$ROOT" DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1 \
    python3 "$ROOT/deep-brain-kernel.py" --check >/dev/null 2>&1; then
     pass "--check passes (job table valid)"
 else

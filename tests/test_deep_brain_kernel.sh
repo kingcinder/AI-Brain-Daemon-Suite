@@ -12,6 +12,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 export WORKSPACE="$ROOT"
-export DEEP_BRAIN_KERNEL_SKIP_HERMES_CHECK=1
+export DEEP_BRAIN_KERNEL_SKIP_JUNO_CHECK=1
 
 python3 tests/test_deep_brain_kernel.py
