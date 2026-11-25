@@ -55,4 +55,31 @@ LINE="💓 helm-pulse $TS | organs $ORGANS_OK/$ORGANS_TOTAL present | queue_dept
 echo "$LINE"
 mkdir -p "$MEM"
 printf '%s\n' "$LINE" >> "$MEM/heartbeat-pulse.log"
+
+# Telemetry rides the pulse (Dither, 2026-11-24 ~20:28 PST): every beat
+# regenerates every organ's dashboard fragment, rebuilds the helm face, and
+# delivers it. Guarded end to end — a telemetry failure never fails the
+# pulse; delivery outcomes land in the delivery log as before.
+{
+  export WORKSPACE
+  # The immune cycle rides the pulse too (wired 2026-11-24 ~20:31, after
+  # Dither asked why the immune system wasn't working: it had no scheduler,
+  # no station bookkeeping, and no escalation — patrol ran only by hand).
+  # Order per the organ's own cycle: pulse is read -> patrol -> stations
+  # accumulate/escalate -> dashboard reflects the result.
+  bash "$SKILLS_DIR/immune-system-memory/scripts/immune-patrol.sh" >> "$MEM/immune-patrol.log" 2>&1
+  python3 "$SKILLS_DIR/immune-system-memory/scripts/immune-stations-update.py" >> "$MEM/immune-patrol.log" 2>&1
+  # The face: patrol and stations speak to logs and JSON; this renders them
+  # into IMMUNE_STATE.md so the face advances with the body (added 2026-11-25,
+  # after the face was found frozen at its 2026-11-24 seed for 5+ hours).
+  python3 "$SKILLS_DIR/immune-system-memory/scripts/immune-face-write.py" >> "$MEM/immune-patrol.log" 2>&1
+  for g in "$SKILLS_DIR"/*/scripts/generate-dashboard.sh; do
+    [ -f "$g" ] && bash "$g" >/dev/null 2>&1
+  done
+  [ -f "$SKILLS_DIR/heartbeat-memory/scripts/dashboard-builder.sh" ] && \
+    bash "$SKILLS_DIR/heartbeat-memory/scripts/dashboard-builder.sh" >/dev/null 2>&1
+  [ -x "$HOME/.juno-brain/bin/helm-telemetry-deliver.py" ] && \
+    "$HOME/.juno-brain/bin/helm-telemetry-deliver.py" >> "$HOME/.juno-brain/logs/helm-telemetry-delivery.log" 2>&1
+} || true
+
 exit 0

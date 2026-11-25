@@ -1,0 +1,259 @@
+#!/usr/bin/env python3
+"""helm-keeper — durability keeper for the Juno helm queue.
+
+Runs as a user systemd service (helm-keeper.service, Restart=always) so the
+queue endpoint survives shell-session crashes and reboots. Every cycle it:
+
+  1. Ensures the queue files exist.
+  2. Advances the byte watermark over the fully-acked queue prefix and
+     compacts that prefix away when it is large (under the same .helm.lock
+     the shim appends with, so no append can be lost to a rename).
+  3. Merges result drops: files Juno leaves in ~/bigpipe-share/results-drop/
+     (*.jsonl — {"id","outcome","note"} acks and {"id","response"} llm
+     answers) are applied to the results log with the same semantics as
+     `openclaw drain:ack` / `drain:respond`, then deleted.
+  4. Refreshes helm-health.json in the workspace and mirrors it to
+     ~/bigpipe-share/helm-health.json, where Juno's VM-side wake watcher
+     reads it through the bigpipe.
+
+The keeper never executes tasks and never deletes an unacked task.
+"""
+import fcntl
+import glob
+import json
+import os
+import sys
+import time
+
+try:
+    from zoneinfo import ZoneInfo
+    PACIFIC = ZoneInfo("America/Los_Angeles")
+except Exception:
+    PACIFIC = None
+
+CYCLE_SECONDS = 20
+COMPACT_MIN_BYTES = 65536
+MAX_ATTEMPTS = 3
+
+
+def workspace():
+    for var in ("BRAIN_WORKSPACE", "WORKSPACE", "OPENCLAW_WORKSPACE"):
+        val = os.environ.get(var)
+        if val:
+            return val
+    return os.path.expanduser("~/.openclaw/workspace")
+
+
+WS = workspace()
+MEM = os.path.join(WS, "memory")
+QUEUE = os.path.join(MEM, "spawn-queue.jsonl")
+RESULTS = os.path.join(MEM, "spawn-results.jsonl")
+DEAD = os.path.join(MEM, "spawn-deadletter.jsonl")
+LOCK = os.path.join(MEM, ".helm.lock")
+WATERMARK = os.path.join(MEM, "spawn-queue.watermark")
+HEALTH = os.path.join(MEM, "helm-health.json")
+LLM_RESULTS = os.path.join(MEM, "llm-results")
+SHARE = os.path.expanduser("~/.juno-brain/workspace-shadow/share")
+DROPS = os.path.join(SHARE, "results-drop")
+HEALTH_MIRROR = os.path.join(SHARE, "helm-health.json")
+
+
+def log(msg):
+    sys.stderr.write("helm-keeper: %s\n" % msg)
+    sys.stderr.flush()
+
+
+def pacific_now():
+    if PACIFIC is not None:
+        from datetime import datetime
+        return datetime.now(PACIFIC).isoformat()
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def read_jsonl(path):
+    out = []
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if raw:
+                    try:
+                        out.append(json.loads(raw))
+                    except ValueError:
+                        continue
+    except FileNotFoundError:
+        pass
+    return out
+
+
+def append_line(path, obj):
+    line = (json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8")
+    fd = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o644)
+    try:
+        os.write(fd, line)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def atomic_write(path, data_bytes):
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o644)
+    try:
+        os.write(fd, data_bytes)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    os.rename(tmp, path)
+
+
+def terminal_ids():
+    done = set()
+    for rec in read_jsonl(RESULTS):
+        if rec.get("outcome") in ("ok", "responded"):
+            done.add(rec.get("id"))
+    for rec in read_jsonl(DEAD):
+        done.add(rec.get("id"))
+    return done
+
+
+def find_task(queue, tid):
+    found = None
+    for rec in queue:
+        if rec.get("id") == tid:
+            found = rec  # last copy wins — it carries the live attempt count
+    return found
+
+
+def apply_result(rec):
+    """Same semantics as the shim's drain:ack / drain:respond."""
+    tid = rec.get("id")
+    if not tid:
+        return
+    queue = read_jsonl(QUEUE)
+    target = find_task(queue, tid)
+    if "response" in rec:
+        os.makedirs(LLM_RESULTS, exist_ok=True)
+        atomic_write(os.path.join(LLM_RESULTS, tid + ".txt"),
+                     str(rec["response"]).encode("utf-8"))
+        append_line(RESULTS, {
+            "id": tid, "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "outcome": "responded", "note": "via results-drop",
+            "label": (target or {}).get("label", ""), "type": (target or {}).get("type", ""),
+        })
+        return
+    outcome = rec.get("outcome")
+    if outcome not in ("ok", "failed") or target is None:
+        return
+    append_line(RESULTS, {
+        "id": tid, "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "outcome": outcome, "note": rec.get("note", "via results-drop"),
+        "label": target.get("label", ""), "type": target.get("type", ""),
+    })
+    if outcome == "failed":
+        attempts = int(target.get("attempts", 0)) + 1
+        if attempts >= MAX_ATTEMPTS:
+            dead = dict(target)
+            dead["attempts"] = attempts
+            dead["dead_ts"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            dead["dead_note"] = rec.get("note", "")
+            append_line(DEAD, dead)
+        else:
+            retry = dict(target)
+            retry["attempts"] = attempts
+            append_line(QUEUE, retry)
+
+
+def cycle():
+    os.makedirs(MEM, exist_ok=True)
+    os.makedirs(LLM_RESULTS, exist_ok=True)
+    for path in (QUEUE, RESULTS, DEAD):
+        if not os.path.exists(path):
+            open(path, "a").close()
+    lock_fd = os.open(LOCK, os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+
+        # 1) merge result drops
+        for drop in sorted(glob.glob(os.path.join(DROPS, "*.jsonl"))):
+            for rec in read_jsonl(drop):
+                try:
+                    apply_result(rec)
+                except Exception as exc:  # one bad drop line never kills the cycle
+                    log("drop %s line failed: %s" % (drop, exc))
+            try:
+                os.unlink(drop)
+            except FileNotFoundError:
+                pass
+
+        # 2) watermark + compaction over the acked prefix
+        done = terminal_ids()
+        raw_lines = []
+        with open(QUEUE, "rb") as fh:
+            raw_lines = fh.readlines()
+        prefix = 0
+        prefix_bytes = 0
+        last_id = None
+        for raw in raw_lines:
+            try:
+                rec = json.loads(raw.decode("utf-8"))
+            except Exception:
+                break
+            if rec.get("id") in done:
+                prefix += 1
+                prefix_bytes += len(raw)
+                last_id = rec.get("id")
+            else:
+                break
+        total = os.path.getsize(QUEUE)
+        if prefix_bytes >= COMPACT_MIN_BYTES and prefix_bytes * 2 >= total and prefix:
+            atomic_write(QUEUE, b"".join(raw_lines[prefix:]))
+            prefix_bytes = 0
+            log("compacted queue: dropped %d acked lines" % prefix)
+        wm = {"offset": prefix_bytes, "last_id": last_id, "epoch": time.time(),
+              "ts_pacific": pacific_now()}
+        atomic_write(WATERMARK, (json.dumps(wm) + "\n").encode("utf-8"))
+
+        # 3) health (one live record per id: last copy wins)
+        latest = {}
+        for r in read_jsonl(QUEUE):
+            latest[r.get("id")] = r
+        unacked = [r for r in latest.values() if r.get("id") not in done]
+        results = read_jsonl(RESULTS)
+        health = {
+            "epoch": time.time(),
+            "ts_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "ts_pacific": pacific_now(),
+            "queue_depth": len(unacked),
+            "oldest_unacked_age_s": (
+                max(0, int(time.time() - min(r.get("epoch", time.time()) for r in unacked)))
+                if unacked else None),
+            "deadletter_count": len(read_jsonl(DEAD)),
+            "watermark": wm,
+            "last_result_ts": results[-1].get("ts") if results else None,
+            "workspace": WS,
+        }
+        payload = (json.dumps(health, indent=1) + "\n").encode("utf-8")
+        atomic_write(HEALTH, payload)
+        try:
+            os.makedirs(SHARE, exist_ok=True)
+            atomic_write(HEALTH_MIRROR, payload)
+        except Exception as exc:
+            log("health mirror failed: %s" % exc)
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
+
+def main():
+    log("starting; workspace=%s cycle=%ds" % (WS, CYCLE_SECONDS))
+    while True:
+        try:
+            cycle()
+        except Exception as exc:
+            log("cycle error: %s" % exc)
+        time.sleep(CYCLE_SECONDS)
+
+
+if __name__ == "__main__":
+    main()

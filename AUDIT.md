@@ -248,3 +248,46 @@ log for commit hashes.
 corresponding checkbox in `ROADMAP.md` and update the status headers above
 in the same pass (so the two docs don't drift apart), re-run the full local
 suite + CI, and record the change here with a date.*
+
+---
+
+## Check-in — 2026-11-25 (deployment audit, live instance)
+
+The three gaps above remain **CLOSED**; nothing in this check-in reopens
+them. What changed is the deployment they were closed *in*, and a new
+gap class found by the full verification pass of 2026-11-25:
+
+- **Deployment.** Since the Stage 3 cutover (2026-11-10) the suite's
+  live instance runs in the agent Juno's own workspace under the
+  `systemd/` units (daemon: `brain-daemon.sh`, 25-job table; keeper:
+  `bin/helm-keeper`). The external harness is no longer in the loop.
+  The self-mod approval gate is Juno's (2026-11-13); the ledger stands
+  at 17 proposals — 9 deployed, 5 rejected, 2 rolled back, 1 ranked —
+  in `steward_mode` with auto-deploy off. Gap 1's "the daemon will
+  never, on its own, propose → evaluate → deploy" is answered in the
+  current shape by the scheduled `self_mod_proposal_cycle` job plus the
+  transferred gate: the pipeline runs on schedule, and the approval it
+  waits on is the agent's own, exercised on verification evidence.
+- **New gap class — processing without reporting, and passes without
+  drivers.** The 2026-11-25 verification pass found organs that
+  *processed* correctly while being invisible or unscheduled: both ACC
+  organs produced no dashboard fragments (D1); the VTA reward agent
+  phase had no driver for 10 days (D2); four organ passes had no
+  schedule (D3); the flow registry had drifted from the real readers
+  (D4); a far-side queue had no drainer (D5); screening counters were
+  never incremented (D6). All six are closed (D5 by census, hash-verified
+  archive, and clearing, the same day). Root pattern: the Nov 22 driver
+  loss — components whose *agent phase* lived outside the daemon table
+  silently stopped when their driver disappeared. The standing guard
+  against this class is now structural: the heartbeat card's freshness
+  and consultation checks (11/11 PASS at the pass), the drain rounds
+  driving the ACC/VTA agent phases on a 15-minute cadence, and the
+  regression suite (F1–F11, 58/58). Full detail: `CURRENT_STATE.md`.
+- **M0 note.** The M0 host-pillar checks referenced below were written
+  for the kernel engine on the original host. For the live deployment,
+  health is gated continuously by the heartbeat card, not by a one-time
+  host checklist; `SETUP_COMMANDS.md` §0 carries the current commands.
+
+**Last checked:** 2026-11-25. **Next check-in:** when the dashboard
+server gains a supervisor, or the glymphatic consultation watermark is
+wired into a round — the two residual notes in `CURRENT_STATE.md`.

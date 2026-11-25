@@ -1,5 +1,36 @@
 # System Setup — deep-brain-kernel.py (Ubuntu 24.04 / kernel 6.8+)
 
+## 0. Current deployment (2026-11-25) — read this first
+
+This document's sections 1–5 are the host-setup record for the
+**`deep-brain-kernel.py`** engine on its original host, and remain
+accurate for that engine. The **live deployment** (since the Stage 3
+cutover, 2026-11-10) runs a different shape, and its setup/verification
+commands are these:
+
+```bash
+# supervision — unit sources ship in systemd/
+systemctl status aibrain.service        # ExecStart: brain-daemon.sh
+systemctl status helm-keeper.service    # ExecStart: bin/helm-keeper
+
+# job-table validation (live table: 25 jobs)
+bash brain-daemon.sh --check
+# expect: every job's script "ok", zero minute collisions
+
+# dashboard (live serve; no systemd unit supervises the server —
+# see CURRENT_STATE.md, residual note 1)
+bash scripts/serve-dashboard.sh start   # loopback :8123
+bash scripts/serve-dashboard.sh status
+```
+
+Live-deployment health is not a one-time setup check: the heartbeat
+card (11 checks) runs every 30 minutes against the running harness,
+backed by the heartbeat regression suite (58/58 on 2026-11-25). See
+`CURRENT_STATE.md` for the card, the bounded repair doctor, and the
+verified state. Where sections below say "all 30 jobs," that is the
+kernel's table on the original host; the live bash table has 25 jobs
+(`BRAIN_DAEMON_SCHEDULE.md`).
+
 ## What's NOT here, and why
 
 The original ask included granting `CAP_BPF`/`CAP_PERFMON` file capabilities

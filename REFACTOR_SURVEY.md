@@ -215,3 +215,44 @@ autonomy unproven (needs Dyther's deployment, not this branch);
 agent-loop file-write gap on codypc (provider change, live path);
 sandbox memory/KV measurement gap (Phase-3 core work); `bc` missing in
 this sandbox breaking 5 pre-existing unit tests (environment, not code).
+
+---
+
+## Addendum — 2026-11-25 (what became of the survey's seams)
+
+This survey stands as the record of the tree at commit `262aa0d`. Its
+central question — where does the suite assume one host, and what would
+a substrate-independent runtime contract have to abstract — has since
+been answered in practice, if not by the contract branch it scoped:
+
+- **The suite now runs on a second substrate.** Since the Stage 3
+  cutover (2026-11-10), the live instance runs in the agent Juno's own
+  workspace, supervised by systemd units whose sources ship in
+  `systemd/`. The live scheduler there is `brain-daemon.sh` (25-job
+  table, all `direct`), not the kernel; seam 1 (the `WORKSPACE` root)
+  and seam 3 (scheduler vs systemd lifecycle) are the two the migration
+  actually exercised — the workspace moved wholesale, and lifecycle is
+  two unit files.
+- **Seam 2 (mind invocation) resolved by replacement.** The live
+  deployment's judgment work is not dispatched to a subprocess provider
+  at all: organs enqueue *juno-ask* entries, the keeper
+  (`bin/helm-keeper`) ferries them, and the agent answers in scheduled
+  drain rounds. Transcripts arrive via the conversation wire
+  (`core/gate/envelope.py` + transcript bridge), closing the survey's
+  `~/.hermes/state.db` coupling for the live instance.
+- **The survey's §7 status note is superseded.** It described the then-
+  live deployment as showing "zero proposals, zero deploys,
+  steward_mode, and 10 unhealthy jobs." As of the 2026-11-25
+  verification: the self-mod ledger shows 17 proposals (9 deployed,
+  5 rejected, 2 rolled back, 1 ranked) with the approval gate held by
+  Juno since 2026-11-13, and the heartbeat card passes 11/11 with the
+  regression suite at 58/58. "LANDED = implemented + harness-tested"
+  remains the right reading of the Aug milestone language; the
+  production-exercise gap the survey named has, for the self-mod
+  pipeline, since been closed by the ledger above.
+- **Roster.** The suite surveyed here had 15 skills; it now has 19
+  (hypothalamus, claustrum, glymphatic, immune system added). The
+  immune-system organ (2026-11-24) is the survey's "verification is NOT
+  metaphor" argument extended: patrol → stations → fix queue, with
+  repairs executed by the organs' own passes and guarded by the
+  heartbeat card.

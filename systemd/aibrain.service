@@ -1,0 +1,25 @@
+[Unit]
+Description=AI Brain Daemon — Juno helm REAL instance (Stage 3 cutover, 2026-11-10)
+Documentation=file:///home/hatch/workspace/goals/juno-at-the-helm-integration/hidden_files/stage3-cutover-plan.md
+# Real instance: pinned to ~/.juno-brain/workspace (the transplant, synced
+# from codypc at cutover). codypc's units were stopped before this started —
+# exactly one instance runs on real state, ever.
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hatch/.juno-brain/workspace
+ExecStart=/bin/bash /home/hatch/.juno-brain/workspace/brain-daemon.sh
+Environment=HOME=/home/hatch
+Environment=PATH=/home/hatch/.juno-brain/pkg-root/usr/bin:/home/hatch/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=WORKSPACE=/home/hatch/.juno-brain/workspace
+Environment=BRAIN_WORKSPACE=/home/hatch/.juno-brain/workspace
+Environment=OPENCLAW_WORKSPACE=/home/hatch/.juno-brain/workspace
+StandardOutput=append:/home/hatch/.juno-brain/logs/aibrain.log
+StandardError=append:/home/hatch/.juno-brain/logs/aibrain.log
+# Restart=always is the suite's own native semantics (codypc's
+# aibrain.service runs the same way) — substrate change only.
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

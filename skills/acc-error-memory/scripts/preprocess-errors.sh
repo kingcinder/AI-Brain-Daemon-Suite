@@ -13,7 +13,7 @@ set -e
 
 WORKSPACE="${WORKSPACE:-$HOME/.openclaw/workspace}"
 AGENT_ID="${AGENT_ID:-main}"
-TRANSCRIPT_DIR="$HOME/.openclaw/agents/$AGENT_ID/sessions"
+TRANSCRIPT_DIR="${TRANSCRIPT_DIR:-$HOME/.openclaw/agents/$AGENT_ID/sessions}"
 OUTPUT="$WORKSPACE/memory/pending-errors.json"
 WATERMARK_FILE="$WORKSPACE/memory/acc-watcher-watermark.json"
 

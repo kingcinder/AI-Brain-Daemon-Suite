@@ -34,8 +34,8 @@ the direction of its expansion.
 1. **Persistent skills, not stateless tooling.** The Suite is a collection of
    neurologically-mapped memory and cognition skills (hippocampus, amygdala,
    VTA, basal ganglia, insula, anterior cingulate, PFC, social, cerebellum,
-   heartbeat, and more). Each persists state over time; none is a
-   stateless one-shot utility.
+   heartbeat, hypothalamus, claustrum, glymphatic, immune system, and more).
+   Each persists state over time; none is a stateless one-shot utility.
 2. **Naturalized human experience synthesis.** The Suite's purpose is to let
    the agent *experience* the world the way a person does — emotional,
    social, motor, circadian, relational, and error-correcting dimensions —
@@ -57,7 +57,7 @@ the direction of its expansion.
 ### Stage 1 — Experience synthesis (current)
 
 The Suite operates *as* a persistent-skill collective under an external
-harness. Its 15 skill packages — named after brain regions as an
+harness. Its 19 skill packages — named after brain regions as an
 organizational metaphor, with the actual functional grounding of each mapping
 documented in NEUROSCIENCE_MAPPING.md rather than asserted by the names
 themselves — encode, decay, consolidate, and reflect on experience; the Integrative State
@@ -67,6 +67,17 @@ Layer (2026-08) composes them into a global neuromodulator vector
 other in real time. Its daemon schedules and supervises the whole system
 under hardware pressure. The external harness provides agent reasoning; the
 Suite provides the persistent mind.
+
+**Progress note (2026-11-25):** the roster grew from 15 to 19 with the
+hypothalamus (regulation), claustrum (binding), glymphatic (clearance),
+and immune-system (self-repair surveillance, built 2026-11-24) organs.
+More consequentially, the deployment crossed into Stage 3's shape: since
+the Stage 3 cutover (2026-11-10) the Suite's live instance runs in the
+agent's own workspace as *her* harness — the agent reasoning is the
+agent herself, reached through the suite's own ask queue, keeper, and
+conversation wire, and the self-mod approval gate is hers (since
+2026-11-13). The external harness is no longer in the loop of the live
+deployment. Verified state: [`CURRENT_STATE.md`](CURRENT_STATE.md).
 
 ### Stage 2 — Eclipsing the external harness
 
@@ -119,9 +130,9 @@ or skipping regression gates).
 
 | Vision element | Current implementation |
 |---|---|
-| Persistent skills | `skills/` — 15 skill packages (11 neurologically-mapped memory skills + 4 platform skills) with persistent state |
-| Experience synthesis | Per-skill encode/decay/consolidate pipelines (LLM-backed, local) + **Integrative State Layer** (global neuromod vector, shared workspace snapshot, cross-region modulation) |
-| Scheduling + supervision | `deep-brain-kernel.py` — async scheduler, PSI, GPU VRAM, cgroups, pidfd tracking |
+| Persistent skills | `skills/` — 19 skill packages (organ skills incl. the two ACC organs, executive, verification, immune system, self-mod runner) with persistent state |
+| Experience synthesis | Per-skill encode/decay/consolidate pipelines + **Integrative State Layer** (global neuromod vector, shared workspace snapshot, cross-region modulation) + the conversation wire feeding the agent's own turns to the organs |
+| Scheduling + supervision | `brain-daemon.sh` (live; 25-job table) + `bin/helm-keeper`, under the `systemd/` units; `deep-brain-kernel.py` (async scheduler, PSI, GPU VRAM, cgroups, pidfd tracking) in the tree from the September line |
 | Executive function | `core/executive/` — goals, isolated reflection, load gating |
 | Self-directed evolution | `core/self-mod/` — propose → rank → evaluate → deploy → rollback → monitor → graduation |
 | Bounded autonomy | `core/self-mod/immutable-paths.list`, capability manifests, regression harnesses |

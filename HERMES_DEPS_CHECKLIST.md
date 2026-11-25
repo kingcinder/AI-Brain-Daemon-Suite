@@ -5,7 +5,17 @@ item is either **INTERNALIZED** (no hermes needed), **OPTIONAL** (hermes
 enhances but isn't required), or **REQUIRES HERMES** (data source or
 integration point that needs the binary).
 
-Last audited: 2026-08-24
+Last audited: 2026-08-24; revised 2026-11-25 for the current deployment.
+
+> **2026-11-25 revision note:** the live deployment no longer runs under
+> Hermes Agent at all. Since the Stage 3 cutover (2026-11-10) the suite
+> runs as the agent Juno's own harness: agent reasoning for judgment work
+> is Juno herself, reached through the suite's ask queue, keeper, and
+> helm-drain rounds; transcripts come from the conversation wire, not
+> from a Hermes session database. Rows below that described the Hermes
+> integration are annotated where the current deployment supersedes them.
+> "REQUIRES HERMES" is now **zero** in the live deployment — the two
+> former cases are closed by replacement, not by new Hermes support.
 
 ## Spawn Jobs (core daemon dispatch)
 
@@ -42,16 +52,16 @@ Last audited: 2026-08-24
 
 | Item | Status | Evidence |
 |---|---|---|
-| Session export | 🔴 REQUIRES HERMES | `export-transcripts.sh` reads `~/.hermes/state.db` (SQLite). This is a data source dependency — hermes owns the session database. |
+| Session export | ✅ INTERNALIZED *(superseded 2026-11-25)* | Formerly: `export-transcripts.sh` read the Hermes session database (SQLite) — a genuine data-source dependency. In the current deployment the conversation wire (`core/gate/envelope.py`) ingresses every turn of the agent's own conversation, and the transcript bridge rewrites those payloads into the shapes the encoders read. No Hermes session database is involved. |
 | Transcript preprocessing | ✅ INTERNALIZED | `preprocess.sh` — transforms exported JSONL, no hermes |
 
 ## Per-Skill Installation
 
 | Item | Status | Evidence |
 |---|---|---|
-| Option B (daemon job table) | ✅ INTERNALIZED | `deep-brain-kernel.py` JOBS table — 30 jobs, no hermes cron needed |
-| Option A (hermes cron) | 🔴 REQUIRES HERMES | Per-skill `install.sh` scripts call `hermes cron create` for Option A registration |
-| Skill registration | ⚪ OPTIONAL | `hermes skills list` shows registered skills — informational, not required for daemon operation |
+| Option B (daemon job table) | ✅ INTERNALIZED | The live JOBS table is `brain-daemon.sh`'s — 25 jobs, no hermes cron needed (the September kernel table had 30; see `BRAIN_DAEMON_SCHEDULE.md`) |
+| Option A (hermes cron) | ⚪ LEGACY — not used | Per-skill `install.sh` scripts can call `hermes cron create` for Option A registration. The live deployment does not use this path; retained in the tree as the legacy registration route. |
+| Skill registration | ⚪ OPTIONAL | `hermes skills list` shows registered skills — informational, not required for daemon operation; the live deployment's skills are read from the workspace directly |
 
 ## Workspace
 
@@ -67,13 +77,18 @@ Last audited: 2026-08-24
 | Spawn jobs | 4/5 | 1 | 0 |
 | Self-mod pipeline | 7/7 | 0 | 0 |
 | Executive function | 4/4 | 0 | 0 |
-| Transcripts | 1/2 | 0 | 1 |
-| Installation | 1/3 | 1 | 1 |
+| Transcripts | 2/2 | 0 | 0 |
+| Installation | 1/3 | 2 (incl. legacy Option A, unused) | 0 |
 | Workspace | 2/2 | 0 | 0 |
-| **Total** | **19/23** | **2** | **2** |
+| **Total** | **20/23** | **3** | **0** |
 
 **Hermes is now optional for: all daemon operations, all self-mod pipeline
 operations, all executive function, all workspace operations.**
 
-**Hermes is still required for: transcript export (data source), Option A
-skill registration (legacy path — Option B is the default).**
+**Hermes is still required for: nothing in the live deployment**
+(2026-11-25). The two former requirements — transcript export (data
+source) and Option A skill registration — were closed by replacement:
+the conversation wire supplies transcripts, and the daemon job table is
+the only registration the live deployment uses. The Hermes integration
+code remains in the tree for the deployment shape it was built for; see
+`HERMES_COMPATIBILITY.md`.

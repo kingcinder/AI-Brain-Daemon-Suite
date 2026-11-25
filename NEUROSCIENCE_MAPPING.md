@@ -26,6 +26,10 @@ This suite does **not** claim to simulate a brain. It is a set of persistent, de
 | `thalamus-memory` | Thalamus | Thalamic **relay/gating** of cortical signals — Crick's "searchlight of attention" hypothesis; selective gating within cortico-thalamo-cortical loops, where cortex (layer 6) feeds back to modulate which inputs the relay amplifies. | gate.sh scores and dispatches signals (feedforward leg, tallied in `relay.stats`); `--feedback attend|release` accepts cortical directives that modulate `attentionFocus` and per-channel gain (the layer-6/TRN top-down leg); attention-filter, decay. | **PARTIAL → now implements bidirectional relay** (feedforward dispatch + cortical feedback gain, with a behavior-asserting test) |
 | `social-memory` | *Social (functional label, not a region)* | No single region owns "social." Nearest named frameworks: associative **social-value learning** — trust updates driven by social prediction error (Behrens, Hunt, Woolrich & Rushworth 2008) — and ToM belief attribution. | Relationship/trust/affinity tracking, free-form belief recording (update-belief), open loops. log-interaction now updates trust by **SPE = outcome − expected** when both are supplied. | **PARTIAL → now implements social prediction error** (name retained as a functional label; no region-equivalence claim) |
 | `heartbeat-memory` | *Heartbeat (job name, not a region)* | No brain region. Nearest real analogue: the **suprachiasmatic-nucleus circadian oscillator** — phase-gated allocation of behavior over the day. | beat.sh computes circadian phase (waking/active/winding_down/asleep) and phase-gates candidate actions + cooldowns, delegating choice to PFC when installed. | **PARTIAL** — genuine circadian gating (SCN analogue); "heartbeat" is a tick-name, documented as such. |
+| `hypothalamus-memory` | Hypothalamus | Homeostatic regulation of internal state — set-point control of energy, temperature, circadian/endocrine axes. | An hourly `regulate.sh` pass over the suite's internal-state variables (scheduled 2026-11-25; before that the pass existed unscheduled). | **NOT YET AUDITED** *(added 2026-11-25)* — structural label; the skill postdates the 2026-08-23 audit and has not been through its mechanism pass. |
+| `claustrum-memory` | Claustrum | Hypothesized binding/integration of distributed cortical activity into unified percepts (Crick & Koch). | An hourly `bind.sh` pass integrating signals across organs (scheduled 2026-11-25). | **NOT YET AUDITED** *(added 2026-11-25)* — structural label; no mechanism claim until audited. |
+| `glymphatic-memory` | *Glymphatic system (a clearance pathway, not a region)* | Clearance of metabolic waste and interstitial solutes, predominantly during sleep. | `clearance-sweep.sh` finds orphaned data stores, stale flows, and overstaying pending files, and reports them for disposal. | **NOT YET AUDITED** *(added 2026-11-25)* — functional label; the analogy is waste clearance, and the skill does perform that function for the suite's data. |
+| `immune-system-memory` | *Immune system (not a brain region)* | Surveillance, threat detection, and repair of the body's own tissues. | Patrol compares each organ's reported face against station thresholds; breaches enter a fix queue repaired by running the affected organ's own activity pass. Built 2026-11-24. | **NOT YET AUDITED** *(added 2026-11-25)* — functional label; operationally load-bearing (its queue drives real repairs and its face is a heartbeat-card check) but no neuroscience mechanism is claimed. |
 | `executive-function`, `verification-memory`, `self-mod-runner` | *None (non-regional infrastructure)* | — | Goal-proposal/outcome cycles; declared-test verification sweep; self-modification pipeline. | **N/A — infrastructure.** No brain-region name is claimed; nearest analogue (executive control networks) is noted where relevant but no functional equivalence is asserted. |
 
 ## Phase 2 — What changed and why
@@ -51,6 +55,20 @@ The **AUTHENTIC** skills (anterior-cingulate, acc-error, prefrontal-cortex) were
 
 - The added learning signals are **approximations**: RPE is a scalar delta rule, not a full TD learner over a value function; replay groups by domain/category theme rather than learned feature similarity; the relay's feedback is a discrete attend/release gain, not continuous layer-6 dynamics. The suite's constraint is that everything runs in bash/jq/python without ML dependencies.
 - The plan's discipline of "verify it fails" was recorded from original task history; the new tests assert the mechanism *fires* (positive assertion) rather than a red-green regression pair.
+
+## Addendum (2026-11-25) — four organs added after this audit
+
+The 2026-08-23 audit covered the 15 skills then in the suite. Four
+organs were added later — `hypothalamus-memory`, `claustrum-memory`,
+`glymphatic-memory`, and `immune-system-memory` (the last built
+2026-11-24, taking the roster to 19) — and are entered in the table
+above as **NOT YET AUDITED**. That verdict is deliberate: this document's
+discipline is that a mechanism claim requires reading the code for the
+region's signature learning signal, and that pass has not been run on
+the four newcomers. Until it is, their names are organizational labels,
+exactly as the suite's position statement requires. The count in the
+position statement above ("eleven of the region-named skills…") refers
+to the audited set and is unchanged.
 
 ## Linkage
 

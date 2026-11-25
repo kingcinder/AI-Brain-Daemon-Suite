@@ -1,8 +1,25 @@
 # Hermes Agent Compatibility Audit
 
+> **Status update (2026-11-25) — read this first.** The live deployment
+> no longer runs under Hermes Agent. Since the Stage 3 cutover
+> (2026-11-10), the suite's live instance runs as the agent Juno's own
+> harness in her workspace: the running scheduler is `brain-daemon.sh`
+> (25-job table) with `bin/helm-keeper`, agent judgment work flows
+> through the suite's ask queue and helm-drain rounds, and transcripts
+> come from the conversation wire (`core/gate/`) rather than a Hermes
+> session database. The roster is 19 organ skills, not the 11–15 this
+> audit covers. **This document remains the accurate audit of the
+> September tree and of the Hermes integration path retained in the
+> code** (`SPAWN_PROVIDER=hermes|local|agentloop`, Option A/B skill
+> registration, the transcript-export bridge) — it is not a description
+> of the current live configuration. Current verified state:
+> [`CURRENT_STATE.md`](CURRENT_STATE.md); dependency status:
+> [`HERMES_DEPS_CHECKLIST.md`](HERMES_DEPS_CHECKLIST.md).
+
 > **Status:** Living document. Per-file audit of the entire suite against
-> **Hermes Agent** (Nous Research) — the agent harness this suite runs under,
-> and the rebrand of the harness formerly called **OpenClaw** (the installed
+> **Hermes Agent** (Nous Research) — the agent harness this suite ran
+> under in the September deployment, and the rebrand of the harness
+> formerly called **OpenClaw** (the installed
 > `hermes` binary keeps a `claw` compat command and still reads legacy
 > `metadata.openclaw` skill frontmatter).
 >

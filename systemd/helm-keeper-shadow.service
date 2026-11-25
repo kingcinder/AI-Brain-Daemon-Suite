@@ -1,0 +1,24 @@
+[Unit]
+Description=Helm keeper — Juno helm SHADOW instance (Stage 2)
+Documentation=file:///home/hatch/workspace/goals/juno-at-the-helm-integration/hidden_files/refactor-plan/task_plan.md
+After=aibrain-shadow.service
+# Shadow only: pinned to ~/.juno-brain/workspace-shadow via environment.
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hatch/.juno-brain/workspace-shadow
+ExecStart=/usr/bin/python3 /home/hatch/.juno-brain/bin/helm-keeper-shadow
+Environment=HOME=/home/hatch
+Environment=PATH=/home/hatch/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=WORKSPACE=/home/hatch/.juno-brain/workspace-shadow
+Environment=BRAIN_WORKSPACE=/home/hatch/.juno-brain/workspace-shadow
+Environment=OPENCLAW_WORKSPACE=/home/hatch/.juno-brain/workspace-shadow
+StandardOutput=append:/home/hatch/.juno-brain/logs/helm-keeper-shadow.log
+StandardError=append:/home/hatch/.juno-brain/logs/helm-keeper-shadow.log
+# Restart=always matches codypc's helm-keeper.service (the keeper's own
+# docstring specifies it) and the Stage 2 design — substrate change only.
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

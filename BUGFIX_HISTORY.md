@@ -18,6 +18,103 @@ specifically to stop that.
 
 ---
 
+## 2026-11-25 — Live-deployment repair pass (verification findings D1–D6, keeper/wire fixes)
+
+Found by the full harness verification pass of 2026-11-25 (criteria
+written before inspection; every finding measured live) plus the
+install work earlier that morning. Full report summary in
+`CURRENT_STATE.md`.
+
+### Bug: keeper wrote answers where askers never read them
+- **Found by:** ACC install work, 2026-11-25 ~02:47.
+- **Root cause:** the keeper's results-drop merge wrote answers only to
+  `memory/llm-results/`, but every asker reads `memory/juno-results/`.
+  Every results-drop answer since the path diverged was invisible; the
+  ACC organs' processing halves had no working driver from 2026-11-22.
+- **Fix:** keeper patched to write **both** directories. Round trip
+  proven end-to-end (test ask → answer read back from `juno-results/`).
+
+### Bug: ACC organs produced no dashboard fragments (D1)
+- **Root cause:** both ACC skills' `generate-dashboard.sh` were
+  pre-fragment *monoliths* that rewrote the whole `brain-dashboard.html`
+  and wrote no fragment, while the shared builder assembles the page
+  from per-organ fragments and expected `acc_error` / `acc_conflict`.
+  The two writers raced over one filename (three build sizes observed
+  within an hour); the delivered copy carried no ACC data at all. The
+  organs themselves were processing correctly throughout.
+- **Fix:** monoliths backed up and replaced with fragment writers in
+  the sibling idiom (own state only, always write, then call the shared
+  builder). Verified in the assembled dashboard, the served page, and
+  the delivered desktop copy. Regression guards: heartbeat regression
+  suite section F10.
+
+### Bug: VTA reward intake frozen for 10 days (D2)
+- **Root cause:** the reward encode pipeline's agent phase had no
+  driver anywhere, and `preprocess-rewards.sh` read a dead transcript
+  path. `pending-rewards.json` sat untouched from 2026-11-15 (133
+  entries, oldest 233h), flagged as an overstay by every glymphatic
+  sweep and acted on by nothing.
+- **Fix:** all 133 entries judged (every one worker boilerplate; 0
+  encoded, 133 rejected, file cleared with the judgment on record);
+  agent phase wired into the helm-drain rounds (step 7b);
+  `vta_encoding` job added to the daemon table; helper script now
+  honors the transcript-bridge corpus path.
+
+### Bug: four organ passes had no schedule (D3)
+- **Root cause:** hypothalamus `regulate`, claustrum `bind`, the
+  heartbeat organ's `beat`, and the glymphatic `clearance-sweep` were
+  built but never added to the daemon's JOBS table; their states
+  advanced only when an unrelated repair happened to run them.
+- **Fix:** five jobs added (`hypothalamus_regulate` :17 hourly,
+  `claustrum_bind` :27 hourly, `heartbeat_state_beat` :33 hourly,
+  `vta_encoding` :44 every 3h, `glymphatic_sweep` :19 every 4h);
+  daemon restarted once via systemd; `--check` clean; proving run
+  rc=0 on all passes with states advanced.
+
+### Bug: glymphatic sweep reported phantom orphans (D4)
+- **Root cause:** flow-registry drift — stores with real readers were
+  never registered in `core/gate/flows.json`, and backup artifacts
+  matched no internal-store pattern, so the clearance sweep reported
+  9 "orphans" per run, most of them false.
+- **Fix:** 6 flows registered with their real readers; `*.backup*` /
+  `*.prepush*` added to internal stores. Next sweep: notes empty.
+
+### Bug: ACC screening counters never incremented (D6)
+- **Root cause:** `totalScreened` / `totalAnalyzed` had no writer —
+  only the initial template and the dashboard fragment referenced
+  them — so both read 0 while screening ran every drain round.
+- **Fix:** the encode pipeline increments both at the points where the
+  counts are true. No backfill: historical screening was never
+  recorded, and invented numbers would be worse than the gap.
+
+### Bug: gate auto-suppressed every wire envelope
+- **Found by:** conversation-wire build, 2026-11-25.
+- **Root cause:** the thalamus gate's scorer read only the legacy
+  signal shape; envelope-shaped signals (everything the new
+  conversation wire produces) parsed empty and were auto-suppressed —
+  the gate could not read the wire it was built to carry.
+- **Fix:** scorer now reads both envelope shapes. The 33 signals
+  suppressed under the broken parse re-scored under the fixed parse.
+
+### Bug: queue check measured a stale snapshot (2026-11-25 ~03:44)
+- **Root cause:** the heartbeat checker read queue depth from the
+  pulse log (up to a heartbeat cycle old) instead of the live queue,
+  and failed the card on asks that had arrived minutes earlier and
+  were already being answered.
+- **Fix:** the check measures the live queue; PASS if empty or the
+  oldest unacked ask is younger than one drain cycle (15 min). The
+  card's bar updated to match. Regression guards: section F11
+  (suite now 58/58).
+
+### Ops: far-side spawn queue archived and cleared (D5)
+- The operator-PC harness copy's spawn queue (567 entries, no drainer,
+  oldest ~16 days) was censused, archived to a dated `.jsonl` with
+  SHA-256 verification (archive and source hashes matched), and the
+  live queue truncated to 0 and verified — behind the connection
+  identity guard, per the operator's instruction.
+
+---
+
 ## 2026-08-25 — Serpent Circle renovation pass (hardening + cleanup)
 
 First executed run of the Serpent Circle meta-skillchain skill. Full detail in

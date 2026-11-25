@@ -112,6 +112,17 @@ echo "$FILTERED" > "$PENDING_FILE"
 REGEX_COUNT=$(python3 -c "import json; print(len(json.load(open('$PENDING_FILE'))))")
 echo "Filtered $TOTAL_COUNT exchanges → $REGEX_COUNT candidates ($(( (TOTAL_COUNT - REGEX_COUNT) * 100 / TOTAL_COUNT ))% reduction)"
 
+# Stats (added 2026-11-25): totalScreened counts every exchange the
+# screening pass examined. No writer ever incremented it before, so the
+# organ reported 0 screened while screening ran every round.
+python3 -c "
+import json
+p = '$WORKSPACE/memory/acc-state.json'
+s = json.load(open(p))
+s.setdefault('stats', {})['totalScreened'] = s['stats'].get('totalScreened', 0) + $TOTAL_COUNT
+json.dump(s, open(p, 'w'), indent=2)
+" 2>/dev/null || true
+
 if [ "$REGEX_COUNT" -eq 0 ]; then
     echo "No error signals detected — nothing to analyze"
     rm -f "$PENDING_FILE"
@@ -132,6 +143,17 @@ if [ "$COUNT" -eq 0 ]; then
     rm -f "$PENDING_FILE"
     exit 0
 fi
+
+# Stats (added 2026-11-25): totalAnalyzed counts the exchanges Juno
+# confirmed and handed to analysis. Same never-incremented defect as
+# totalScreened above.
+python3 -c "
+import json
+p = '$WORKSPACE/memory/acc-state.json'
+s = json.load(open(p))
+s.setdefault('stats', {})['totalAnalyzed'] = s['stats'].get('totalAnalyzed', 0) + $COUNT
+json.dump(s, open(p, 'w'), indent=2)
+" 2>/dev/null || true
 
 echo ""
 echo "Step 5: $COUNT exchanges ready for analysis"

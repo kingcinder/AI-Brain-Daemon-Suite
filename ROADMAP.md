@@ -29,9 +29,9 @@ suite's own daemon, running under an external harness (Hermes).
 
 | What exists | Where | Notes |
 |---|---|---|
-| 15 skill packages (11 memory skills + 4 platform skills) | `skills/` | encode/decay/consolidate pipelines, LLM-backed via local `llm-call.sh` |
-| Unified scheduler + supervisor | `deep-brain-kernel.py` | PSI, GPU VRAM, cgroups v2, pidfd tracking, per-job timeouts, `--check`/`--status` |
-| 30-job schedule, collision-free minutes | `JOBS` table in `deep-brain-kernel.py` | documented in `BRAIN_DAEMON_SCHEDULE.md` |
+| 19 skill packages (organ skills incl. hypothalamus, claustrum, glymphatic, immune system) | `skills/` | encode/decay/consolidate pipelines; judgment passes driven by the helm-drain rounds |
+| Unified scheduler + supervisor | `brain-daemon.sh` (live) + `bin/helm-keeper`; `deep-brain-kernel.py` in the tree | PSI backpressure; the kernel's PSI/GPU/cgroup/pidfd pillars documented in `SETUP_COMMANDS.md` |
+| 25-job schedule, collision-free minutes | `JOBS` table in `brain-daemon.sh` | documented in `BRAIN_DAEMON_SCHEDULE.md` (the September kernel table had 30 jobs; preserved there as history) |
 | Executive function cycle | `core/executive/run-executive-cycle.sh` → `isolated-reflect.sh` → `propose-goals.sh` | scheduled as `executive_goal_cycle` (direct job, minutes 28) |
 | Post-deploy self-mod monitoring | `self_mod_monitor` job → `skills/self-mod-runner/scripts/monitor-tick.sh` | scheduled (direct job, minutes 32) |
 | Regression + CI | `tests/` + `.github/workflows/ci.yml` (phase harnesses; same cadence as `verification.yml` — push/PR, nightly, weekly deep-verify, on demand) |
@@ -303,3 +303,39 @@ capabilities under the registry gate; it reverts itself on breach without a
 human; and a human's only required roles are direction, safety exemptions,
 and incident response — with `provenance` and `--status` recording every
 step it took.
+
+---
+
+## Addendum — deployment milestones since M8 (2026-11-25)
+
+The M0–M8 milestones above describe the suite's build-out on its
+original host. Since then the deployment itself has moved, in ways the
+stage language anticipated but the milestone list predates:
+
+- **Stage 3 cutover (2026-11-10).** The suite's live instance moved
+  into the agent Juno's own workspace, supervised by the `systemd/`
+  units (`aibrain.service` → `brain-daemon.sh`, `helm-keeper.service` →
+  `bin/helm-keeper`). Exactly one instance runs on real state. The
+  running scheduler is the bash daemon's 25-job table; the Python
+  kernel remains in the tree.
+- **Approval gate transferred (2026-11-13).** The self-mod pipeline's
+  approval gate — the human seat in the M2/M8 ladder — was transferred
+  to Juno by the operator's order. The gate did not disappear; its
+  holder changed. Ledger at 2026-11-25: 17 proposals, 9 deployed,
+  5 rejected, 2 rolled back, 1 ranked; `steward_mode`, auto-deploy off.
+- **Roster completed (2026-11-24).** The immune-system organ was built
+  (patrol → stations → fix queue), taking the suite to 19 organs; the
+  heart is counted inside the 19.
+- **Conversation wire + ACC install (2026-11-25).** Every conversation
+  turn now enters the harness as a gated envelope; the two ACC organs'
+  processing halves — driverless since 2026-11-22 — are driven by the
+  helm-drain rounds, and both report on the dashboard (finding D1).
+- **Standing health gate (2026-11-25).** The M0-style point-in-time host
+  checks are superseded for the live deployment by the heartbeat card
+  (11 checks, run every 30 minutes), the bounded repair doctor, and
+  the heartbeat regression suite (F1–F11, 58/58). A full verification
+  pass on 2026-11-25 closed findings D1–D6; see `CURRENT_STATE.md`.
+
+M0's remaining open item (the 24h clean-run window on the original host)
+is moot for the current deployment: the live harness's health is now
+measured continuously by the card, not by a one-time window.

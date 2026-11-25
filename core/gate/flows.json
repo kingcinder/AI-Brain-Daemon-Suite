@@ -92,7 +92,7 @@
       "reader": "juno-ask.sh pollers (organ scripts, agent-loop, generate-proposals-juno)",
       "reader_rhythm": "per-ask, poll 3s until timeout",
       "semantics": "merge",
-      "sla_seconds": 3600,
+      "sla_seconds": 14400,
       "store": "memory/juno-results"
     },
     {
@@ -866,6 +866,79 @@
       "semantics": "merge",
       "sla_seconds": 86400,
       "store": "memory/pending-emotions.json"
+    },
+    {
+      "id": "conversation-turns",
+      "kind": "queue",
+      "producer": "~/workspace/bin/conversation-ingress (main chat turns, origin external|juno) + conversation-wire-sweep backstop",
+      "reader": "thalamus-memory/scripts/gate.sh --process",
+      "reader_rhythm": "daemon thalamus_gate + signal_dispatch (every 2h); immediate --process on elevated live turns",
+      "semantics": "append",
+      "sla_seconds": 900,
+      "store": "memory/brain-signals.jsonl",
+      "evidence": {
+        "path": "memory/conversation-turns/"
+      }
+    },
+    {
+      "id": "named-emotions",
+      "kind": "state",
+      "producer": "amygdala-memory encode (agent phase)",
+      "reader": "amygdala-memory/scripts/load-emotion.sh + dashboard",
+      "reader_rhythm": "on consultation",
+      "semantics": "replace",
+      "sla_seconds": 86400,
+      "store": "memory/named-emotions.json"
+    },
+    {
+      "id": "encoded-emotions",
+      "kind": "log",
+      "producer": "amygdala-memory/scripts/encode-pipeline.sh",
+      "reader": "amygdala-memory (state rebuild + audit)",
+      "reader_rhythm": "per encode run",
+      "semantics": "append",
+      "sla_seconds": 86400,
+      "store": "memory/encoded-emotions.jsonl"
+    },
+    {
+      "id": "immune-fix-queue",
+      "kind": "queue",
+      "producer": "immune-system-memory patrol + stations",
+      "reader": "heartbeat-doctor (organ activity passes) + immune-face-write.py",
+      "reader_rhythm": "heartbeat-card-check (30m) + every pulse",
+      "semantics": "merge",
+      "sla_seconds": 3600,
+      "store": "memory/immune-fix-queue.json"
+    },
+    {
+      "id": "immune-stations",
+      "kind": "state",
+      "producer": "immune-system-memory/scripts/immune-stations-update.py",
+      "reader": "immune-face-write.py + heartbeat-doctor",
+      "reader_rhythm": "every pulse",
+      "semantics": "replace",
+      "sla_seconds": 3600,
+      "store": "memory/immune-stations.json"
+    },
+    {
+      "id": "pending-clean",
+      "kind": "queue",
+      "producer": "immune-system-memory/scripts/filter-pending.py",
+      "reader": "Juno (backlog processing) feeding hippocampus summarize-pending",
+      "reader_rhythm": "per backlog processing run",
+      "semantics": "replace",
+      "sla_seconds": 86400,
+      "store": "memory/pending-clean.json"
+    },
+    {
+      "id": "pending-held",
+      "kind": "queue",
+      "producer": "immune-system-memory/scripts/filter-pending.py",
+      "reader": "Juno review only \u2014 held/quarantine partition, never auto-summarized",
+      "reader_rhythm": "per backlog processing run",
+      "semantics": "replace",
+      "sla_seconds": 86400,
+      "store": "memory/pending-held.json"
     }
   ],
   "internal_stores": [
@@ -914,7 +987,9 @@
     {
       "evidence_note": "snapshot ledger appended by hippocampus snapshot-tick.sh; snapshots consumed by core/snapshot restore paths; pre-registered",
       "pattern": "memory/snapshots/index.jsonl"
-    }
+    },
+    "*.backup*",
+    "*.prepush*"
   ],
   "purpose": "Flow registry for the ONE GATED INGRESS (Gated-Ingress Refactor, 2026-11-20). Every producer -> store/queue -> reader rhythm in Juno's substrate is registered here. Registration REQUIRES reader + sla_seconds + semantics (append|merge; overwrite is not a registrable value). The gate refuses envelopes for unregistered destinations (I1); the invariant patrol FAILs on stores present but unregistered (I2) and WARNs when a flow's reader evidence is older than its SLA (I2). Evidence = the file/field the reader rhythm stamps: lastConsultedAt inside organ state files (helm-drain 2c pattern, I6), the gate checkpoint, or the helm health epoch.",
   "version": 1

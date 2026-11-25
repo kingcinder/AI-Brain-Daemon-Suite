@@ -53,6 +53,11 @@ WORKSPACE="${WORKSPACE:-$HOME/.juno-brain/workspace}"
 # Suite scripts split across both env names (WORKSPACE / OPENCLAW_WORKSPACE).
 # The daemon is the single launcher: unify them here so every job sees one workspace.
 export OPENCLAW_WORKSPACE="$WORKSPACE"
+# Queue asks (juno-ask.sh) default to a 30s wait, which the keeper's ~20s
+# merge cycle plus any drainer latency cannot reliably meet; 240s makes
+# daemon-driven encoders (ACC conflicts/errors) servable by the 15-min
+# helm-drain cadence and by a live session. Set 2026-11-25, ACC install.
+export JUNO_TIMEOUT="${JUNO_TIMEOUT:-240}"
 SKILLS_DIR="$WORKSPACE/skills"
 PIDS_DIR="$WORKSPACE/memory/daemon-pids"
 TICK_SECONDS=30
@@ -105,6 +110,11 @@ self_mod_proposal_cycle|direct|19|46|self-mod-runner/scripts/proposal-cycle-tick
 thalamus_decay|direct|0,4,8,12,16,20|48|thalamus-memory/scripts/decay.sh
 neuromod_update|direct|*|6,21,36,51|thalamus-memory/scripts/neuromod-update.sh
 signal_dispatch|direct|1,3,5,7,9,11,13,15,17,19,21,23|54|thalamus-memory/scripts/gate.sh
+hypothalamus_regulate|direct|*|17|hypothalamus-memory/scripts/regulate.sh
+claustrum_bind|direct|*|27|claustrum-memory/scripts/bind.sh
+heartbeat_state_beat|direct|*|33|heartbeat-memory/scripts/beat.sh
+vta_encoding|direct|1,4,7,10,13,16,19,22|44|vta-memory/scripts/encode-pipeline.sh
+glymphatic_sweep|direct|0,4,8,12,16,20|19|glymphatic-memory/scripts/clearance-sweep.sh
 "
 
 log() {

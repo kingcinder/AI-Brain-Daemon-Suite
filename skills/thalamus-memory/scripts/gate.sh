@@ -164,15 +164,21 @@ _score_signal() {
     goals=$(_get_active_goals)
 
     local source signal_name intensity
-    source=$(echo "$signal_json" | jq -r '.source // ""' 2>/dev/null || echo "")
-    signal_name=$(echo "$signal_json" | jq -r '.signal // ""' 2>/dev/null || echo "")
-    intensity=$(echo "$signal_json" | jq -r '.intensity // "0.5"' 2>/dev/null || echo "0.5")
+    # Two envelope shapes share the bus: the legacy publish.sh shape
+    # (.source/.signal/.intensity/.payload) and the gated-ingress shape
+    # (.envelope.source_id/.type/.urgency/.payload_ref, envelope.py
+    # Phase B). Read both — before this normalization (2026-11-25) every
+    # envelope-shaped signal parsed as empty source/signal, scored 0 on
+    # goal relevance, and was auto-suppressed unread.
+    source=$(echo "$signal_json" | jq -r '.envelope.source_id // .source // ""' 2>/dev/null || echo "")
+    signal_name=$(echo "$signal_json" | jq -r '.envelope.type // .signal // ""' 2>/dev/null || echo "")
+    intensity=$(echo "$signal_json" | jq -r '.intensity // ({"routine":0.5,"elevated":0.75,"critical":1.0}[.envelope.urgency // "routine"] // 0.5)' 2>/dev/null || echo "0.5")
 
     # 1. Goal relevance: does signal text match any active goal description?
     local goal_relevance=0.0
     if [[ -n "$goals" ]]; then
         local combined
-        combined="$source $signal_name $(echo "$signal_json" | jq -r '.payload | tostring' 2>/dev/null || echo '')"
+        combined="$source $signal_name $(echo "$signal_json" | jq -r '.payload // .envelope.payload_ref // "" | tostring' 2>/dev/null || echo '')"
         while IFS= read -r goal; do
             [[ -z "$goal" ]] && continue
             # Simple word overlap scoring — literal substring match (glob with
@@ -345,6 +351,7 @@ _dispatch() {
     if [[ "$action" = "suppress" ]]; then
         local tmp="$STATE_FILE.tmp.$$"
         jq --arg src "$source" --arg sig "$signal_name" --argjson intensity "$intensity" \
+           --arg raw "$raw_signal" \
            --arg now "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
            --arg retry "$(date -u -d '+1 hour' +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" \
         '.suppressedQueue += [{
@@ -352,7 +359,8 @@ _dispatch() {
             intensity: $intensity,
             suppressedAt: $now,
             retryAfter: $retry,
-            reason: "gate score below threshold"
+            reason: "gate score below threshold",
+            raw: $raw
         }]' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
         return 0
     fi
@@ -421,6 +429,42 @@ _dispatch() {
 _process() {
     _init_state
     _ensure_relay
+
+    # ── Retry expired suppressions ──────────────────────────────────────
+    # Added 2026-11-25: until now NOTHING ever re-read the suppressed
+    # queue — retryAfter was written and displayed but never honored, so
+    # a suppressed signal was silently final. Entries whose retryAfter
+    # has passed are removed and re-scored from their stored raw signal
+    # (raw is stored at suppression time; a fresh suppression re-queues
+    # with a new retryAfter). Legacy entries without raw cannot be
+    # re-scored and are dropped at expiry.
+    local now_epoch expired_count
+    now_epoch=$(date -u +%s)
+    expired_count=$(jq -r --argjson now "$now_epoch" \
+        '[.suppressedQueue[]? | select((.retryAfter | fromdateiso8601? // 0) <= $now)] | length' \
+        "$STATE_FILE" 2>/dev/null || echo 0)
+    if [[ "${expired_count:-0}" -gt 0 ]]; then
+        local retry_raws tmp_r
+        retry_raws=$(jq -r --argjson now "$now_epoch" \
+            '[.suppressedQueue[]? | select((.retryAfter | fromdateiso8601? // 0) <= $now) | .raw // empty] | .[]' \
+            "$STATE_FILE" 2>/dev/null || true)
+        tmp_r="$STATE_FILE.tmp.$$"
+        jq --argjson now "$now_epoch" \
+            '.suppressedQueue = [.suppressedQueue[]? | select((.retryAfter | fromdateiso8601? // 9999999999) > $now)]' \
+            "$STATE_FILE" > "$tmp_r" && mv "$tmp_r" "$STATE_FILE"
+        while IFS= read -r raw_line; do
+            [[ -z "$raw_line" ]] && continue
+            local rscored raction rsource rsignal rintensity rscore
+            rscored=$(_score_signal "$raw_line")
+            raction=$(echo "$rscored" | jq -r '.action' 2>/dev/null || echo "suppress")
+            rsource=$(echo "$rscored" | jq -r '.source' 2>/dev/null || echo "")
+            rsignal=$(echo "$rscored" | jq -r '.signal' 2>/dev/null || echo "")
+            rintensity=$(echo "$rscored" | jq -r '.intensity' 2>/dev/null || echo "0.5")
+            rscore=$(echo "$rscored" | jq -r '.gateScore' 2>/dev/null || echo "0")
+            _update_stats "$raction"
+            _dispatch "$rsource" "$rsignal" "$raction" "$rintensity" "$rscore" "$raw_line"
+        done <<< "$retry_raws"
+    fi
 
     local start_line=0
     [[ -f "$GATE_CHECKPOINT" ]] && start_line=$(head -1 "$GATE_CHECKPOINT" 2>/dev/null || echo 0)

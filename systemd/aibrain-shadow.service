@@ -1,0 +1,25 @@
+[Unit]
+Description=AI Brain Daemon — Juno helm SHADOW instance (Stage 2)
+Documentation=file:///home/hatch/workspace/goals/juno-at-the-helm-integration/hidden_files/refactor-plan/task_plan.md
+# Shadow only: pinned to ~/.juno-brain/workspace-shadow. The pristine
+# transplant and codypc's live suite are never touched by this unit.
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hatch/.juno-brain/workspace-shadow
+ExecStart=/bin/bash /home/hatch/.juno-brain/workspace-shadow/brain-daemon.sh
+Environment=HOME=/home/hatch
+Environment=PATH=/home/hatch/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=WORKSPACE=/home/hatch/.juno-brain/workspace-shadow
+Environment=BRAIN_WORKSPACE=/home/hatch/.juno-brain/workspace-shadow
+Environment=OPENCLAW_WORKSPACE=/home/hatch/.juno-brain/workspace-shadow
+StandardOutput=append:/home/hatch/.juno-brain/logs/aibrain-shadow.log
+StandardError=append:/home/hatch/.juno-brain/logs/aibrain-shadow.log
+# Restart=always is the suite's own native semantics (codypc's
+# aibrain.service runs the same way) and matches the Stage 2 design's
+# restart-on-death behaviour — substrate change only, no new behaviour.
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

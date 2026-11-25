@@ -194,6 +194,13 @@ if [ "$ZONE_COUNT" -gt 0 ]; then
     fi
 fi
 
+# ── Advance the encode watermark ──────────────────────────────────────────
+# Added 2026-11-25 (ACC install): nothing ever set the watermark, so every
+# run re-analyzed the same exchanges from index 0 and re-logged duplicate
+# conflicts. Advance by the number of exchanges this run consumed.
+WM_NOW=$("$SKILL_DIR/scripts/update-watermark.sh" --get 2>/dev/null || echo 0)
+"$SKILL_DIR/scripts/update-watermark.sh" --set $((WM_NOW + EXCHANGE_COUNT)) 2>/dev/null || true
+
 # ── Log event ─────────────────────────────────────────────────────────────────
 "$SKILL_DIR/scripts/log-event.sh" \
   encoding \

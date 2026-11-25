@@ -30,19 +30,6 @@ with open('$OUTPUT_FILE', 'w') as f:
 print('✅ Synced to $OUTPUT_FILE')
 "
 
-# Live pulse — since the Stage 6 cutover the heartbeat that actually beats is
-# helm-pulse.sh (the action-chooser rendered above is retired; Juno acts
-# herself). Append the latest pulse line so this face shows both halves
-# honestly. Added 2026-11-14 under Dither's organ-ownership grant.
-PULSE_LOG="$WORKSPACE/memory/heartbeat-pulse.log"
-if [ -f "$PULSE_LOG" ]; then
-    {
-        echo ""
-        echo "## Live Pulse (helm-pulse)"
-        echo "Last pulse: $(tail -n 1 "$PULSE_LOG")"
-    } >> "$OUTPUT_FILE"
-fi
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ -f "$SCRIPT_DIR/generate-dashboard.sh" ]; then
     "$SCRIPT_DIR/generate-dashboard.sh" 2>/dev/null || true

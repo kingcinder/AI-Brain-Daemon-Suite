@@ -79,7 +79,17 @@ def main():
         print(f"clearance-sweep: registry unreadable: {e}", file=sys.stderr)
         return 2
     flows = reg.get("flows", [])
-    internal_pats = reg.get("internal_stores", [])
+    # Registry entries are either plain glob strings or dicts carrying a
+    # "pattern" key (pre-registered stores, added 2026-11-20). Normalize to
+    # strings — covered() below feeds every entry to fnmatch, which crashed
+    # on the dicts and froze this organ's state from 2026-11-22 until the
+    # normalization was added 2026-11-25.
+    internal_pats = []
+    for _p in reg.get("internal_stores", []):
+        if isinstance(_p, str):
+            internal_pats.append(_p)
+        elif isinstance(_p, dict) and _p.get("pattern"):
+            internal_pats.append(_p["pattern"])
 
     # ── 1. Backlog-age audit ────────────────────────────────────────
     for flow in flows:

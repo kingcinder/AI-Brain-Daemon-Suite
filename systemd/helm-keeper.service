@@ -1,0 +1,25 @@
+[Unit]
+Description=Helm keeper — Juno helm REAL instance (Stage 3 cutover, 2026-11-10)
+Documentation=file:///home/hatch/workspace/goals/juno-at-the-helm-integration/hidden_files/stage3-cutover-plan.md
+After=aibrain.service
+# Real instance: pinned to ~/.juno-brain/workspace via environment;
+# SHARE is ~/bigpipe-share, the original keeper's semantics.
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hatch/.juno-brain/workspace
+ExecStart=/usr/bin/python3 /home/hatch/.juno-brain/bin/helm-keeper
+Environment=HOME=/home/hatch
+Environment=PATH=/home/hatch/.juno-brain/pkg-root/usr/bin:/home/hatch/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=WORKSPACE=/home/hatch/.juno-brain/workspace
+Environment=BRAIN_WORKSPACE=/home/hatch/.juno-brain/workspace
+Environment=OPENCLAW_WORKSPACE=/home/hatch/.juno-brain/workspace
+StandardOutput=append:/home/hatch/.juno-brain/logs/helm-keeper.log
+StandardError=append:/home/hatch/.juno-brain/logs/helm-keeper.log
+# Restart=always matches codypc's helm-keeper.service (the keeper's own
+# docstring specifies it) — substrate change only.
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
