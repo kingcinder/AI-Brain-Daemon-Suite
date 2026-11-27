@@ -199,7 +199,7 @@ health record, not silently.
 | `deep-brain-kernel.py` | The Python engine from the September line (async scheduler + pressure supervisor). In the tree; not the engine running in the current deployment. |
 | `bin/` | Helm tooling: the keeper, telemetry snapshot/delivery, invariant patrol, organ digest. |
 | `scripts/` | `serve-dashboard.sh` + `dashboard-server.py` (live dashboard), `ci-gate.sh`, `deep-verify.sh`. |
-| `systemd/` | Unit sources: `aibrain.service`, `helm-keeper.service`, `aibrain-dashboard.service` (plus shadow variants used for cutover testing). |
+| `systemd/` | Unit sources: `aibrain.service`, `helm-keeper.service`, `aibrain-dashboard.service`, `aibrain-dashboard-tunnel.service` (plus shadow variants used for cutover testing). |
 | `tests/` | Phase harnesses and per-skill unit suites, including the verification region's self-test. |
 | `docs/` | Design specs, runbooks, and verification evidence from the suite's build-out (historical records). |
 
@@ -291,3 +291,24 @@ are in the tree. The heartbeat card stands **12/12 PASS**. Details in the
   under `aibrain-dashboard.service` (Restart=always; kill-tested live),
   and the unit source ships in `systemd/` — its only copy previously
   sat in /etc, and a VM replacement ate it.
+- **The Field (2026-11-27).** The helm gained a Field page: a radar of
+  six labelled proxy spokes (noticing the pull, feeling the cost,
+  choosing not to loop, holding the distinction, revising instead of
+  repeating, staying with uncertainty) scored on every pulse by
+  `skills/insula-memory/scripts/field-score.py` from process-stream
+  features plus ACC state, with the basis counts shown on the page —
+  and the Matrix, a 32³-vertex lattice where each process-stream batch
+  lands as light. Regression guards F15.
+- **The unflappable dashboard tunnel (2026-11-27).** The reverse
+  tunnel to the operator's PC spent two days flapping for three
+  separate reasons: it was an unsupervised `nohup` ssh that died with
+  every route flap; the heartbeat doctor verified the dashboard server
+  by counting processes named after a launcher that execs python, a
+  needle a healthy server never matches, so the rung vetoed its own
+  repairs; and stale root-owned listeners on the far end blocked
+  rebinds invisibly. The tunnel is now a supervised service —
+  `aibrain-dashboard-tunnel.service` running
+  `scripts/dashboard-tunnel-run.sh` (identity probe, stale-listener
+  clearing, the ssh exec'd in the foreground, Restart=always) — and
+  the doctor verifies the server by the thing itself (HTTP 200 on its
+  port) and ensures the tunnel unit. Regression guards F16/F17.

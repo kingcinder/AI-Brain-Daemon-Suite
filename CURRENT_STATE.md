@@ -264,3 +264,52 @@ events and 45 claims (37 backed, 8 candidates). Design: the
 insula-memory SKILL.md, "The process stream" section. Regression guards
 F13 (jam) and F14 (process stream) hold in the deployment's test suite;
 the heartbeat card stands 12/12.
+
+## Addendum 2 — 2026-11-27, later (PST)
+
+**The Field.** `skills/insula-memory/scripts/field-score.py` now runs on
+every pulse (hook in `helm-pulse.sh`): it scores six labelled proxy
+spokes — noticing the pull, feeling the cost, choosing not to loop,
+holding the distinction, revising instead of repeating, staying with
+uncertainty — from the process stream's fresh features plus the ACC
+state, and writes `field-state.json` for the helm's Field page, which
+shows the radar, the basis counts behind each spoke, and the Matrix (a
+32³-vertex lattice; each process-stream batch lands once per signal —
+process / affect / effort — as a lit cluster with falloff). Verified
+live 2026-11-27 (synthetic tests, a live scored run, the page rendering
+on the operator's desktop). Regression guard F15.
+
+**The unflappable dashboard tunnel.** The dashboard reverse tunnel
+flapped all day on 2026-11-27 (and on the two days before it) for three
+root causes, each proven from live code or logs:
+
+1. The tunnel was an unsupervised `setsid nohup` ssh. Every flap of the
+   route it rides killed it, and nothing relaunched it until the
+   30-minute heartbeat card noticed.
+2. The heartbeat doctor's dashboard-server rung verified the server by
+   counting processes matching `serve-dashboard.sh` — but the
+   launcher's foreground mode execs python, so the healthy process is
+   `dashboard-server.py` and the count was always 0. The rung fired
+   exactly when the server needed starting and then vetoed the tunnel
+   repair it had just enabled (2026-11-27 10:09: "start rc=0,
+   is-active=active, processes now 0" while the server was serving).
+3. A dead tunnel's sshd child can hold the far end's listen port as a
+   root-owned process, invisible to an unprivileged process listing,
+   blocking every rebind until killed by PID.
+
+The fix gives every failure mode an owner: the tunnel is now
+`aibrain-dashboard-tunnel.service` (unit source in `systemd/`,
+Restart=always) running `scripts/dashboard-tunnel-run.sh` — identity
+probe first, monitor an existing healthy forward, clear stale
+listeners via the operator's passwordless sudo, then exec the ssh in
+the foreground. The doctor's server rung verifies by the thing itself
+(HTTP 200 on the server's port) and its tunnel repair ensures the
+tunnel unit, with the old launcher kept as fallback. Verified
+2026-11-27: the fixed rung in a live doctor run (final: ALL PASS), a
+stop-the-server drill (rung restored it to 200), the heartbeat card at
+12/12, and regression guards F16 (updated) and F17 (new) holding.
+Honest limit, stated at the time of writing: the route the tunnel
+rides is itself down (a runtime-side outage, recurring and outside the
+suite); the unit retries on its RestartSec and self-heals when the
+route returns. A tunnel absent during a route outage is weather, not
+a suite fault — and the card says which of the two it is.

@@ -81,6 +81,15 @@ fi
   timeout 60 python3 "$SKILLS_DIR/insula-memory/scripts/process-stream.py" feed >> "$MEM/process-stream.log" 2>&1
 } || true
 
+# The Field is scored on the same beat (2026-11-27, Dither-ordered): the
+# scorer reads the process stream's fresh features plus the ACC state and
+# rewrites the Field radar's spokes as labelled proxies. It consumes
+# derived features only, and a scorer failure never fails the pulse.
+{
+  export WORKSPACE
+  timeout 30 python3 "$SKILLS_DIR/insula-memory/scripts/field-score.py" >> "$MEM/field-score.log" 2>&1
+} || true
+
 # The jam rides the line (2026-11-27): any organ at >=3 accumulated cells
 # jams the whole system, and the beat says so, every beat, until a patrol
 # measures the organ whole again. Not a warning that scrolls past — the

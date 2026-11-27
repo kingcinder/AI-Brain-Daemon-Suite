@@ -1,0 +1,24 @@
+[Unit]
+Description=AI Brain dashboard reverse tunnel — codypc 127.0.0.1:18123 -> VM 127.0.0.1:8123
+# Source of truth lives HERE, in home, so a VM replacement cannot orphan
+# the unit (same lesson as aibrain-dashboard.service, 2026-11-27). The
+# tunnel spent 2026-11-25→27 as an unsupervised setsid+nohup ssh: every
+# route-1 flap killed it and nothing relaunched it until the 30-minute
+# heartbeat card noticed. Under systemd it has an owner again: the
+# runner probes REAL_PC, clears stale codypc listeners, and execs the
+# ssh in the foreground; Restart=always treats route death as weather.
+After=aibrain-dashboard.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hatch/.juno-brain/workspace
+ExecStart=/bin/bash /home/hatch/.juno-brain/workspace/scripts/dashboard-tunnel-run.sh
+Environment=HOME=/home/hatch
+Environment=PATH=/home/hatch/.juno-brain/pkg-root/usr/bin:/home/hatch/.local/bin:/usr/local/bin:/usr/bin:/bin
+StandardOutput=append:/home/hatch/.juno-brain/logs/dashboard-tunnel.log
+StandardError=append:/home/hatch/.juno-brain/logs/dashboard-tunnel.log
+Restart=always
+RestartSec=20
+
+[Install]
+WantedBy=default.target
