@@ -313,3 +313,16 @@ rides is itself down (a runtime-side outage, recurring and outside the
 suite); the unit retries on its RestartSec and self-heals when the
 route returns. A tunnel absent during a route outage is weather, not
 a suite fault — and the card says which of the two it is.
+
+**Same-day correction (2026-11-27 ~10:48 PST).** The 10:39 card check
+caught what the first version missed: the runner's checks all ride
+route 1, so during a flap they cannot tell a live tunnel from a dead
+one — it kept trying to launch into an already-bound port while the
+doctor's fallback held the real tunnel, and its identity probe failed
+in the same minute the fallback's ssh connected. Fix, live and
+verified: the runner now checks first for a tunnel ssh already alive
+on this machine and monitors its local PID (no route needed), never
+launching a second one, and retries the identity probe three times
+inside the run instead of losing a whole restart cycle to one blip.
+Verified 2026-11-27 ~10:48: unit active in monitor mode on the live
+fallback ssh, exactly one tunnel ssh, card 12/12.
