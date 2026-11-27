@@ -17,6 +17,58 @@ MEM = os.path.join(WS, "memory")
 LOG = os.path.join(MEM, "immune-patrol.log")
 STATIONS = os.path.join(MEM, "immune-stations.json")
 FIXQUEUE = os.path.join(MEM, "immune-fix-queue.json")
+JAMFILE = os.path.join(MEM, "immune-jam.json")
+
+# The jam (Dither-ordered 2026-11-27): cells are counted PER ORGAN, and any
+# organ at JAM_THRESHOLD or more accumulated cells jams the whole system.
+# Every patrol aspect belongs to exactly one organ. The heart (heartbeat
+# organ) carries the system's core aspects — daemon, keeper, pulse, queue,
+# spinal cord — and is counted like every other organ (Dither, 2026-11-24).
+JAM_THRESHOLD = 3
+ASPECT_ORGAN = {
+    "daemon process": "heartbeat",
+    "keeper process": "heartbeat",
+    "pulse log": "heartbeat",
+    "spawn queue unacked": "heartbeat",
+    "spinal cord (openclaw shim)": "heartbeat",
+    "amygdala state": "amygdala",
+    "named emotions": "amygdala",
+    "backlog pending-emotions.json": "amygdala",
+    "insula state": "insula",
+    "backlog pending-memories.json": "hippocampus",
+    "heart (heartbeat organ state)": "heartbeat",
+    "organ directories enumerated": "immune-system",
+}
+
+
+def organ_of(aspect):
+    if aspect in ASPECT_ORGAN:
+        return ASPECT_ORGAN[aspect]
+    if aspect.startswith("organ "):
+        return aspect[len("organ "):].strip()
+    if aspect.startswith("systemd "):
+        return "heartbeat"
+    return aspect
+
+
+def organ_cells(stations):
+    """stations: {aspect: station-dict} -> {organ: total cells}."""
+    counts = {}
+    for aspect, s in stations.items():
+        counts[organ_of(aspect)] = counts.get(organ_of(aspect), 0) + s.get("cellsAccumulated", 0)
+    return counts
+
+
+def compute_jam(stations, threshold=JAM_THRESHOLD):
+    """Return the list of jammed organs: [{organ, cells, aspects}] at or
+    over threshold, worst first. Empty list means no jam."""
+    counts = organ_cells(stations)
+    jammed = []
+    for organ, cells in counts.items():
+        if cells >= threshold:
+            aspects = sorted(a for a in stations if organ_of(a) == organ)
+            jammed.append({"organ": organ, "cells": cells, "aspects": aspects})
+    return sorted(jammed, key=lambda j: -j["cells"])
 
 def latest_block():
     if not os.path.exists(LOG):
@@ -67,12 +119,34 @@ def main():
             queue.append({"aspect": aspect, "cellsAccumulated": s["cellsAccumulated"],
                           "since": s.get("since"), "queuedAt": now})
     data["stations"] = sorted(stations.values(), key=lambda s: -s["cellsAccumulated"])
+    data["organCells"] = organ_cells(stations)
     data["lastUpdate"] = now
     json.dump(data, open(STATIONS, "w"), indent=1)
     json.dump({"updated": now, "queue": queue}, open(FIXQUEUE, "w"), indent=1)
+    # The jam file: recomputed from the live stations every cycle. It is
+    # never edited by hand and no script clears it — it clears when a patrol
+    # measures the organ's aspects at bar and the stations stand down.
+    jammed = compute_jam(stations)
+    prev = {}
+    if os.path.exists(JAMFILE):
+        try:
+            prev = json.load(open(JAMFILE))
+        except Exception:
+            prev = {}
+    jam = {"jammed": bool(jammed), "organs": jammed, "updated": now}
+    if jammed:
+        jam["since"] = prev.get("since") if prev.get("jammed") else now
+    elif prev.get("jammed"):
+        jam["clearedAt"] = now
+        jam["lastJam"] = {"organs": prev.get("organs", []), "since": prev.get("since")}
+    json.dump(jam, open(JAMFILE, "w"), indent=1)
     print("stations=%d cleared=%s fix_queue=%s" % (
         len(stations), cleared or "none",
         [q["aspect"] for q in queue] or "none"))
+    if jammed:
+        print("JAM: " + "; ".join(
+            "%s %d cells (%s)" % (j["organ"], j["cells"], ", ".join(j["aspects"]))
+            for j in jammed))
     return 0
 
 if __name__ == "__main__":

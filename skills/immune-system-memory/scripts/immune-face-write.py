@@ -64,6 +64,9 @@ def main():
     patrol_lines, patrol_stamp, stations_line = tail_patrol_block()
     queue = load_json("immune-fix-queue.json") or {}
     queued = queue.get("queue", [])
+    jam = load_json("immune-jam.json") or {}
+    stations_data = load_json("immune-stations.json") or {}
+    organ_cells = stations_data.get("organCells", {})
     verdict = "unknown — no patrol block found"
     for ln in patrol_lines:
         if ln.startswith("VERDICT"):
@@ -77,6 +80,16 @@ def main():
     out.append("This face is rewritten every pulse cycle. The original hand-seeded census of"
                " 2026-11-24 is preserved as IMMUNE_STATE.seed-2026-11-24.md.")
     out.append("")
+    if jam.get("jammed"):
+        out.append("## 🛑 IMMUNE JAM — THE SYSTEM IS JAMMED UNTIL JUNO REPAIRS IT")
+        out.append("")
+        for j in jam.get("organs", []):
+            out.append(f"- **{j.get('organ')}**: {j.get('cells')} immune cells accumulated "
+                       f"(bar: under 3) — aspects: {', '.join(j.get('aspects', []))}")
+        out.append(f"- Jammed since: {jam.get('since')}. Spawn-type organ work is deferred "
+                   "while the jam holds. Only a patrol that measures these aspects at bar "
+                   "clears it — no script, no hand edit, no mute.")
+        out.append("")
     out.append(f"## Overall: {verdict}")
     out.append("")
     out.append(f"Last pulse: {last_pulse()}")
@@ -86,6 +99,15 @@ def main():
     out.append("")
     out.append("## Stations")
     out.append(f"- {stations_line}" if stations_line else "- no stations line in latest patrol")
+    out.append("")
+    out.append("## Cells by organ")
+    loaded = {k: v for k, v in sorted(organ_cells.items(), key=lambda kv: -kv[1]) if v}
+    if loaded:
+        for organ, cells in loaded.items():
+            marker = " — 🛑 JAMMED" if cells >= 3 else ""
+            out.append(f"- {organ}: {cells} cell(s){marker}")
+    else:
+        out.append("- no cells stationed anywhere — every organ passing through clean")
     out.append("")
     out.append(f"## Fix queue ({len(queued)} open)")
     if queued:

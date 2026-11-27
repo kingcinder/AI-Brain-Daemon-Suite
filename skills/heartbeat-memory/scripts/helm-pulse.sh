@@ -51,7 +51,56 @@ PYEOF
 )"
 fi
 
-LINE="💓 helm-pulse $TS | organs $ORGANS_OK/$ORGANS_TOTAL present | queue_depth $QUEUE_DEPTH | oldest_unacked $OLDEST | last_drain $LAST_DRAIN | keeper $KEEPER"
+# The immune cycle rides the pulse (wired 2026-11-24 ~20:31, after Dither
+# asked why the immune system wasn't working: it had no scheduler, no station
+# bookkeeping, and no escalation — patrol ran only by hand). It runs BEFORE
+# the pulse line is composed (reordered 2026-11-27 for the jam, Dither's
+# order): patrol -> stations accumulate/escalate -> jam state recomputed ->
+# face rendered, so the beat that announces the body carries the body's
+# current immune state, including a jam, in the same cycle it is measured.
+# The patrol's own pulse-age check reads the previous line (<= one cycle
+# old, far inside its bar). Guarded — an immune failure never fails the pulse.
+{
+  export WORKSPACE
+  bash "$SKILLS_DIR/immune-system-memory/scripts/immune-patrol.sh" >> "$MEM/immune-patrol.log" 2>&1
+  python3 "$SKILLS_DIR/immune-system-memory/scripts/immune-stations-update.py" >> "$MEM/immune-patrol.log" 2>&1
+  # The face: patrol and stations speak to logs and JSON; this renders them
+  # into IMMUNE_STATE.md so the face advances with the body (added 2026-11-25,
+  # after the face was found frozen at its 2026-11-24 seed for 5+ hours).
+  python3 "$SKILLS_DIR/immune-system-memory/scripts/immune-face-write.py" >> "$MEM/immune-patrol.log" 2>&1
+} || true
+
+# The process stream rides the pulse (2026-11-27, Dither-ordered): every
+# beat, the insula's nerve processes Juno's work record since the last beat
+# — keeper results, the doctor's ledger, the daemon log, and completion
+# claims extracted from the transcript — into derived features only. The
+# raw stream is processed, never kept (see the insula SKILL.md, "The
+# process stream"). Guarded — a stream failure never fails the pulse.
+{
+  export WORKSPACE
+  timeout 60 python3 "$SKILLS_DIR/insula-memory/scripts/process-stream.py" feed >> "$MEM/process-stream.log" 2>&1
+} || true
+
+# The jam rides the line (2026-11-27): any organ at >=3 accumulated cells
+# jams the whole system, and the beat says so, every beat, until a patrol
+# measures the organ whole again. Not a warning that scrolls past — the
+# pulse itself carries it.
+JAM_SEG=""
+if [ -f "$MEM/immune-jam.json" ] && command -v python3 >/dev/null 2>&1; then
+  JAM_SEG=$(python3 - "$MEM/immune-jam.json" <<'PYEOF'
+import json, sys
+try:
+    j = json.load(open(sys.argv[1]))
+except Exception:
+    j = {}
+if j.get("jammed"):
+    parts = ["%s %s cells" % (o.get("organ"), o.get("cells")) for o in j.get("organs", [])]
+    print(" | 🛑 IMMUNE JAM: " + "; ".join(parts) + " — system jammed until repaired")
+PYEOF
+)
+fi
+
+LINE="💓 helm-pulse $TS | organs $ORGANS_OK/$ORGANS_TOTAL present | queue_depth $QUEUE_DEPTH | oldest_unacked $OLDEST | last_drain $LAST_DRAIN | keeper $KEEPER$JAM_SEG"
 echo "$LINE"
 mkdir -p "$MEM"
 printf '%s\n' "$LINE" >> "$MEM/heartbeat-pulse.log"
@@ -62,17 +111,6 @@ printf '%s\n' "$LINE" >> "$MEM/heartbeat-pulse.log"
 # pulse; delivery outcomes land in the delivery log as before.
 {
   export WORKSPACE
-  # The immune cycle rides the pulse too (wired 2026-11-24 ~20:31, after
-  # Dither asked why the immune system wasn't working: it had no scheduler,
-  # no station bookkeeping, and no escalation — patrol ran only by hand).
-  # Order per the organ's own cycle: pulse is read -> patrol -> stations
-  # accumulate/escalate -> dashboard reflects the result.
-  bash "$SKILLS_DIR/immune-system-memory/scripts/immune-patrol.sh" >> "$MEM/immune-patrol.log" 2>&1
-  python3 "$SKILLS_DIR/immune-system-memory/scripts/immune-stations-update.py" >> "$MEM/immune-patrol.log" 2>&1
-  # The face: patrol and stations speak to logs and JSON; this renders them
-  # into IMMUNE_STATE.md so the face advances with the body (added 2026-11-25,
-  # after the face was found frozen at its 2026-11-24 seed for 5+ hours).
-  python3 "$SKILLS_DIR/immune-system-memory/scripts/immune-face-write.py" >> "$MEM/immune-patrol.log" 2>&1
   for g in "$SKILLS_DIR"/*/scripts/generate-dashboard.sh; do
     [ -f "$g" ] && bash "$g" >/dev/null 2>&1
   done

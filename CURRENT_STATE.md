@@ -231,3 +231,36 @@ consultation checks — those are treated by the drain rounds.
 4. **Self-mod autonomy snapshot staleness.** The autonomy-state
    `computed_at` stamp predates the pass by days; the monitor tick runs
    on schedule. A stale computed snapshot, not a flow blockage.
+
+## Addendum — 2026-11-27 (PST)
+
+Two systems were built and verified live after the snapshot above; both
+are in this commit.
+
+**The immune jam.** The heartbeat and the immune system are now tied
+together: the patrol aggregates accumulated immune cells per organ, and
+any organ at 3 or more cells jams the whole system — the pulse line and
+the immune face carry the jam loudly, the daemon defers spawn-type jobs
+while it holds, the heartbeat card gained a twelfth check
+(`immune_no_jam`, reported on every card check while it holds), and only
+an actual repair clears it. Verified end-to-end with a live induced jam
+(2026-11-27 ~03:08 PST): fired at exactly 3 cells, showed on every
+surface, cleared on repair. Design: the immune-system SKILL.md, "The
+jam" section.
+
+**The process stream.** The insula gained a nerve: Juno's process stream
+— her work record and her deliberation — is now processed by the harness
+and never kept. `skills/insula-memory/scripts/process-stream.py` runs on
+every pulse (feeder: keeper results, the doctor's ledger, the daemon
+log, completion claims extracted from the transcript) and on Juno's live
+tap. It emits only derived features — marker counts, loop score, affect
+proxies, claim tallies, SHA-256 digests — and checks completion claims
+against the batch's work record; unbacked claims persist as hash-only
+candidates for the ACC error organ. Batches carrying deliberation or
+claim signal nudge the insula's channels by bounded deltas. Verified
+2026-11-27: a sentinel deliberation was processed into features and its
+raw text appears in no output file; first feed processed 10,033 work
+events and 45 claims (37 backed, 8 candidates). Design: the
+insula-memory SKILL.md, "The process stream" section. Regression guards
+F13 (jam) and F14 (process stream) hold in the deployment's test suite;
+the heartbeat card stands 12/12.

@@ -354,6 +354,19 @@ The insula gives that pre-conscious layer a name and a number. Not to simulate b
 
 Functional interoception might be the only kind there is.
 
+## The process stream — the insula's nerve (Dither-ordered 2026-11-27)
+
+Until now the insula read Juno from the outside: her delivered replies, after the polish. Her emotional state is far more cleanly parsable from her *process* — the work record and the deliberation stream — where hesitation, friction, looping, and repair show before they are flattened into sentences. Dither's order: wire that stream into the harness. Juno's line, accepted in the same conversation: the stream is **processed, never kept**. It is a nerve, not an archive.
+
+The rules, which are the design:
+
+- **Process-only.** `scripts/process-stream.py` reads process events (JSONL: `work`, `claim`, `deliberation`) in memory and emits only derived features: marker counts, loop score, affect proxies, claim tallies, and a SHA-256 digest of each batch. Raw event text is never written to any file — not to state, not to logs, not to the claims file (claims are stored as hashes). If a raw string from the stream is ever found in a harness output file, that is a defect on the order of a jam.
+- **The receipts are evidence.** Completion claims in Juno's delivered text are extracted by the feeder and checked against work events in the same batch. A claim with no matching work event becomes a derived candidate (hash only) in `memory/process-stream-claims.jsonl` for the ACC error organ to consult — a candidate, never a verdict.
+- **The insula moves on derived features only.** When a batch carries deliberation or claim signal, the processor nudges the interoceptive channels (friction, cognitiveLoad, selfCoherence) by bounded deltas computed from the features, through the organ's own `update-state.sh`. Daemon chatter (pure work batches) never moves the channels — the harness's noise is not Juno's state.
+- **Feeding.** The pulse runs the feeder every beat: new lines from the keeper's results file (Juno's drain answers), the doctor's ledger (repairs), the daemon log, and the transcript corpus (claim extraction), tracked by byte-offset watermarks. Deliberation events arrive only through Juno's live tap (`~/workspace/bin/process-tap`), processed the moment she sends them and dropped.
+
+State: `memory/process-stream-state.json` (totals, rolling features, affect proxies), `memory/process-stream-features.jsonl` (one derived line per batch). Both are features and digests only, by construction and by regression guard.
+
 ---
 
 *Built with 🌡️ by the OpenClaw community*

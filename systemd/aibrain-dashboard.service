@@ -1,0 +1,23 @@
+[Unit]
+Description=AI Brain dashboard server — Juno (port 8123, reverse-tunnelled to codypc)
+# Source of truth lives HERE, in home, so a VM replacement cannot orphan
+# the unit: install to /etc/systemd/system from this file (the 2026-11-27
+# 03:00 install kept its only copy in /etc and a VM replacement ate it
+# within the hour — the server died, the tunnel had nothing to serve).
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hatch/.juno-brain/workspace
+ExecStart=/bin/bash /home/hatch/.juno-brain/workspace/scripts/serve-dashboard.sh foreground
+Environment=HOME=/home/hatch
+Environment=PATH=/home/hatch/.juno-brain/pkg-root/usr/bin:/home/hatch/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=WORKSPACE=/home/hatch/.juno-brain/workspace
+Environment=BRAIN_WORKSPACE=/home/hatch/.juno-brain/workspace
+Environment=OPENCLAW_WORKSPACE=/home/hatch/.juno-brain/workspace
+StandardOutput=append:/home/hatch/.juno-brain/logs/aibrain-dashboard.log
+StandardError=append:/home/hatch/.juno-brain/logs/aibrain-dashboard.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
