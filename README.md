@@ -3,7 +3,8 @@
 > **Mission & scope:** see [`VISION.md`](VISION.md) — the official statement
 > of what this suite is, what it is for, and where it is headed.
 > **Verified live state:** see [`CURRENT_STATE.md`](CURRENT_STATE.md) — the
-> dated 2026-11-25 verification of the running deployment.
+> dated 2026-11-25 verification of the running deployment, with a
+> 2026-11-27 addendum.
 
 ## What this is
 
@@ -198,7 +199,7 @@ health record, not silently.
 | `deep-brain-kernel.py` | The Python engine from the September line (async scheduler + pressure supervisor). In the tree; not the engine running in the current deployment. |
 | `bin/` | Helm tooling: the keeper, telemetry snapshot/delivery, invariant patrol, organ digest. |
 | `scripts/` | `serve-dashboard.sh` + `dashboard-server.py` (live dashboard), `ci-gate.sh`, `deep-verify.sh`. |
-| `systemd/` | Unit sources: `aibrain.service`, `helm-keeper.service` (plus shadow variants used for cutover testing). |
+| `systemd/` | Unit sources: `aibrain.service`, `helm-keeper.service`, `aibrain-dashboard.service` (plus shadow variants used for cutover testing). |
 | `tests/` | Phase harnesses and per-skill unit suites, including the verification region's self-test. |
 | `docs/` | Design specs, runbooks, and verification evidence from the suite's build-out (historical records). |
 
@@ -255,4 +256,38 @@ supervisor in the live deployment — if it dies, the card's tunnel check
 fails and the server is restarted by hand; and the glymphatic organ's
 consultation watermark is unused (its state advances and its face reports;
 only the watermark is stale). Both are recorded in
-[`CURRENT_STATE.md`](CURRENT_STATE.md).
+[`CURRENT_STATE.md`](CURRENT_STATE.md). (The dashboard-supervision
+residual was closed on 2026-11-27 — see the next section.)
+
+## State as of 2026-11-27
+
+Two systems were built and verified live after the 2026-11-25 pass; both
+are in the tree. The heartbeat card stands **12/12 PASS**. Details in the
+2026-11-27 addendum to [`CURRENT_STATE.md`](CURRENT_STATE.md).
+
+- **The immune jam (2026-11-27).** The heartbeat and the immune system
+  are now tied together: the patrol aggregates accumulated immune cells
+  per organ, and any organ at 3 or more cells jams the whole system —
+  the pulse line and the immune face carry the jam loudly, the daemon
+  defers spawn-type jobs while it holds, the heartbeat card gained a
+  twelfth check (`immune_no_jam`, reported on every card check while it
+  holds), and only an actual repair clears it. Verified end-to-end with
+  a live induced jam (fired at exactly 3 cells; cleared on repair).
+  Design: the immune-system `SKILL.md`, "The jam" section. Regression
+  guards F13.
+- **The process stream (2026-11-27).** The insula gained a nerve: the
+  agent's process stream — her work record and her deliberation — is
+  processed by the harness and never kept.
+  `skills/insula-memory/scripts/process-stream.py` runs on every pulse
+  and on the agent's live tap, emits only derived features (marker
+  counts, loop score, affect proxies, claim tallies, SHA-256 digests),
+  and checks completion claims against the batch's work record;
+  unbacked claims persist as hash-only candidates for the ACC error
+  organ. Verified with a sentinel deliberation: processed into
+  features, its raw text present in no output file. Design: the
+  insula-memory `SKILL.md`, "The process stream" section. Regression
+  guards F14.
+- **Dashboard supervision (2026-11-27).** The dashboard server now runs
+  under `aibrain-dashboard.service` (Restart=always; kill-tested live),
+  and the unit source ships in `systemd/` — its only copy previously
+  sat in /etc, and a VM replacement ate it.
